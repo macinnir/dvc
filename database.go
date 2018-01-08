@@ -37,12 +37,20 @@ type DVCFile struct {
 	FullPath    string
 }
 
+// ToLogString parses the file name into a human readable string for logging the action
 func (d *DVCFile) ToLogString() (logString string) {
+
+	// 001_{action}_{target}
 	fileNameParts := strings.Split(d.Name, "_")
-	// fileOrdinal := fileNameParts[0]
-	fileTarget := strings.Join(fileNameParts[2:], "_")
-	fileTarget = fileTarget[0 : len(fileTarget)-4]
+
+	// action
 	fileAction := fileNameParts[1]
+
+	// target
+	fileTarget := strings.Join(fileNameParts[2:], "_")
+
+	// Remove the `.sql` extension
+	fileTarget = fileTarget[0 : len(fileTarget)-4]
 	switch fileAction {
 	case "createTable":
 		logString = fmt.Sprintf("Creating table `%s`", fileTarget)
@@ -56,6 +64,8 @@ func (d *DVCFile) ToLogString() (logString string) {
 		logString = fmt.Sprintf("Creating view `%s`", fileTarget)
 	case "alterView":
 		logString = fmt.Sprintf("Altering view `%s`", fileTarget)
+	case "dropView":
+		logString = fmt.Sprintf("Dropping view `%s`", fileTarget)
 	case "insert":
 		logString = fmt.Sprintf("Inserting data into `%s`", fileTarget)
 	}
