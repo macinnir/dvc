@@ -80,7 +80,7 @@ type Database struct {
 // Connect connects to a database
 // Todo "named" connections
 func (d *Database) Connect(user string, pass string) (e error) {
-	var connectionString = user + ":" + pass + "@tcp(" + d.host + ":3306)/" + d.name + "?charset=utf8"
+	var connectionString = user + ":" + pass + "@tcp(" + d.host + ")/" + d.name + "?charset=utf8"
 	d.conn, e = sql.Open("mysql", connectionString)
 	return
 }
