@@ -40,7 +40,7 @@ func (s *Server) FetchDatabases() (e error) {
 
 // Connect connects to a server
 func (s *Server) Connect(user string, pass string) (e error) {
-	var connectionString = user + ":" + pass + "@tcp(" + s.Name + ":3306)/?charset=utf8"
+	var connectionString = user + ":" + pass + "@tcp(" + s.Name + ")/?charset=utf8"
 	log.Printf("Connecting to server: %s", connectionString)
 	s.conn, e = sql.Open("mysql", connectionString)
 	return
