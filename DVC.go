@@ -8,14 +8,15 @@ import (
 	"sort"
 )
 
-// DataVC data version control
-type DataVC struct {
+// DVC data version control
+type DVC struct {
 	Connections map[string]Server
 	ChangeLogs  map[string]ChangeLog
 	Databases   map[string]Database
 }
 
-func (d *DataVC) Run(changesetsPath string, dbHost string, dbName string, dbUser string, dbPass string) {
+// Run runs the dvc
+func (d *DVC) Run(changesetsPath string, dbHost string, dbName string, dbUser string, dbPass string) {
 
 	var e error
 	var server Server
