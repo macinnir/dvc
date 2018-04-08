@@ -2,6 +2,12 @@
 
 # Usage 
 
+1. Load Config 
+2. Load changesets json file 
+3. Load changesets sql files 
+4. Pull down the hash of the changesets file 
+4. Verify which changesets have been applied 
+
 ## Code 
 ```
 import (

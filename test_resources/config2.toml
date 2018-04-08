@@ -1,0 +1,6 @@
+host = "hostTest"
+databaseName = "dbTest"
+username = "usernameTest"
+password = "passwordTest"
+changesetPath = "test_resources/changes"
+databaseType = "badDatabaseType"

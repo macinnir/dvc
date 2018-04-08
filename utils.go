@@ -1,4 +1,4 @@
-package dvc
+package main
 
 import (
 	"crypto/md5"

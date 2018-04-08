@@ -1,0 +1,6 @@
+host = "127.0.0.1:3307"
+databaseName = "dbTest2"
+username = "root"
+password = "root"
+changesetPath = "test_resources/changes"
+databaseType = "mysql"
