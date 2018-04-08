@@ -94,10 +94,10 @@ type DVC struct {
 
 func (d *DVC) verifyChangesetFile() (e error) {
 	// fmt.Printf("Looking for changeset file at path %s\n", d.Config.ChangeSetPath)
-	if _, e = os.Stat(d.Config.ChangeSetPath); os.IsNotExist(e) {
-		e = errors.New("changeset path does not exist")
-		return
-	}
+	// if _, e = os.Stat(d.Config.ChangeSetPath); os.IsNotExist(e) {
+	// 	e = errors.New("changeset path does not exist")
+	// 	return
+	// }
 
 	dt := ""
 	for _, t := range DatabaseTypes {
@@ -157,13 +157,12 @@ func (d *DVC) FetchSchema() (database *Database, e error) {
 }
 
 // ImportSchema calles `FetchSchema` and then marshal's it into a JSON object, writing it to the default schema.json file
-func (d *DVC) ImportSchema() (e error) {
+func (d *DVC) ImportSchema(fileName string) (e error) {
 
 	var database *Database
 
 	database, e = d.FetchSchema()
 
-	fileName := d.Config.DatabaseName + ".json"
 	filePath := "./" + fileName
 	// fmt.Printf("4. Writing schema to %s\n", filePath)
 
@@ -193,12 +192,12 @@ func (d *DVC) ReadSchemaFromFile(filePath string) (database *Database, e error) 
 	return
 }
 
-func (d *DVC) CompareSchema() (sql string, e error) {
+func (d *DVC) CompareSchema(schemaFile string) (sql string, e error) {
 
 	var localSchema *Database
 	var remoteSchema *Database
 
-	localSchema, e = d.ReadSchemaFromFile("./dbTest.json")
+	localSchema, e = d.ReadSchemaFromFile(schemaFile)
 	if e != nil {
 		return
 	}

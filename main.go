@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	configFilePath = "test_resources/config3.toml"
+	configFilePath = "dvc.toml"
 )
 
 func main() {
@@ -35,19 +35,23 @@ func main() {
 	switch cmd {
 	case "import":
 
-		if e = dvc.ImportSchema(); e != nil {
+		schemaFile := dvc.Config.DatabaseName + ".schema.json"
+
+		if e = dvc.ImportSchema(schemaFile); e != nil {
 			go log.Printf("Error: %s", e.Error())
 			os.Exit(1)
 		}
 
-		log.Printf("Schema `%s`.`%s` imported.", dvc.Config.Host, dvc.Config.DatabaseName)
+		log.Printf("Schema `%s`.`%s` imported to %s.", dvc.Config.Host, dvc.Config.DatabaseName, schemaFile)
 		os.Exit(0)
 
 	case "compare":
 
 		sql := ""
 
-		if sql, e = dvc.CompareSchema(); e != nil {
+		schemaFile := dvc.Config.DatabaseName + ".schema.json"
+
+		if sql, e = dvc.CompareSchema(schemaFile); e != nil {
 			log.Printf("ERROR: %s", e.Error())
 			os.Exit(1)
 		}
