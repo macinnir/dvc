@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -16,12 +17,12 @@ func QueryCreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql st
 		if _, ok := remoteSchema.Tables[tableName]; !ok {
 
 			// fmt.Printf("Local table %s is not in remote\n", table.Name)
-			query, e = QueryCreateTable(&table)
+			query, e = QueryCreateTable(table)
 			// fmt.Printf("Running Query: %s\n", query)
 			sql += query + "\n"
 		} else {
 			remoteTable := remoteSchema.Tables[tableName]
-			query, e = QueryCreateTableChangeSQL(&table, &remoteTable)
+			query, e = QueryCreateTableChangeSQL(table, remoteTable)
 			if len(query) > 0 {
 				sql += query + "\n"
 			}
@@ -30,7 +31,7 @@ func QueryCreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql st
 
 	for _, table := range remoteSchema.Tables {
 		if _, ok := localSchema.Tables[table.Name]; !ok {
-			query, e = QueryDropTable(&table)
+			query, e = QueryDropTable(table)
 			sql += query + "\n"
 		}
 	}
@@ -46,7 +47,7 @@ func QueryCreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql strin
 
 		// Column does not exist remotely
 		if _, ok := remoteTable.Columns[column.Name]; !ok {
-			query, e = QueryAlterTableCreateColumn(localTable, &column)
+			query, e = QueryAlterTableCreateColumn(localTable, column)
 			if e != nil {
 				return
 			}
@@ -59,7 +60,7 @@ func QueryCreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql strin
 
 			remoteColumn := remoteTable.Columns[column.Name]
 
-			query, e = QueryAlterTableChangeColumn(localTable, &column, &remoteColumn)
+			query, e = QueryAlterTableChangeColumn(localTable, column, remoteColumn)
 
 			if e != nil {
 				return
@@ -75,7 +76,7 @@ func QueryCreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql strin
 
 		// Column does not exist locally
 		if _, ok := localTable.Columns[column.Name]; !ok {
-			query, e = QueryAlterTableDropColumn(localTable, &column)
+			query, e = QueryAlterTableDropColumn(localTable, column)
 			if e != nil {
 				return
 			}
@@ -132,10 +133,18 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 
 	cols := []string{}
 
+	sortedColumns := make(SortedColumns, 0, len(table.Columns))
+
 	for _, column := range table.Columns {
+		sortedColumns = append(sortedColumns, column)
+	}
+
+	sort.Sort(sortedColumns)
+
+	for _, column := range sortedColumns {
 
 		colQuery := ""
-		colQuery, e = QueryCreateColumn(&column)
+		colQuery, e = QueryCreateColumn(column)
 		col := colQuery
 
 		idx++

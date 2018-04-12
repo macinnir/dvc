@@ -11,6 +11,11 @@ var (
 	configFilePath = "dvc.toml"
 )
 
+func fatal(msg string) {
+	fmt.Printf("ERROR: %s\n", msg)
+	os.Exit(1)
+}
+
 func main() {
 
 	var e error
@@ -21,15 +26,13 @@ func main() {
 	argLen := len(args)
 
 	if argLen < 2 {
-		fmt.Println("Missing command...")
-		os.Exit(1)
+		fatal("Missing command...")
 	}
 
 	cmd := args[1]
 
 	if dvc, e = NewDVC(configFilePath); e != nil {
-		log.Printf("ERROR: %s", e.Error())
-		os.Exit(1)
+		fatal(e.Error())
 	}
 
 	switch cmd {
@@ -38,12 +41,89 @@ func main() {
 		schemaFile := dvc.Config.DatabaseName + ".schema.json"
 
 		if e = dvc.ImportSchema(schemaFile); e != nil {
-			go log.Printf("Error: %s", e.Error())
-			os.Exit(1)
+			fatal(e.Error())
 		}
 
 		log.Printf("Schema `%s`.`%s` imported to %s.", dvc.Config.Host, dvc.Config.DatabaseName, schemaFile)
 		os.Exit(0)
+
+	case "gen":
+
+		var database *Database
+
+		if argLen < 3 {
+			fatal("Missing gen type [schema | model | repo]")
+		}
+		subCmd := args[2]
+
+		// Load the schema
+		schemaFile := dvc.Config.DatabaseName + ".schema.json"
+		database, e = dvc.ReadSchemaFromFile(schemaFile)
+		if e != nil {
+			fatal(e.Error())
+		}
+
+		switch subCmd {
+		case "schema":
+			e = GenerateGoSchemaFile(database)
+			if e != nil {
+				fatal(e.Error())
+			}
+		case "repos":
+
+			for _, table := range database.Tables {
+				e = GenerateGoRepoFile(table)
+				if e != nil {
+					fatal(e.Error())
+				}
+			}
+
+			GenerateReposBootstrapFile(database)
+
+		case "repo":
+			if argLen < 4 {
+				fatal("Missing repo name")
+			}
+
+			var t *Table
+
+			if t, e = FindTableByName(database, args[3]); e != nil {
+				fatal(e.Error())
+			}
+
+			if e = GenerateGoRepoFile(t); e != nil {
+				fatal(e.Error())
+			}
+
+		case "models":
+
+			for _, table := range database.Tables {
+				e = GenerateGoModelFile(table)
+				if e != nil {
+					fatal(e.Error())
+				}
+			}
+
+		case "model":
+			if argLen < 4 {
+				fatal("missing model name")
+			}
+
+			var t *Table
+
+			if t, e = FindTableByName(database, args[3]); e != nil {
+				fatal(e.Error())
+			}
+
+			if e = GenerateGoModelFile(t); e != nil {
+				fatal(e.Error())
+			}
+
+		// case "typescript":
+		// 	goCode, e = GenerateTypescriptTypes(database)
+		default:
+			fatal(fmt.Sprintf("Unknown output type: `%s`", subCmd))
+		}
 
 	case "compare":
 
@@ -52,8 +132,7 @@ func main() {
 		schemaFile := dvc.Config.DatabaseName + ".schema.json"
 
 		if sql, e = dvc.CompareSchema(schemaFile); e != nil {
-			log.Printf("ERROR: %s", e.Error())
-			os.Exit(1)
+			fatal(e.Error())
 		}
 
 		if len(sql) == 0 {
@@ -73,26 +152,19 @@ func main() {
 					log.Printf("Writing sql to path `%s`", filePath)
 					e = ioutil.WriteFile(filePath, []byte(sql), 0644)
 					if e != nil {
-						log.Printf("ERROR: %s", e.Error())
-						os.Exit(1)
+						fatal(e.Error())
 					}
-
-					os.Exit(0)
-
 				} else {
-					log.Printf("Missing path to write sql to")
-					os.Exit(1)
+					fatal("Missing path to write sql to")
 				}
 			case "apply":
-
 				e = dvc.ApplyChangeset(sql)
 				if e != nil {
-					log.Printf("ERROR: %s", e.Error())
-					os.Exit(1)
+					fatal(e.Error())
 				}
 
 			default:
-				fmt.Printf("Unknown argument: `%s`\n", args[2])
+				fatal(fmt.Sprintf("Unknown argument: `%s`\n", args[2]))
 				os.Exit(1)
 			}
 
@@ -111,8 +183,7 @@ func main() {
 		fmt.Println("\timport")
 
 	default:
-		log.Printf("Unknown command: `%s`", cmd)
-		os.Exit(1)
+		fatal(fmt.Sprintf("Unknown command: `%s`", cmd))
 	}
 
 }

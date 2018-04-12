@@ -61,7 +61,7 @@ type DatabaseMgr struct {
 }
 
 // ListTables fetches the complete set of tables from this database
-func (d *DatabaseMgr) ListTables(databaseName string) (tables map[string]Table, e error) {
+func (d *DatabaseMgr) ListTables(databaseName string) (tables map[string]*Table, e error) {
 
 	var rows *sql.Rows
 	query := "select `TABLE_NAME`, `ENGINE`, `VERSION`, `ROW_FORMAT`, `TABLE_ROWS`, `DATA_LENGTH`, `TABLE_COLLATION`, `AUTO_INCREMENT` FROM information_schema.tables WHERE TABLE_SCHEMA = '" + databaseName + "'"
@@ -74,10 +74,10 @@ func (d *DatabaseMgr) ListTables(databaseName string) (tables map[string]Table, 
 		defer rows.Close()
 	}
 
-	tables = map[string]Table{}
+	tables = map[string]*Table{}
 
 	for rows.Next() {
-		table := Table{}
+		table := &Table{}
 		rows.Scan(
 			&table.Name,
 			&table.Engine,
@@ -94,7 +94,7 @@ func (d *DatabaseMgr) ListTables(databaseName string) (tables map[string]Table, 
 	return
 }
 
-func (d *DatabaseMgr) ListColumns(databaseName string, tableName string) (columns map[string]Column, e error) {
+func (d *DatabaseMgr) ListColumns(databaseName string, tableName string) (columns map[string]*Column, e error) {
 	var rows *sql.Rows
 
 	query := fmt.Sprintf(`
@@ -126,7 +126,7 @@ func (d *DatabaseMgr) ListColumns(databaseName string, tableName string) (column
 		defer rows.Close()
 	}
 
-	columns = map[string]Column{}
+	columns = map[string]*Column{}
 
 	for rows.Next() {
 		column := Column{}
@@ -145,7 +145,7 @@ func (d *DatabaseMgr) ListColumns(databaseName string, tableName string) (column
 		); e != nil {
 			return
 		}
-		columns[column.Name] = column
+		columns[column.Name] = &column
 	}
 
 	return
