@@ -164,7 +164,7 @@ func (d *DatabaseMgr) BuildDatabase(databaseName string) (database *Database, e 
 	tableLen := len(database.Tables)
 
 	if tableLen == 0 {
-		e = fmt.Errorf("no tables found in database %s", database.Name)
+		// e = fmt.Errorf("no tables found in database %s", database.Name)
 		return
 	}
 
