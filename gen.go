@@ -640,33 +640,68 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 }
 
 func GenerateTypescriptTypes(database *Database) (goCode string, e error) {
-
 	goCode = "// #genStart \n\n"
-
 	for _, table := range database.Tables {
-		goCode += fmt.Sprintf("/**\n * %s\n */\n", table.Name)
-		goCode += fmt.Sprintf("declare interface %s {\n", table.Name)
-		for _, column := range table.Columns {
 
-			fieldType := "number"
-			switch column.DataType {
-			case "enum":
-				fieldType = "string"
-			case "text":
-				fieldType = "string"
-			case "date":
-				fieldType = "string"
-			case "datetime":
-				fieldType = "string"
-			}
+		str := ""
 
-			goCode += fmt.Sprintf("\t%s: %s;\n", column.Name, fieldType)
+		if str, e = GenerateTypescriptType(table); e != nil {
+			return
 		}
 
-		goCode += "}\n\n"
+		goCode += str
 	}
 
 	goCode += "// #genEnd\n"
+
+	return
+}
+
+func GenerateTypescriptType(table *Table) (goCode string, e error) {
+
+	goCode += fmt.Sprintf("/**\n * %s\n */\n", table.Name)
+	goCode += fmt.Sprintf("declare interface %s {\n", table.Name)
+	for _, column := range table.Columns {
+
+		fieldType := "number"
+		switch column.DataType {
+		case "varchar":
+			fieldType = "string"
+		case "enum":
+			fieldType = "string"
+		case "text":
+			fieldType = "string"
+		case "date":
+			fieldType = "string"
+		case "datetime":
+			fieldType = "string"
+		case "char":
+			fieldType = "string"
+		}
+		// decimal
+		//
+
+		goCode += fmt.Sprintf("\t%s: %s;\n", column.Name, fieldType)
+	}
+
+	goCode += "}\n\n"
+
+	return
+
+}
+
+func GenerateTypescriptTypesFile(database *Database) (e error) {
+
+	var goCode string
+
+	outFile := "./src/types/types.d.ts"
+
+	goCode, e = GenerateTypescriptTypes(database)
+	if e != nil {
+		return
+	}
+
+	ioutil.WriteFile(outFile, []byte(goCode), 0644)
 
 	return
 

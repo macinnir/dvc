@@ -119,8 +119,8 @@ func main() {
 				fatal(e.Error())
 			}
 
-		// case "typescript":
-		// 	goCode, e = GenerateTypescriptTypes(database)
+		case "typescript":
+			GenerateTypescriptTypesFile(database)
 		default:
 			fatal(fmt.Sprintf("Unknown output type: `%s`", subCmd))
 		}
