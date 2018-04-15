@@ -319,6 +319,9 @@ func (d *DVC) ApplyChangeset(changeset string) (e error) {
 
 	for _, s := range statements {
 		sql := strings.Trim(strings.Trim(s, " "), "\n")
+		if len(sql) == 0 {
+			continue
+		}
 		fmt.Printf("Running sql: %s", sql)
 		_, e = d.ServerMgr.conn.Exec(sql)
 		if e != nil {
