@@ -238,7 +238,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 		goCode += fmt.Sprintf("\tDelete(model *models.%s) (e error)\n", table.Name)
 	}
 
-	goCode += fmt.Sprintf("\tGetMany(limit int, offset int, args ...string)(collection []models.%s, e error)\n", table.Name)
+	goCode += fmt.Sprintf("\tGetMany(limit int, offset int, args ...string)(collection []*models.%s, e error)\n", table.Name)
 	goCode += fmt.Sprintf("\tGetByID(%s %s)(model *models.%s, e error)\n", primaryKey, idType, table.Name)
 	goCode += fmt.Sprintf("\tGetSingle(args ...string)(model *models.%s, e error)\n", table.Name)
 
@@ -382,7 +382,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 		table.Name,
 	)
 
-	goCode += fmt.Sprintf("func (r *%sRepo) GetMany(limit int, offset int, args ...string) (collection []models.%s, e error) {\n",
+	goCode += fmt.Sprintf("func (r *%sRepo) GetMany(limit int, offset int, args ...string) (collection []*models.%s, e error) {\n",
 		table.Name,
 		table.Name,
 	)
@@ -416,7 +416,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 		return
 	}
 
-	collection = []models.%s{}
+	collection = []*models.%s{}
 
 	for rows.Next() {
 
@@ -428,7 +428,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 			return 
 		}
 
-		collection = append(collection, *model)
+		collection = append(collection, model)
 	}
 
 	return`, table.Name, table.Name)
