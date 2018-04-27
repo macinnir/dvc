@@ -447,7 +447,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 
 	goCode += fmt.Sprintf(`
 
-	var collection []models.%s
+	var collection []*models.%s
 	if collection, e = r.GetMany(1, 0, args...); e != nil {
 		return 
 	}
@@ -457,7 +457,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 		return 
 	}
 
-	model = &collection[0]
+	model = collection[0]
 	return 
 
 	`, table.Name)
