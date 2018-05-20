@@ -190,25 +190,25 @@ func QueryAlterTableDropColumn(table *Table, column *Column) (sql string, e erro
 
 // QueryAlterTableAddIndex returns an alter table sql statement that adds an index to a table
 func QueryAlterTableAddIndex(table *Table, column *Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`)", table.Name, column.Name, column.Name)
+	sql = fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`);", table.Name, column.Name, column.Name)
 	return
 }
 
 // QueryAlterTableAddUniqueIndex returns an alter table sql statement that adds a unique index to a table
 func QueryAlterTableAddUniqueIndex(table *Table, column *Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`)", table.Name, column.Name, column.Name)
+	sql = fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`);", table.Name, column.Name, column.Name)
 	return
 }
 
 // QueryAlterTableDropIndex returns an alter table sql statement that drops an index
 func QueryAlterTableDropIndex(table *Table, column *Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s`", table.Name, column.Name)
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s`;", table.Name, column.Name)
 	return
 }
 
 // QueryAlterTableDropUniqueIndex returns an alter table sql statement that drops a unique index
 func QueryAlterTableDropUniqueIndex(table *Table, column *Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s`", table.Name, column.Name)
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s`;", table.Name, column.Name)
 	return
 }
 
@@ -269,6 +269,7 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 	sql = fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n);", table.Name, strings.Join(cols, ",\n\t"))
 
 	if len(uniqueKeyColumns) > 0 {
+		sql += "\n"
 		for _, uniqueKeyColumn := range uniqueKeyColumns {
 			t, _ := QueryAlterTableAddUniqueIndex(table, uniqueKeyColumn)
 			sql += t + "\n"
