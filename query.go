@@ -230,10 +230,10 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 	cols := []string{}
 
 	// Unique Keys
-	uniqueKeys := []string{}
+	uniqueKeyColumns := []*Column{}
 
 	// Regular Keys (allows for multiple entries)
-	multiKeys := []string{}
+	multiKeyColumns := []*Column{}
 
 	sortedColumns := make(SortedColumns, 0, len(table.Columns))
 
@@ -255,9 +255,9 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 		case "PRI":
 			primaryKey = column.Name
 		case "UNI":
-			uniqueKeys = append(uniqueKeys, column.Name)
+			uniqueKeyColumns = append(uniqueKeyColumns, column)
 		case "MUL":
-			multiKeys = append(multiKeys, column.Name)
+			multiKeyColumns = append(multiKeyColumns, column)
 		}
 		cols = append(cols, col)
 	}
@@ -266,19 +266,21 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 		cols = append(cols, fmt.Sprintf("PRIMARY KEY(`%s`)", primaryKey))
 	}
 
-	if len(uniqueKeys) > 0 {
-		for _, uniqueKey := range uniqueKeys {
-			cols = append(cols, fmt.Sprintf("UNIQUE KEY (`%s`)", uniqueKey))
-		}
-	}
-
-	if len(multiKeys) > 0 {
-		for _, multiKey := range multiKeys {
-			cols = append(cols, fmt.Sprintf("KEY (`%s`)", multiKey))
-		}
-	}
-
 	sql = fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n);", table.Name, strings.Join(cols, ",\n\t"))
+
+	if len(uniqueKeyColumns) > 0 {
+		for _, uniqueKeyColumn := range uniqueKeyColumns {
+			t, _ := QueryAlterTableAddUniqueIndex(table, uniqueKeyColumn)
+			sql += t + "\n"
+		}
+	}
+
+	if len(multiKeyColumns) > 0 {
+		for _, multiKeyColumn := range multiKeyColumns {
+			t, _ := QueryAlterTableAddIndex(table, multiKeyColumn)
+			sql += t + "\n"
+		}
+	}
 
 	return
 }
