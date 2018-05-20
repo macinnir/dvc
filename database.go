@@ -94,6 +94,7 @@ func (d *DatabaseMgr) ListTables(databaseName string) (tables map[string]*Table,
 	return
 }
 
+// ListColumns lists all of the columns in a table
 func (d *DatabaseMgr) ListColumns(databaseName string, tableName string) (columns map[string]*Column, e error) {
 	var rows *sql.Rows
 
@@ -151,6 +152,7 @@ func (d *DatabaseMgr) ListColumns(databaseName string, tableName string) (column
 	return
 }
 
+// BuildDatabase builds a database schema from the target database's meta data
 func (d *DatabaseMgr) BuildDatabase(databaseName string) (database *Database, e error) {
 
 	database = &Database{

@@ -133,6 +133,12 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 
 	cols := []string{}
 
+	// Unique Keys
+	uniqueKeys := []string{}
+
+	// Regular Keys (allows for multiple entries)
+	multiKeys := []string{}
+
 	sortedColumns := make(SortedColumns, 0, len(table.Columns))
 
 	for _, column := range table.Columns {
@@ -149,14 +155,31 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 
 		idx++
 
-		if column.ColumnKey == "PRI" {
+		switch column.ColumnKey {
+		case "PRI":
 			primaryKey = column.Name
+		case "UNI":
+			uniqueKeys = append(uniqueKeys, column.Name)
+		case "MUL":
+			multiKeys = append(multiKeys, column.Name)
 		}
-
 		cols = append(cols, col)
 	}
+
 	if len(primaryKey) > 0 {
 		cols = append(cols, fmt.Sprintf("PRIMARY KEY(`%s`)", primaryKey))
+	}
+
+	if len(uniqueKeys) > 0 {
+		for _, uniqueKey := range uniqueKeys {
+			cols = append(cols, fmt.Sprintf("UNIQUE KEY (`%s`)", uniqueKey))
+		}
+	}
+
+	if len(multiKeys) > 0 {
+		for _, multiKey := range multiKeys {
+			cols = append(cols, fmt.Sprintf("KEY (`%s`)", multiKey))
+		}
 	}
 
 	sql = fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n);", table.Name, strings.Join(cols, ",\n\t"))
