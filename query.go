@@ -13,7 +13,7 @@ func QueryCreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql st
 	// What tables are in local that aren't in remote?
 	for tableName, table := range localSchema.Tables {
 
-		// Table does not exist
+		// Table does not exist on remote schema
 		if _, ok := remoteSchema.Tables[tableName]; !ok {
 
 			// fmt.Printf("Local table %s is not in remote\n", table.Name)
@@ -29,7 +29,10 @@ func QueryCreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql st
 		}
 	}
 
+	// What tables are in remote that aren't in local?
 	for _, table := range remoteSchema.Tables {
+
+		// Table does not exist on local schema
 		if _, ok := localSchema.Tables[table.Name]; !ok {
 			query, e = QueryDropTable(table)
 			sql += query + "\n"
@@ -39,6 +42,9 @@ func QueryCreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql st
 	return
 }
 
+// QueryCreateTableChangeSQL returns a set of statements that alter a table's structure if and only if there is a difference between
+// the local and remote tables
+// If no change is found, an empty string is returned.
 func QueryCreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql string, e error) {
 
 	var query string
@@ -88,17 +94,84 @@ func QueryCreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql strin
 	return
 }
 
+// QueryAlterTableChangeColumn returns an alter table sql statement that adds or removes an index from a column
+// if and only if the one (e.g. local) has a column and the other (e.g. remote) does not
+// Truth table
+// 		Remote 	| 	Local 	| 	Result
+// ---------------------------------------------------------
+// 1. 	MUL		| 	none 	| 	Drop index
+// 2. 	UNI		| 	none 	| 	Drop unique index
+// 3. 	none 	| 	MUL 	|  	Create index
+// 4. 	none 	| 	UNI 	| 	Create unique index
+// 5. 	MUL		| 	UNI 	| 	Drop index; Create unique index
+// 6. 	UNI 	| 	MUL 	| 	Drop unique index; Create index
+// 7. 	none	| 	none	| 	Do nothing
+// 8. 	MUL		| 	MUL		| 	Do nothing
+// 9. 	UNI		|   UNI		| 	Do nothing
 func QueryAlterTableChangeColumn(table *Table, localColumn *Column, remoteColumn *Column) (sql string, e error) {
 
+	t := ""
 	query := ""
 
-	// if localColumn.
+	// 7,8,9
+	if localColumn.ColumnKey == remoteColumn.ColumnKey {
+		return
+	}
+
+	// <7
+	if localColumn.ColumnKey != remoteColumn.ColumnKey {
+
+		// 1,2: There is no indexing on the local schema
+		if localColumn.ColumnKey == "" {
+			switch remoteColumn.ColumnKey {
+			// 1
+			case "MUL":
+				t, _ = QueryAlterTableDropIndex(table, localColumn)
+				query += t + "\n"
+			// 2
+			case "UNI":
+				t, _ = QueryAlterTableDropUniqueIndex(table, localColumn)
+				query += t + "\n"
+			}
+		}
+
+		// 3, 4: There is no indexing on the remote schema
+		if remoteColumn.ColumnKey == "" {
+			switch localColumn.ColumnKey {
+			// 3
+			case "MUL":
+				t, _ = QueryAlterTableAddIndex(table, localColumn)
+				query += t + "\n"
+			// 4
+			case "UNI":
+				t, _ = QueryAlterTableAddUniqueIndex(table, localColumn)
+				query += t + "\n"
+			}
+		}
+
+		// 5
+		if remoteColumn.ColumnKey == "MUL" && localColumn.ColumnKey == "UNI" {
+			t, _ = QueryAlterTableDropIndex(table, localColumn)
+			query += t + "\n"
+			t, _ = QueryAlterTableAddUniqueIndex(table, localColumn)
+			query += t + "\n"
+		}
+
+		// 6
+		if remoteColumn.ColumnKey == "UNI" && localColumn.ColumnKey == "MUL" {
+			t, _ = QueryAlterTableDropUniqueIndex(table, localColumn)
+			query += t + "\n"
+			t, _ = QueryAlterTableAddIndex(table, localColumn)
+			query += t + "\n"
+		}
+	}
 
 	sql = query
 	return
 
 }
 
+// QueryAlterTableCreateColumn returns an alter table sql statement that adds a column
 func QueryAlterTableCreateColumn(table *Table, column *Column) (sql string, e error) {
 
 	query := ""
@@ -107,22 +180,45 @@ func QueryAlterTableCreateColumn(table *Table, column *Column) (sql string, e er
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query)
 
 	return
-
 }
 
+// QueryAlterTableDropColumn returns an alter table sql statement that drops a column
 func QueryAlterTableDropColumn(table *Table, column *Column) (sql string, e error) {
-
 	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
-
 	return
-
 }
 
+// QueryAlterTableAddIndex returns an alter table sql statement that adds an index to a table
+func QueryAlterTableAddIndex(table *Table, column *Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`)", table.Name, column.Name, column.Name)
+	return
+}
+
+// QueryAlterTableAddUniqueIndex returns an alter table sql statement that adds a unique index to a table
+func QueryAlterTableAddUniqueIndex(table *Table, column *Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`)", table.Name, column.Name, column.Name)
+	return
+}
+
+// QueryAlterTableDropIndex returns an alter table sql statement that drops an index
+func QueryAlterTableDropIndex(table *Table, column *Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s`", table.Name, column.Name)
+	return
+}
+
+// QueryAlterTableDropUniqueIndex returns an alter table sql statement that drops a unique index
+func QueryAlterTableDropUniqueIndex(table *Table, column *Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s`", table.Name, column.Name)
+	return
+}
+
+// QueryDropTable returns a drop table sql statement
 func QueryDropTable(table *Table) (sql string, e error) {
 	sql = fmt.Sprintf("DROP TABLE `%s`;", table.Name)
 	return
 }
 
+// QueryCreateTable returns a create table sql statement
 func QueryCreateTable(table *Table) (sql string, e error) {
 
 	// colLen := len(table.Columns)
@@ -187,6 +283,7 @@ func QueryCreateTable(table *Table) (sql string, e error) {
 	return
 }
 
+// QueryCreateColumn returns a create table column sql statement
 func QueryCreateColumn(column *Column) (sql string, e error) {
 
 	sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
