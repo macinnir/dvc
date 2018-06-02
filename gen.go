@@ -638,11 +638,14 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 			includeSql = true
 			switch fieldType {
 			case "string":
-				fieldType = "sql.NullString"
+				// fieldType = "sql.NullString"
+				fieldType = "null.String"
 			case "int64":
-				fieldType = "sql.NullInt64"
+				// fieldType = "sql.NullInt64"
+				fieldType = "null.Int"
 			case "float64":
-				fieldType = "sql.NullFloat64"
+				// fieldType = "sql.NullFloat64"
+				fieldType = "null.Float"
 			}
 		}
 
@@ -650,7 +653,8 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 	}
 
 	if includeSql == true {
-		goCode += "import \"database/sql\"\n"
+		// goCode += "import \"database/sql\"\n"
+		goCode += "import \"gopkg.in/guregu/null.v3\""
 	}
 
 	goCode += fmt.Sprintf("// %s represents a %s model\n", table.Name, table.Name)
