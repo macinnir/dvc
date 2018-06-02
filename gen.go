@@ -601,8 +601,6 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 
 	goCode += "// #genStart\n\n"
 	goCode += "package models\n\n"
-	goCode += fmt.Sprintf("// %s represents a %s model\n", table.Name, table.Name)
-	goCode += fmt.Sprintf("type %s struct {\n", table.Name)
 
 	var sortedColumns = make(SortedColumns, 0, len(table.Columns))
 
@@ -611,6 +609,10 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 	}
 
 	sort.Sort(sortedColumns)
+
+	includeSql := false
+
+	fieldCode := ""
 
 	for _, column := range sortedColumns {
 
@@ -632,8 +634,28 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 			fieldType = "float64"
 		}
 
-		goCode += fmt.Sprintf("\t%s %s `json:\"%s\"`\n", column.Name, fieldType, column.Name)
+		if column.IsNullable == true {
+			includeSql = true
+			switch fieldType {
+			case "string":
+				fieldType = "sql.NullString"
+			case "int64":
+				fieldType = "sql.NullInt64"
+			case "float64":
+				fieldType = "sql.NullFloat64"
+			}
+		}
+
+		fieldCode += fmt.Sprintf("\t%s %s `json:\"%s\"`\n", column.Name, fieldType, column.Name)
 	}
+
+	if includeSql == true {
+		goCode += "import \"database/sql\"\n"
+	}
+
+	goCode += fmt.Sprintf("// %s represents a %s model\n", table.Name, table.Name)
+	goCode += fmt.Sprintf("type %s struct {\n", table.Name)
+	goCode += fieldCode
 	goCode += "}\n\n"
 	goCode += "// #genEnd"
 	return
