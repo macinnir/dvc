@@ -119,7 +119,7 @@ func (s *Schema) Init() {
 }
 
 //
-func scanFileParts(filePath string) (fileHead string, fileFoot string, imports []string, e error) {
+func scanFileParts(filePath string, trackImports bool) (fileHead string, fileFoot string, imports []string, e error) {
 
 	lineStart := -1
 	lineEnd := -1
@@ -150,19 +150,23 @@ func scanFileParts(filePath string) (fileHead string, fileFoot string, imports [
 
 		line = strings.Trim(line, " ")
 
-		if line == "import (" {
-			isImports = true
-			continue
-		}
+		if trackImports == true {
 
-		if isImports == true {
-			if line == ")" {
-				isImports = false
+			if line == "import (" {
+				isImports = true
 				continue
 			}
 
-			imports = append(imports, line[2:len(line)-1])
-			continue
+			if isImports == true {
+				if line == ")" {
+					isImports = false
+					continue
+				}
+
+				imports = append(imports, line[2:len(line)-1])
+				continue
+			}
+
 		}
 
 		if line == "// #genStart" {
@@ -561,7 +565,7 @@ func GenerateGoRepoFile(table *Table) (e error) {
 
 	outFile := fmt.Sprintf("./repos/%s.go", table.Name)
 
-	if fileHead, fileFoot, imports, e = scanFileParts(outFile); e != nil {
+	if fileHead, fileFoot, imports, e = scanFileParts(outFile, true); e != nil {
 		return
 	}
 
@@ -584,7 +588,7 @@ func GenerateGoSchemaFile(database *Database) (e error) {
 
 	outFile := fmt.Sprintf("./schema/schema.go")
 
-	if fileHead, fileFoot, _, e = scanFileParts(outFile); e != nil {
+	if fileHead, fileFoot, _, e = scanFileParts(outFile, false); e != nil {
 		return
 	}
 
@@ -608,7 +612,7 @@ func GenerateGoModelFile(table *Table) (e error) {
 
 	outFile := fmt.Sprintf("./models/%s.go", table.Name)
 
-	if fileHead, fileFoot, imports, e = scanFileParts(outFile); e != nil {
+	if fileHead, fileFoot, imports, e = scanFileParts(outFile, false); e != nil {
 		return
 	}
 
