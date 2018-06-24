@@ -118,7 +118,8 @@ func (s *Schema) Init() {
 	return
 }
 
-func scanFile(filePath string) (fileHead string, fileFoot string, e error) {
+//
+func scanFileParts(filePath string) (fileHead string, fileFoot string, imports []string, e error) {
 
 	lineStart := -1
 	lineEnd := -1
@@ -126,6 +127,7 @@ func scanFile(filePath string) (fileHead string, fileFoot string, e error) {
 
 	fileHead = ""
 	fileFoot = ""
+	imports = []string{}
 
 	// Check if file exists
 	if _, e = os.Stat(filePath); os.IsNotExist(e) {
@@ -142,9 +144,26 @@ func scanFile(filePath string) (fileHead string, fileFoot string, e error) {
 	fileString := string(fileBytes)
 	fileLines := strings.Split(fileString, "\n")
 
+	isImports := false
+
 	for lineNum, line := range fileLines {
 
 		line = strings.Trim(line, " ")
+
+		if line == "import (" {
+			isImports = true
+			continue
+		}
+
+		if isImports == true {
+			if line == ")" {
+				isImports = false
+				continue
+			}
+
+			imports = append(imports, line)
+			continue
+		}
 
 		if line == "// #genStart" {
 			lineStart = lineNum
@@ -190,7 +209,7 @@ func scanStringForFuncSignature(str string, signatureRegexp string) (matches []s
 	return
 }
 
-func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
+func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode string, e error) {
 
 	primaryKey := ""
 	primaryKeyType := ""
@@ -221,13 +240,42 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 		idType = "string"
 	}
 
+	defaultImports := []string{
+		"goalgopher/models",
+		"database/sql",
+		"github.com/macinnir/go-dal",
+		"errors",
+	}
+
+	if len(imports) > 0 {
+
+		for _, di := range defaultImports {
+
+			exists := false
+
+			for _, ii := range imports {
+				if ii == di {
+					exists = true
+					break
+				}
+			}
+
+			if !exists {
+				imports = append(imports, di)
+			}
+
+		}
+
+	} else {
+		imports = defaultImports
+	}
+
 	goCode += "// #genStart\n\n"
 	goCode += "package repos\n\n"
 	goCode += "import(\n"
-	goCode += "\t\"goalgopher/models\"\n"
-	goCode += "\t\"database/sql\"\n"
-	goCode += "\t\"github.com/macinnir/go-dal\"\n"
-	goCode += "\t\"errors\"\n"
+	for _, i := range imports {
+		goCode += "\t\"" + i + "\"\n"
+	}
 	goCode += ")\n\n"
 	goCode += fmt.Sprintf("// I%sRepo outlines the repository methods for %s objects\n", table.Name, table.Name)
 	goCode += fmt.Sprintf("type I%sRepo interface {\n", table.Name)
@@ -238,6 +286,7 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 		goCode += fmt.Sprintf("\tDelete(model *models.%s) (e error)\n", table.Name)
 	}
 
+	goCode += fmt.Sprintf("\tHardDelete(model *models.%s) (e error)\n", table.Name)
 	goCode += fmt.Sprintf("\tGetMany(limit int, offset int, args ...string)(collection []*models.%s, e error)\n", table.Name)
 	goCode += fmt.Sprintf("\tGetByID(%s %s)(model *models.%s, e error)\n", primaryKey, idType, table.Name)
 	goCode += fmt.Sprintf("\tGetSingle(args ...string)(model *models.%s, e error)\n", table.Name)
@@ -346,6 +395,20 @@ func GenerateGoRepo(table *Table, fileFoot string) (goCode string, e error) {
 
 		goCode += "}\n\n"
 	}
+
+	goCode += fmt.Sprintf("// HardDelete performs a SQL DELETE operation on a %s entry in the database\n", table.Name)
+	goCode += fmt.Sprintf("func (r *%sRepo) HardDelete(model *models.%s) (e error) {\n\n",
+		table.Name,
+		table.Name,
+	)
+
+	goCode += fmt.Sprintf("\tq := r.Dal.Delete(\"%s\")\n", table.Name)
+	goCode += fmt.Sprintf("\tq.Where(\"%s\", model.%s)", primaryKey, primaryKey)
+
+	goCode += fmt.Sprintf("\n\t_, e = q.Exec()\n")
+	goCode += fmt.Sprintf("\n\treturn\n")
+
+	goCode += "}\n\n"
 
 	// SelectByID
 
@@ -494,14 +557,15 @@ func GenerateGoRepoFile(table *Table) (e error) {
 	fileHead := ""
 	fileFoot := ""
 	goCode := ""
+	imports := []string{}
 
 	outFile := fmt.Sprintf("./repos/%s.go", table.Name)
 
-	if fileHead, fileFoot, e = scanFile(outFile); e != nil {
+	if fileHead, fileFoot, imports, e = scanFileParts(outFile); e != nil {
 		return
 	}
 
-	goCode, e = GenerateGoRepo(table, fileFoot)
+	goCode, e = GenerateGoRepo(table, fileFoot, imports)
 	if e != nil {
 		return
 	}
@@ -520,7 +584,7 @@ func GenerateGoSchemaFile(database *Database) (e error) {
 
 	outFile := fmt.Sprintf("./schema/schema.go")
 
-	if fileHead, fileFoot, e = scanFile(outFile); e != nil {
+	if fileHead, fileFoot, _, e = scanFileParts(outFile); e != nil {
 		return
 	}
 
@@ -540,14 +604,15 @@ func GenerateGoSchemaFile(database *Database) (e error) {
 func GenerateGoModelFile(table *Table) (e error) {
 
 	var fileHead, fileFoot, goCode string
+	var imports []string
 
 	outFile := fmt.Sprintf("./models/%s.go", table.Name)
 
-	if fileHead, fileFoot, e = scanFile(outFile); e != nil {
+	if fileHead, fileFoot, imports, e = scanFileParts(outFile); e != nil {
 		return
 	}
 
-	goCode, e = GenerateGoModel(table)
+	goCode, e = GenerateGoModel(table, imports)
 	if e != nil {
 		return
 	}
@@ -583,9 +648,11 @@ func GenerateGoModels(database *Database) (goCode string, e error) {
 
 	goCode = "// #genStart \n\n"
 
+	imports := []string{}
+
 	for _, table := range database.Tables {
 		code := ""
-		if code, e = GenerateGoModel(table); e != nil {
+		if code, e = GenerateGoModel(table, imports); e != nil {
 			return
 		}
 
@@ -597,7 +664,7 @@ func GenerateGoModels(database *Database) (goCode string, e error) {
 	return
 }
 
-func GenerateGoModel(table *Table) (goCode string, e error) {
+func GenerateGoModel(table *Table, imports []string) (goCode string, e error) {
 
 	goCode += "// #genStart\n\n"
 	goCode += "package models\n\n"
