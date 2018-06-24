@@ -118,6 +118,39 @@ func main() {
 			if e = GenerateGoModelFile(t); e != nil {
 				fatal(e.Error())
 			}
+		case "all":
+
+			// Generate schema
+			fmt.Print("Generating schema...")
+			e = GenerateGoSchemaFile(database)
+			if e != nil {
+				fatal(e.Error())
+			}
+			fmt.Print("done\n")
+
+			// Generate repos
+			fmt.Printf("Generating %d repos...", len(database.Tables))
+			for _, table := range database.Tables {
+				e = GenerateGoRepoFile(table)
+				if e != nil {
+					fatal(e.Error())
+				}
+			}
+			fmt.Print("done\n")
+
+			fmt.Print("Generating repo bootstrap file...")
+			GenerateReposBootstrapFile(database)
+			fmt.Print("done\n")
+
+			// Generate models
+			fmt.Printf("Generating %d models...", len(database.Tables))
+			for _, table := range database.Tables {
+				e = GenerateGoModelFile(table)
+				if e != nil {
+					fatal(e.Error())
+				}
+			}
+			fmt.Print("done\n")
 
 		case "typescript":
 			GenerateTypescriptTypesFile(database)
@@ -189,7 +222,8 @@ func main() {
 		fmt.Println("DVC Help")
 		fmt.Println("\timport")
 		fmt.Println("\t\tBuild a schema definition file based on the target database. This will overwrite any existing schema definition file.")
-		fmt.Println("\tgen ( models | repos | schema )")
+		fmt.Println("\tgen ( models | repos | schema | all)")
+		fmt.Println("\t\tall\t Generate all options below")
 		fmt.Println("\t\tmodels\t Generate models based on imported schema information. Will fail if no imported schema file exists.")
 		fmt.Println("\t\trepos\t Generate repositories based on imported schema information. Will fail if no imported schema file exists.")
 		fmt.Println("\t\tschema\t Generate go-dal schema bootstrap code based on imported schema information. Will fail if no imported schema file exists.")
