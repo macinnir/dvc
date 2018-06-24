@@ -214,6 +214,8 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 	primaryKey := ""
 	primaryKeyType := ""
 
+	fmt.Printf("Imports: %v", imports)
+
 	funcSig := fmt.Sprintf(`^func \(r \*%sRepo\) [A-Z].*$`, table.Name)
 
 	footMatches := scanStringForFuncSignature(fileFoot, funcSig)
