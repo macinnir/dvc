@@ -214,8 +214,6 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 	primaryKey := ""
 	primaryKeyType := ""
 
-	fmt.Printf("Imports: %v", imports)
-
 	funcSig := fmt.Sprintf(`^func \(r \*%sRepo\) [A-Z].*$`, table.Name)
 
 	footMatches := scanStringForFuncSignature(fileFoot, funcSig)
@@ -251,6 +249,7 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 
 	if len(imports) > 0 {
 
+		fmt.Printf("Comparing imports...\n")
 		for _, di := range defaultImports {
 
 			exists := false
@@ -258,6 +257,7 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 			for _, ii := range imports {
 				if ii == di {
 					exists = true
+					fmt.Printf("exists!")
 					break
 				}
 			}
@@ -271,6 +271,8 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 	} else {
 		imports = defaultImports
 	}
+
+	fmt.Printf("Imports: %v", imports)
 
 	goCode += "// #genStart\n\n"
 	goCode += "package repos\n\n"
