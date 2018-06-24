@@ -129,9 +129,17 @@ func main() {
 
 		sql := ""
 
+		nextArgIdx := 2
+
 		schemaFile := dvc.Config.DatabaseName + ".schema.json"
 
-		if sql, e = dvc.CompareSchema(schemaFile); e != nil {
+		isCompareFlipped := false
+		if argLen > 2 && args[nextArgIdx] == "reverse" {
+			isCompareFlipped = true
+			nextArgIdx++
+		}
+
+		if sql, e = dvc.CompareSchema(schemaFile, isCompareFlipped); e != nil {
 			fatal(e.Error())
 		}
 
@@ -140,14 +148,17 @@ func main() {
 			os.Exit(0)
 		}
 
-		if argLen > 2 {
+		if argLen > nextArgIdx {
 			// "--file="
 
-			switch args[2] {
+			switch args[nextArgIdx] {
 			case "write":
-				if argLen > 3 {
 
-					filePath := args[3]
+				nextArgIdx++
+
+				if argLen > nextArgIdx {
+
+					filePath := args[nextArgIdx]
 
 					log.Printf("Writing sql to path `%s`", filePath)
 					e = ioutil.WriteFile(filePath, []byte(sql), 0644)

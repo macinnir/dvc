@@ -18,6 +18,7 @@ const (
 	DatabaseTypeSQLite    = "sqlite"
 )
 
+// DatabaseTypes is a slice of database type constants
 var DatabaseTypes = []string{
 	DatabaseTypeMysql,
 	DatabaseTypeSQLServer,
@@ -55,6 +56,7 @@ type IRepo interface {
 // 	return
 // }
 
+// DatabaseMgr is a collection of methdods for interacting with the database
 type DatabaseMgr struct {
 	databaseName string
 	connection   *sql.DB

@@ -192,7 +192,12 @@ func (d *DVC) ReadSchemaFromFile(filePath string) (database *Database, e error) 
 	return
 }
 
-func (d *DVC) CompareSchema(schemaFile string) (sql string, e error) {
+// CompareSchema returns a string that contains a new line (`\n`) separated list of sql statements
+// This comparison assumes the local `schemaFile` is the authority and the remote database is the
+// schema to be updated
+// @param reverse bool If true, the remote and local schema comparison is flipped in that the remote schema is treated as the authority
+// 		and the local schema is treated as the schema to be updated.
+func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e error) {
 
 	var localSchema *Database
 	var remoteSchema *Database
@@ -247,7 +252,11 @@ func (d *DVC) CompareSchema(schemaFile string) (sql string, e error) {
 
 	sql = ""
 
-	sql, e = QueryCreateChangeSQL(localSchema, remoteSchema)
+	if reverse == true {
+		sql, e = QueryCreateChangeSQL(remoteSchema, localSchema)
+	} else {
+		sql, e = QueryCreateChangeSQL(localSchema, remoteSchema)
+	}
 
 	return
 }
