@@ -161,7 +161,7 @@ func scanFileParts(filePath string) (fileHead string, fileFoot string, imports [
 				continue
 			}
 
-			imports = append(imports, line)
+			imports = append(imports, line[1:len(line)-1])
 			continue
 		}
 
