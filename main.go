@@ -187,10 +187,17 @@ func main() {
 
 	case "help":
 		fmt.Println("DVC Help")
-		fmt.Println("\tcompare")
-		fmt.Println("\t\t[default] - Write the change sql to stdout")
-		fmt.Println("\t\twrite [path] - Write the sql to a file path")
-		fmt.Println("\t\tapply - Apply the changes after the comparison sql has been generated.")
+		fmt.Println("\timport")
+		fmt.Println("\t\tBuild a schema definition file based on the target database. This will overwrite any existing schema definition file.")
+		fmt.Println("\tgen ( models | repos | schema )")
+		fmt.Println("\t\tmodels\t Generate models based on imported schema information. Will fail if no imported schema file exists.")
+		fmt.Println("\t\trepos\t Generate repositories based on imported schema information. Will fail if no imported schema file exists.")
+		fmt.Println("\t\tschema\t Generate go-dal schema bootstrap code based on imported schema information. Will fail if no imported schema file exists.")
+		fmt.Println("\tcompare [reverse] [ ( write <path> | apply ) ]")
+		fmt.Println("\t\t Default behavior (no arguments) is to compare local schema as authority against remote database as target and write the resulting sql to stdout.")
+		fmt.Println("\t\t reverse\tOptional reverse command will swith the roles of the schemas, making the remote database the authority and the local schema the target for updating.")
+		fmt.Println("\t\t write\tAfter performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).")
+		fmt.Println("\t\t apply\tAfter performing the comparison, the resulting sequel statements will be immediately applied to the target database.")
 		fmt.Println("\timport")
 
 	default:
