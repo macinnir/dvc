@@ -610,7 +610,7 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 
 	sort.Sort(sortedColumns)
 
-	includeSql := false
+	includeNullPackage := false
 
 	fieldCode := ""
 
@@ -635,7 +635,7 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 		}
 
 		if column.IsNullable == true {
-			includeSql = true
+			includeNullPackage = true
 			switch fieldType {
 			case "string":
 				// fieldType = "sql.NullString"
@@ -652,9 +652,9 @@ func GenerateGoModel(table *Table) (goCode string, e error) {
 		fieldCode += fmt.Sprintf("\t%s %s `json:\"%s\"`\n", column.Name, fieldType, column.Name)
 	}
 
-	if includeSql == true {
+	if includeNullPackage == true {
 		// goCode += "import \"database/sql\"\n"
-		goCode += "import \"gopkg.in/guregu/null.v3\""
+		goCode += "import \"gopkg.in/guregu/null.v3\"\n\n"
 	}
 
 	goCode += fmt.Sprintf("// %s represents a %s model\n", table.Name, table.Name)
