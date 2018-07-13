@@ -1,17 +1,146 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
-	"os/exec"
-	"regexp"
 	"sort"
 	"strings"
 )
 
+//
+// Commands
+//
+
+// GenerateReposBootstrapFile generates a repos bootstrap file in golang
 func GenerateReposBootstrapFile(database *Database) (e error) {
+
+	outFile := "./repos/repos.go"
+	goCode, e := GenerateReposBootstrapGoCodeFromDatabase(database)
+
+	if e != nil {
+		return
+	}
+
+	e = WriteGoCodeToFile(goCode, outFile)
+
+	return
+}
+
+// GenerateGoRepoFile generates a repo file in golang
+func GenerateGoRepoFile(table *Table) (e error) {
+
+	fileHead := ""
+	fileFoot := ""
+	goCode := ""
+	imports := []string{}
+
+	outFile := fmt.Sprintf("./repos/%s.go", table.Name)
+
+	if fileHead, fileFoot, imports, e = scanFileParts(outFile, true); e != nil {
+		return
+	}
+
+	goCode, e = GenerateGoRepo(table, fileFoot, imports)
+	if e != nil {
+		return
+	}
+	outFileContent := fileHead + goCode + fileFoot
+
+	e = WriteGoCodeToFile(outFileContent, outFile)
+	return
+}
+
+// GenerateGoSchemaFile generates a schema file in golang
+func GenerateGoSchemaFile(database *Database) (e error) {
+
+	var fileHead, fileFoot, goCode string
+
+	outFile := fmt.Sprintf("./schema/schema.go")
+
+	if fileHead, fileFoot, _, e = scanFileParts(outFile, false); e != nil {
+		return
+	}
+
+	goCode, e = GenerateGoSchema(database)
+	if e != nil {
+		return
+	}
+
+	outFileContent := fileHead + goCode + fileFoot
+
+	e = WriteGoCodeToFile(outFileContent, outFile)
+	return
+}
+
+// GenerateGoModelFile generates a model file in golang
+func GenerateGoModelFile(table *Table) (e error) {
+
+	var fileHead, fileFoot, goCode string
+	var imports []string
+
+	outFile := fmt.Sprintf("./models/%s.go", table.Name)
+
+	if fileHead, fileFoot, imports, e = scanFileParts(outFile, false); e != nil {
+		return
+	}
+
+	goCode, e = GenerateGoModel(table, imports)
+	if e != nil {
+		return
+	}
+
+	goCode = fileHead + goCode + fileFoot
+
+	e = WriteGoCodeToFile(goCode, outFile)
+	return
+}
+
+// GenerateTypescriptTypesFile generates a typescript type file
+func GenerateTypescriptTypesFile(database *Database) (e error) {
+
+	var goCode string
+
+	outFile := "./src/types/types.d.ts"
+
+	goCode, e = GenerateTypescriptTypes(database)
+	if e != nil {
+		return
+	}
+
+	ioutil.WriteFile(outFile, []byte(goCode), 0644)
+
+	return
+
+}
+
+//
+// String Generators
+//
+
+// GenerateGoModels generates models for golang
+func GenerateGoModels(database *Database) (goCode string, e error) {
+
+	goCode = "// #genStart \n\n"
+
+	imports := []string{}
+
+	for _, table := range database.Tables {
+		code := ""
+		if code, e = GenerateGoModel(table, imports); e != nil {
+			return
+		}
+
+		goCode += code
+	}
+
+	goCode += "// #genEnd\n"
+
+	return
+}
+
+// GenerateReposBootstrapGoCodeFromDatabase generates golang code for a Repo Bootstrap file from
+// a database object
+func GenerateReposBootstrapGoCodeFromDatabase(database *Database) (goCode string, e error) {
 
 	props := ""
 	defs := ""
@@ -28,62 +157,38 @@ func GenerateReposBootstrapFile(database *Database) (e error) {
 		defs += fmt.Sprintf("\tr.%s = repo%s\n\n", table.Name, table.Name)
 	}
 
-	goCode := fmt.Sprintf(`
-package repos
-
-import (
-	dal "github.com/macinnir/go-dal"
-)
-
-// Repos is a collection of repositories
-type Repos struct {
-	Base        dal.ISchema
-%s
-}
-
-// Bootstrap bootstraps all of the repositories into a single repository object
-func Bootstrap(schema dal.ISchema) *Repos {
-
-	r := new(Repos)
-
-	r.Base = schema
-
-	// Repos
-%s
-
-	return r
-}
-
-		`,
-		props,
-		defs,
-	)
-
-	outFile := "./repos/repos.go"
-
-	e = ioutil.WriteFile(outFile, []byte(goCode), 0644)
-
-	cmd := exec.Command("go", "fmt", outFile)
-	e = cmd.Run()
+	goCode = "package repos"
+	goCode += "\n\nimport("
+	goCode += "\n\tdal \"github.com/macinnir/go-dal\""
+	goCode += "\n)"
+	goCode += "\n\n// Repos is a collection of repositories"
+	goCode += "\ntype Repos struct {"
+	goCode += "\n\tBase\tdal.ISchema"
+	goCode += fmt.Sprintf("\n%s", props)
+	goCode += "\n}"
+	goCode += "\n\n//Bootstrap bootstraps all of the repositories into a single repository object"
+	goCode += "\nfunc Bootstrap(schema dal.ISchema) *Repos {"
+	goCode += "\n\n\tr := new(Repos)"
+	goCode += "\n\n\tr.Base = schema"
+	goCode += "\n\n\t// Repos"
+	goCode += fmt.Sprintf("\n\n%s", defs)
+	goCode += "\n\n\treturn r"
+	goCode += "\n}"
 
 	return
 }
 
+// GenerateGoSchema generates golang code for a schema file
 func GenerateGoSchema(database *Database) (goCode string, e error) {
 
-	goCode = `
-// #genStart
+	goCode = "\n// #genStart"
+	goCode += "\n// Schema defines the data access layer schema"
+	goCode += "\ntype Schema struct {"
+	goCode += "\n\tSchema dal.ISchema"
+	goCode += "\n}"
+	goCode += "\n// Init initializes the DAL Schema"
+	goCode += "\nfunc (s *Schema) Init() {"
 
-// Schema defines the data access layer schema 
-type Schema struct {
-	Schema dal.ISchema
-}
-
-
-// Init initializes the DAL Schema
-func (s *Schema) Init() {
-	
-		`
 	for _, table := range database.Tables {
 		cols := ""
 
@@ -96,21 +201,13 @@ func (s *Schema) Init() {
 		sort.Sort(sortedColumns)
 
 		for _, column := range sortedColumns {
-			cols += fmt.Sprintf(`
-			"%s",`, column.Name)
+			cols += fmt.Sprintf("\t\t\t\"%s\",\n", column.Name)
 		}
 
-		goCode += fmt.Sprintf(`
-	// %s
-	s.Schema.AddTable(
-		"%s",
-		[]string{%s
-		})
-			`,
-			table.Name,
-			table.Name,
-			cols,
-		)
+		goCode += fmt.Sprintf("\n\n//%s", table.Name)
+		goCode += fmt.Sprintf("\n\ts.Schema.AddTable(")
+		goCode += fmt.Sprintf("\n\t\t\"%s\",", table.Name)
+		goCode += fmt.Sprintf("[]string{%s\n\t})", cols)
 	}
 
 	goCode += "\n}\n\n// #genEnd\n"
@@ -118,101 +215,7 @@ func (s *Schema) Init() {
 	return
 }
 
-//
-func scanFileParts(filePath string, trackImports bool) (fileHead string, fileFoot string, imports []string, e error) {
-
-	lineStart := -1
-	lineEnd := -1
-	var fileBytes []byte
-
-	fileHead = ""
-	fileFoot = ""
-	imports = []string{}
-
-	// Check if file exists
-	if _, e = os.Stat(filePath); os.IsNotExist(e) {
-		e = nil
-		return
-	}
-
-	fileBytes, e = ioutil.ReadFile(filePath)
-
-	if e != nil {
-		fatal(e.Error())
-	}
-
-	fileString := string(fileBytes)
-	fileLines := strings.Split(fileString, "\n")
-
-	isImports := false
-
-	for lineNum, line := range fileLines {
-
-		line = strings.Trim(line, " ")
-
-		if trackImports == true {
-
-			if line == "import (" {
-				isImports = true
-				continue
-			}
-
-			if isImports == true {
-				if line == ")" {
-					isImports = false
-					continue
-				}
-
-				imports = append(imports, line[2:len(line)-1])
-				continue
-			}
-
-		}
-
-		if line == "// #genStart" {
-			lineStart = lineNum
-			continue
-		}
-
-		if line == "// #genEnd" {
-			lineEnd = lineNum
-			continue
-		}
-
-		if lineStart == -1 {
-			fileHead += line + "\n"
-			continue
-		}
-
-		if lineEnd > -1 {
-			fileFoot += line + "\n"
-		}
-	}
-
-	if lineStart == -1 || lineEnd == -1 {
-		e = fmt.Errorf("No gen tags found in outFile at path %s", filePath)
-	}
-
-	return
-}
-
-func scanStringForFuncSignature(str string, signatureRegexp string) (matches []string) {
-
-	lines := strings.Split(str, "\n")
-
-	var validSignature = regexp.MustCompile(signatureRegexp)
-
-	matches = []string{}
-
-	for _, line := range lines {
-		if validSignature.Match([]byte(line)) {
-			matches = append(matches, line)
-		}
-	}
-
-	return
-}
-
+// GenerateGoRepo returns a string for a repo in golang
 func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode string, e error) {
 
 	primaryKey := ""
@@ -556,118 +559,7 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 	return
 }
 
-func GenerateGoRepoFile(table *Table) (e error) {
-
-	fileHead := ""
-	fileFoot := ""
-	goCode := ""
-	imports := []string{}
-
-	outFile := fmt.Sprintf("./repos/%s.go", table.Name)
-
-	if fileHead, fileFoot, imports, e = scanFileParts(outFile, true); e != nil {
-		return
-	}
-
-	goCode, e = GenerateGoRepo(table, fileFoot, imports)
-	if e != nil {
-		return
-	}
-	outFileContent := fileHead + goCode + fileFoot
-	ioutil.WriteFile(outFile, []byte(outFileContent), 0644)
-
-	cmd := exec.Command("go", "fmt", outFile)
-	e = cmd.Run()
-
-	return
-}
-
-func GenerateGoSchemaFile(database *Database) (e error) {
-
-	var fileHead, fileFoot, goCode string
-
-	outFile := fmt.Sprintf("./schema/schema.go")
-
-	if fileHead, fileFoot, _, e = scanFileParts(outFile, false); e != nil {
-		return
-	}
-
-	goCode, e = GenerateGoSchema(database)
-	if e != nil {
-		return
-	}
-
-	outFileContent := fileHead + goCode + fileFoot
-	ioutil.WriteFile(outFile, []byte(outFileContent), 0644)
-
-	cmd := exec.Command("go", "fmt", outFile)
-	e = cmd.Run()
-	return
-}
-
-func GenerateGoModelFile(table *Table) (e error) {
-
-	var fileHead, fileFoot, goCode string
-	var imports []string
-
-	outFile := fmt.Sprintf("./models/%s.go", table.Name)
-
-	if fileHead, fileFoot, imports, e = scanFileParts(outFile, false); e != nil {
-		return
-	}
-
-	goCode, e = GenerateGoModel(table, imports)
-	if e != nil {
-		return
-	}
-
-	outFileContent := fileHead + goCode + fileFoot
-	ioutil.WriteFile(outFile, []byte(outFileContent), 0644)
-
-	cmd := exec.Command("go", "fmt", outFile)
-	e = cmd.Run()
-
-	return
-
-}
-
-func FindTableByName(database *Database, tableName string) (table *Table, e error) {
-
-	// Search for table
-	for _, dbTable := range database.Tables {
-		if dbTable.Name == tableName {
-			table = dbTable
-			break
-		}
-	}
-
-	if table == nil {
-		e = errors.New("table not found")
-	}
-
-	return
-}
-
-func GenerateGoModels(database *Database) (goCode string, e error) {
-
-	goCode = "// #genStart \n\n"
-
-	imports := []string{}
-
-	for _, table := range database.Tables {
-		code := ""
-		if code, e = GenerateGoModel(table, imports); e != nil {
-			return
-		}
-
-		goCode += code
-	}
-
-	goCode += "// #genEnd\n"
-
-	return
-}
-
+// GenerateGoModel returns a string for a model in golang
 func GenerateGoModel(table *Table, imports []string) (goCode string, e error) {
 
 	goCode += "// #genStart\n\n"
@@ -736,6 +628,7 @@ func GenerateGoModel(table *Table, imports []string) (goCode string, e error) {
 	return
 }
 
+// GenerateTypescriptTypes returns a string for a typscript types file
 func GenerateTypescriptTypes(database *Database) (goCode string, e error) {
 	goCode = "// #genStart \n\n"
 	for _, table := range database.Tables {
@@ -754,6 +647,7 @@ func GenerateTypescriptTypes(database *Database) (goCode string, e error) {
 	return
 }
 
+// GenerateTypescriptType returns a string for a type in typescript
 func GenerateTypescriptType(table *Table) (goCode string, e error) {
 
 	goCode += fmt.Sprintf("/**\n * %s\n */\n", table.Name)
@@ -782,23 +676,6 @@ func GenerateTypescriptType(table *Table) (goCode string, e error) {
 	}
 
 	goCode += "}\n\n"
-
-	return
-
-}
-
-func GenerateTypescriptTypesFile(database *Database) (e error) {
-
-	var goCode string
-
-	outFile := "./src/types/types.d.ts"
-
-	goCode, e = GenerateTypescriptTypes(database)
-	if e != nil {
-		return
-	}
-
-	ioutil.WriteFile(outFile, []byte(goCode), 0644)
 
 	return
 

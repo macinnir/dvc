@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 )
 
 type IFiles interface {
@@ -13,25 +12,6 @@ type IFiles interface {
 
 // Files
 type Files struct {
-}
-
-// ScanChangesetDir scans the changeset directory for any sql files
-func (f *Files) ScanChangesetDir(rootPath string) (paths []string, e error) {
-
-	var fileInfos []os.FileInfo
-	paths = []string{}
-
-	fileInfos, e = ioutil.ReadDir(rootPath)
-
-	for _, f := range fileInfos {
-		if f.IsDir() || filepath.Ext(f.Name()) != ".sql" {
-			continue
-		}
-		paths = append(paths, f.Name())
-	}
-
-	return
-
 }
 
 // FetchLocalChangesetList gets the contents of the changesets.json file

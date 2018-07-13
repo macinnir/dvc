@@ -5,31 +5,29 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 	// "strconv"
 	// "fmt"
 	"crypto/sha1"
 	"encoding/base64"
-	"github.com/BurntSushi/toml"
 	// "io/ioutil"
 	// "log"
 	// "path"
 	// "sort"
 )
 
-func loadConfig(configFilePath string) (config *Config, e error) {
-
-	// fmt.Printf("Looking for config at path %s\n", configFilePath)
-	if _, e = os.Stat(configFilePath); os.IsNotExist(e) {
-		e = fmt.Errorf("Config file `%s` not found", configFilePath)
-		return
-	}
-
-	config = &Config{}
-	_, e = toml.DecodeFile(configFilePath, config)
-	return
-}
+// Command Names
+const (
+	CommandImport        = "import"
+	CommandGen           = "gen"
+	CommandGenSchema     = "schema"
+	CommandGenRepos      = "repos"
+	CommandGenModels     = "models"
+	CommandGenAll        = "all"
+	CommandGenTypescript = "typescript"
+	CommandCompare       = "compare"
+	CommandHelp          = "help"
+)
 
 // NewDVC creates a new DVC instance
 // Can be called 2 ways:
@@ -44,7 +42,7 @@ func NewDVC(args ...string) (dvc *DVC, e error) {
 
 		// load config from file path
 		configFilePath = args[0]
-		config, e = loadConfig(configFilePath)
+		config, e = loadConfigFromFile(configFilePath)
 
 		if e != nil {
 			return
@@ -70,13 +68,7 @@ func NewDVC(args ...string) (dvc *DVC, e error) {
 
 	dvc = &DVC{
 		Config: config,
-		Files:  &Files{},
-		ServerMgr: &ServerMgr{
-			Config: config,
-		},
 	}
-
-	e = dvc.verifyChangesetFile()
 
 	return
 }
@@ -92,103 +84,39 @@ type DVC struct {
 	Databases          map[string]*Database
 }
 
-func (d *DVC) verifyChangesetFile() (e error) {
-	// fmt.Printf("Looking for changeset file at path %s\n", d.Config.ChangeSetPath)
-	// if _, e = os.Stat(d.Config.ChangeSetPath); os.IsNotExist(e) {
-	// 	e = errors.New("changeset path does not exist")
-	// 	return
-	// }
+func (d *DVC) initCommand() (server *Server) {
 
-	dt := ""
-	for _, t := range DatabaseTypes {
-		if d.Config.DatabaseType == t {
-			dt = d.Config.DatabaseType
-			break
-		}
-	}
-
-	if dt == "" {
-		e = errors.New("invalid database type")
-		return
-	}
-
-	return
-}
-
-// FetchSchema fetches schema data from the target database and builds a Database object from it
-func (d *DVC) FetchSchema() (database *Database, e error) {
-
-	// fmt.Printf("1. Connecting to host %s\n", d.Config.Host)
-	d.ServerMgr.Connect()
-
-	if d.Databases, e = d.ServerMgr.FetchDatabases(); e != nil {
-		return
-	}
-
-	// fmt.Printf("2. Looking for database %s\n", d.Config.DatabaseName)
-	databaseName := ""
-	for _, db := range d.Databases {
-		if db.Name == d.Config.DatabaseName {
-			databaseName = db.Name
-			break
-		}
-	}
-
-	if len(databaseName) == 0 {
-		e = errors.New("Database not found")
-		return
-	}
-
-	// fmt.Printf("...found database %s\n", databaseName)
-
-	dbMgr := DatabaseMgr{
-		connection: d.ServerMgr.conn,
-	}
-
-	// fmt.Println("3. Building database schema")
-	d.ServerMgr.UseDatabase(databaseName)
-	database, e = dbMgr.BuildDatabase(databaseName)
+	var e error
+	server, e = FetchServer(d.Config.Host, d.Config.Username, d.Config.Password)
 
 	if e != nil {
-		return
+		panic(e)
 	}
 
+	UseDatabase(server, d.Config.DatabaseName)
+
 	return
+
 }
 
 // ImportSchema calles `FetchSchema` and then marshal's it into a JSON object, writing it to the default schema.json file
+// @command import
 func (d *DVC) ImportSchema(fileName string) (e error) {
 
-	var database *Database
+	server := d.initCommand()
 
-	database, e = d.FetchSchema()
-
+	database := &Database{
+		Host: server.Host,
+		Name: d.Config.DatabaseName,
+	}
+	database.Tables, e = FetchTables(server, d.Config.DatabaseName)
+	if e != nil {
+		return
+	}
 	filePath := "./" + fileName
-	// fmt.Printf("4. Writing schema to %s\n", filePath)
-
 	dbBytes := []byte{}
 	dbBytes, e = json.MarshalIndent(database, " ", "    ")
 	e = ioutil.WriteFile(filePath, dbBytes, 0644)
-
-	return
-
-}
-
-// ReadSchemaFromFile Unmarshal's database json to a Database object
-func (d *DVC) ReadSchemaFromFile(filePath string) (database *Database, e error) {
-
-	fileBytes, e := ioutil.ReadFile(filePath)
-
-	if e != nil {
-		return
-	}
-
-	database = &Database{}
-
-	e = json.Unmarshal(fileBytes, database)
-	if e != nil {
-		return
-	}
 	return
 }
 
@@ -197,17 +125,20 @@ func (d *DVC) ReadSchemaFromFile(filePath string) (database *Database, e error) 
 // schema to be updated
 // @param reverse bool If true, the remote and local schema comparison is flipped in that the remote schema is treated as the authority
 // 		and the local schema is treated as the schema to be updated.
+// @command compare [reverse]
 func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e error) {
 
 	var localSchema *Database
 	var remoteSchema *Database
 
-	localSchema, e = d.ReadSchemaFromFile(schemaFile)
+	localSchema, e = ReadSchemaFromFile(schemaFile)
 	if e != nil {
 		return
 	}
 
-	remoteSchema, e = d.FetchSchema()
+	server := d.initCommand()
+
+	remoteSchema, e = FetchDatabase(server, d.Config.DatabaseName)
 
 	if e != nil {
 		return
@@ -261,68 +192,11 @@ func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e erro
 	return
 }
 
-func (d *DVC) WriteChangeset(sql string) (newFilePath string, e error) {
-
-	// paths := []string{}
-
-	// paths, e = d.Files.ScanChangesetDir(d.Config.ChangeSetPath)
-
-	// if e != nil {
-	// 	return
-	// }
-
-	// ordinalInt := 0
-
-	// for _, p := range paths {
-
-	// 	if len(p) < 11 {
-	// 		continue
-	// 	}
-
-	// 	ordinal := p[0:6]
-
-	// 	ordinalInt, e = strconv.Atoi(ordinal)
-
-	// }
-
-	// ordinalInt++
-
-	// nextFile := fmt.Sprintf("%06d", ordinalInt) + ".sql"
-	newFilePath = d.Config.ChangeSetPath + "/changes.sql"
-
-	e = ioutil.WriteFile(newFilePath, []byte(sql), 0644)
-	return
-}
-
-func (d *DVC) FetchChangesetFile() (changesetFileString string, e error) {
-
-	filePath := d.Config.ChangeSetPath + "/changes.sql"
-
-	if _, e = os.Stat(filePath); os.IsNotExist(e) {
-		return
-	}
-
-	var fileBytes []byte
-
-	fileBytes, e = ioutil.ReadFile(filePath)
-	if e != nil {
-		return
-	}
-
-	fmt.Printf(string(fileBytes))
-
-	changesetFileString = string(fileBytes)
-	return
-}
-
+// ApplyChangeset runs the sql produced by the `CompareSchema` command against the target database
+// @command compare [reverse] apply
 func (d *DVC) ApplyChangeset(changeset string) (e error) {
 
-	e = d.ServerMgr.Connect()
-	if e != nil {
-		return
-	}
-
-	d.ServerMgr.UseDatabase(d.Config.DatabaseName)
+	server := d.initCommand()
 
 	statements := strings.Split(changeset, ";")
 
@@ -332,13 +206,39 @@ func (d *DVC) ApplyChangeset(changeset string) (e error) {
 			continue
 		}
 		fmt.Printf("Running sql: %s", sql)
-		_, e = d.ServerMgr.conn.Exec(sql)
+
+		server.Connection.Exec(sql)
 		if e != nil {
 			return
 		}
 	}
 
 	return
+}
+
+// PrintHelp prints the help documentation to stdout
+func (d *DVC) PrintHelp() {
+	help := PrintHelp()
+	fmt.Println(help)
+}
+
+// PrintHelp prints help documentation to stdout
+func PrintHelp() string {
+	help := "DVC Help\n"
+	help += "\timport\n"
+	help += "\t\tBuild a schema definition file based on the target database. This will overwrite any existing schema definition file.\n"
+	help += "\tgen ( models | repos | schema | all)\n"
+	help += "\t\tall\t Generate all options below\n"
+	help += "\t\tmodels\t Generate models based on imported schema information. Will fail if no imported schema file exists.\n"
+	help += "\t\trepos\t Generate repositories based on imported schema information. Will fail if no imported schema file exists.\n"
+	help += "\t\tschema\t Generate go-dal schema bootstrap code based on imported schema information. Will fail if no imported schema file exists.\n"
+	help += "\tcompare [reverse] [ ( write <path> | apply ) ]\n"
+	help += "\t\t Default behavior (no arguments) is to compare local schema as authority against remote database as target and write the resulting sql to stdout.\n"
+	help += "\t\t reverse\tOptional reverse command will swith the roles of the schemas, making the remote database the authority and the local schema the target for updating.\n"
+	help += "\t\t write\tAfter performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).\n"
+	help += "\t\t apply\tAfter performing the comparison, the resulting sequel statements will be immediately applied to the target database.\n"
+	help += "\timport\n"
+	return help
 }
 
 func (d *DVC) Run() (e error) {
@@ -363,6 +263,29 @@ func (d *DVC) Run() (e error) {
 	// if d.ChangesetSignature, e = HashFileMd5(d.Config.ChangeSetPath + "/changesets.json"); e != nil {
 	// 	return
 	// }
+
+	return
+}
+
+func (d *DVC) verifyChangesetFile() (e error) {
+	// fmt.Printf("Looking for changeset file at path %s\n", d.Config.ChangeSetPath)
+	// if _, e = os.Stat(d.Config.ChangeSetPath); os.IsNotExist(e) {
+	// 	e = errors.New("changeset path does not exist")
+	// 	return
+	// }
+
+	dt := ""
+	for _, t := range DatabaseTypes {
+		if d.Config.DatabaseType == t {
+			dt = d.Config.DatabaseType
+			break
+		}
+	}
+
+	if dt == "" {
+		e = errors.New("invalid database type")
+		return
+	}
 
 	return
 }

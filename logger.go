@@ -15,6 +15,12 @@ type logger struct {
 	// logs []ChangeLog
 }
 
+// Log reprents a log entry
+type Log struct {
+	LogType    string
+	LogMessage string
+}
+
 // ToLogString parses the file name into a human readable string for logging the action
 // func (l *logger) ParseChangeLogToLogString(f ChangeFile) (logString string) {
 

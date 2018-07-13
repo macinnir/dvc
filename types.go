@@ -1,5 +1,13 @@
 package main
 
+import ()
+
+type Options uint
+
+type Command struct {
+	Options Options
+}
+
 // Changeset represents all of the changes in an environment and their changes
 type Changeset struct {
 	ChangeFiles map[string]ChangeFile
@@ -31,45 +39,6 @@ type Config struct {
 	DatabaseType  string `toml:"databaseType"`
 }
 
-// Database represents a database
-type Database struct {
-	RunID int64
-	Name  string
-	Host  string
-	// Sets          map[string]*ChangeSet
-	SortedSetKeys []string
-	Tables        map[string]*Table
-	// Logs          []ChangeLog
-}
-
-// Table represents a table in a database
-type Table struct {
-	Name          string             `json:"name"`
-	Engine        string             `json:"engine"`
-	Version       int                `json:"version"`
-	RowFormat     string             `json:"rowFormat"`
-	Rows          int64              `json:"rows"`
-	DataLength    int64              `json:"dataLength"`
-	Collation     string             `json:"collation"`
-	AutoIncrement int64              `json:"autoIncrement"`
-	Columns       map[string]*Column `json:"columns"`
-}
-
-// Column represents a column in a table
-type Column struct {
-	Name       string `json:"column"`
-	Position   int    `json:"position"`
-	Default    string `json:"default"`
-	IsNullable bool   `json:"isNullable"`
-	DataType   string `json:"dataType"`
-	MaxLength  int    `json:"maxLength"`
-	Precision  int    `json:"precision"`
-	CharSet    string `json:"charSet"`
-	Type       string `json:"type"`
-	ColumnKey  string `json:"columnKey"`
-	Extra      string `json:"extra"`
-}
-
 // SortedColumns is a slice of Column objects
 type SortedColumns []*Column
 
@@ -86,17 +55,4 @@ func (c SortedColumns) Swap(i, j int) {
 // Less is part of sort.Interface. We use count as the value to sort by
 func (c SortedColumns) Less(i, j int) bool {
 	return c[i].Position < c[j].Position
-}
-
-// Server represents a server
-type Server struct {
-	Name      string `json:"name"`
-	Host      string `json:"host"`
-	Databases map[string]*Database
-}
-
-// Log reprents a log entry
-type Log struct {
-	LogType    string
-	LogMessage string
 }

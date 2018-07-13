@@ -71,3 +71,13 @@ Examples:
         001_alterTable_myTable__addColumn_foo.sql
         002_alterTable_myTable__addIndex_ucFoo.sql
 ```
+
+# Documentation 
+
+Based on DocOpt
+http://docopt.org/
+
+Dependencies
+https://golang.github.io/dep/docs/migrating.html
+
+https://glide.sh/

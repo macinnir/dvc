@@ -11,22 +11,15 @@ var (
 	configFilePath = "dvc.toml"
 )
 
-func fatal(msg string) {
-	fmt.Printf("ERROR: %s\n", msg)
-	os.Exit(1)
-}
-
 func main() {
 
 	var e error
 	var dvc *DVC
-
 	args := os.Args
 
-	argLen := len(args)
-
-	if argLen < 2 {
-		fatal("Missing command...")
+	if len(args) < 2 {
+		log.Fatal("Missing command")
+		return
 	}
 
 	cmd := args[1]
@@ -36,7 +29,7 @@ func main() {
 	}
 
 	switch cmd {
-	case "import":
+	case CommandImport:
 
 		schemaFile := dvc.Config.DatabaseName + ".schema.json"
 
@@ -47,29 +40,30 @@ func main() {
 		log.Printf("Schema `%s`.`%s` imported to %s.", dvc.Config.Host, dvc.Config.DatabaseName, schemaFile)
 		os.Exit(0)
 
-	case "gen":
+	case CommandGen:
 
 		var database *Database
 
-		if argLen < 3 {
+		if len(args) < 3 {
 			fatal("Missing gen type [schema | model | repo]")
 		}
 		subCmd := args[2]
 
 		// Load the schema
 		schemaFile := dvc.Config.DatabaseName + ".schema.json"
-		database, e = dvc.ReadSchemaFromFile(schemaFile)
+		database, e = ReadSchemaFromFile(schemaFile)
 		if e != nil {
 			fatal(e.Error())
 		}
 
 		switch subCmd {
-		case "schema":
+		case CommandGenSchema:
 			e = GenerateGoSchemaFile(database)
 			if e != nil {
 				fatal(e.Error())
 			}
-		case "repos":
+
+		case CommandGenRepos:
 
 			for _, table := range database.Tables {
 				e = GenerateGoRepoFile(table)
@@ -81,13 +75,13 @@ func main() {
 			GenerateReposBootstrapFile(database)
 
 		case "repo":
-			if argLen < 4 {
+			if len(args) < 4 {
 				fatal("Missing repo name")
 			}
 
 			var t *Table
 
-			if t, e = FindTableByName(database, args[3]); e != nil {
+			if t, e = database.FindTableByName(args[3]); e != nil {
 				fatal(e.Error())
 			}
 
@@ -95,7 +89,7 @@ func main() {
 				fatal(e.Error())
 			}
 
-		case "models":
+		case CommandGenModels:
 
 			for _, table := range database.Tables {
 				e = GenerateGoModelFile(table)
@@ -105,20 +99,20 @@ func main() {
 			}
 
 		case "model":
-			if argLen < 4 {
+			if len(args) < 4 {
 				fatal("missing model name")
 			}
 
 			var t *Table
 
-			if t, e = FindTableByName(database, args[3]); e != nil {
+			if t, e = database.FindTableByName(args[3]); e != nil {
 				fatal(e.Error())
 			}
 
 			if e = GenerateGoModelFile(t); e != nil {
 				fatal(e.Error())
 			}
-		case "all":
+		case CommandGenAll:
 
 			// Generate schema
 			fmt.Print("Generating schema...")
@@ -158,7 +152,7 @@ func main() {
 			fatal(fmt.Sprintf("Unknown output type: `%s`", subCmd))
 		}
 
-	case "compare":
+	case CommandCompare:
 
 		sql := ""
 
@@ -167,7 +161,7 @@ func main() {
 		schemaFile := dvc.Config.DatabaseName + ".schema.json"
 
 		isCompareFlipped := false
-		if argLen > 2 && args[nextArgIdx] == "reverse" {
+		if len(args) > 2 && args[nextArgIdx] == "reverse" {
 			isCompareFlipped = true
 			nextArgIdx++
 		}
@@ -181,7 +175,7 @@ func main() {
 			os.Exit(0)
 		}
 
-		if argLen > nextArgIdx {
+		if len(args) > nextArgIdx {
 			// "--file="
 
 			switch args[nextArgIdx] {
@@ -189,7 +183,7 @@ func main() {
 
 				nextArgIdx++
 
-				if argLen > nextArgIdx {
+				if len(args) > nextArgIdx {
 
 					filePath := args[nextArgIdx]
 
@@ -209,7 +203,6 @@ func main() {
 
 			default:
 				fatal(fmt.Sprintf("Unknown argument: `%s`\n", args[2]))
-				os.Exit(1)
 			}
 
 		}
@@ -218,21 +211,8 @@ func main() {
 		fmt.Printf("%s", sql)
 		os.Exit(0)
 
-	case "help":
-		fmt.Println("DVC Help")
-		fmt.Println("\timport")
-		fmt.Println("\t\tBuild a schema definition file based on the target database. This will overwrite any existing schema definition file.")
-		fmt.Println("\tgen ( models | repos | schema | all)")
-		fmt.Println("\t\tall\t Generate all options below")
-		fmt.Println("\t\tmodels\t Generate models based on imported schema information. Will fail if no imported schema file exists.")
-		fmt.Println("\t\trepos\t Generate repositories based on imported schema information. Will fail if no imported schema file exists.")
-		fmt.Println("\t\tschema\t Generate go-dal schema bootstrap code based on imported schema information. Will fail if no imported schema file exists.")
-		fmt.Println("\tcompare [reverse] [ ( write <path> | apply ) ]")
-		fmt.Println("\t\t Default behavior (no arguments) is to compare local schema as authority against remote database as target and write the resulting sql to stdout.")
-		fmt.Println("\t\t reverse\tOptional reverse command will swith the roles of the schemas, making the remote database the authority and the local schema the target for updating.")
-		fmt.Println("\t\t write\tAfter performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).")
-		fmt.Println("\t\t apply\tAfter performing the comparison, the resulting sequel statements will be immediately applied to the target database.")
-		fmt.Println("\timport")
+	case CommandHelp:
+		dvc.PrintHelp()
 
 	default:
 		fatal(fmt.Sprintf("Unknown command: `%s`", cmd))
