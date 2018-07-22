@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	// "fmt"
@@ -89,7 +90,7 @@ func (ss *serverService) FetchDatabaseTables(server *Server, databaseName string
 			&table.AutoIncrement,
 		)
 
-		table.Columns, e = FetchColumns(server, table.Name)
+		table.Columns, e = ss.FetchTableColumns(server, table.Name)
 
 		if e != nil {
 			log.Fatalf("ERROR: %s", e.Error())

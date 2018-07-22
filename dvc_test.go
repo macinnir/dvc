@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -15,23 +14,23 @@ func TestDvcBadConfigFilePath(t *testing.T) {
 	}
 }
 
-func TestDvcInvalidDatabaseType(t *testing.T) {
-	_, e := NewDVC("./test_resources/config2.toml")
+// func TestDvcInvalidDatabaseType(t *testing.T) {
+// 	_, e := NewDVC("./test_resources/config2.toml")
 
-	if e == nil {
-		t.Error("Dvc should have thrown an error when the config2.toml has a bad database type.")
-		return
-	}
+// 	if e == nil {
+// 		t.Error("Dvc should have thrown an error when the config2.toml has a bad database type.")
+// 		return
+// 	}
 
-	err := e.Error()
+// 	err := e.Error()
 
-	fmt.Printf("Error: %s\n", err)
+// 	fmt.Printf("Error: %s\n", err)
 
-	if err != "invalid database type" {
-		t.Error("Dvc should have returned a config error indicating a bad value for the database type")
-		return
-	}
-}
+// 	if err != "invalid database type" {
+// 		t.Error("Dvc should have returned a config error indicating a bad value for the database type")
+// 		return
+// 	}
+// }
 
 func TestDvcGoodConfigFilePath(t *testing.T) {
 	d, e := NewDVC("dvc.toml")
@@ -66,7 +65,6 @@ func TestDvcGoodConfigFilePath(t *testing.T) {
 	}
 
 }
-
 func TestDvcMissingArguments(t *testing.T) {
 
 	_, e := NewDVC()
@@ -80,7 +78,6 @@ func TestDvcMissingArguments(t *testing.T) {
 		t.Error("NewDVC should have returned a `not enough arguments` error")
 	}
 }
-
 func TestDvcMultipleArguments(t *testing.T) {
 	d, e := NewDVC("host", "name", "user", "pass", "test_resources/changes", "mysql")
 

@@ -20,7 +20,7 @@ func (f *Files) FetchLocalChangesetList(rootPath string) (sqlPaths []string, e e
 
 	changesetJSONPath := rootPath + "/changesets.json"
 
-	fmt.Printf("Looking for changeset file at path %s\n", changesetJSONPath)
+	// fmt.Printf("Looking for changeset file at path %s\n", changesetJSONPath)
 	if _, e = os.Stat(changesetJSONPath); os.IsNotExist(e) {
 		return
 	}

@@ -75,25 +75,25 @@ func NewDVC(args ...string) (dvc *DVC, e error) {
 
 // DVC is the core object for running Database Version Control
 type DVC struct {
-	Config             *Config      // Config is the config object
-	LocalSQLPaths      []string     // LocalSQLPaths is a list of paths pulled from the changesets.json file
-	ChangesetSignature string       // ChangesetSignature is a SHA signature for the changesets.json file
-	LocalChangeFiles   []ChangeFile // LocalChangeFiles is a list of paths to local change files
-	Files              *Files       // Files is the injected file manager
-	ServerMgr          *ServerMgr   // ServerMgr is the injected server manager
+	Config             *Config        // Config is the config object
+	LocalSQLPaths      []string       // LocalSQLPaths is a list of paths pulled from the changesets.json file
+	ChangesetSignature string         // ChangesetSignature is a SHA signature for the changesets.json file
+	LocalChangeFiles   []ChangeFile   // LocalChangeFiles is a list of paths to local change files
+	Files              *Files         // Files is the injected file manager
+	serverService      *serverService // ServerService is the injected server manager
 	Databases          map[string]*Database
 }
 
 func (d *DVC) initCommand() (server *Server) {
 
 	var e error
-	server, e = FetchServer(d.Config.Host, d.Config.Username, d.Config.Password)
+	server, e = d.serverService.ConnectToServer(d.Config.Host, d.Config.Username, d.Config.Password)
 
 	if e != nil {
 		panic(e)
 	}
 
-	UseDatabase(server, d.Config.DatabaseName)
+	d.serverService.UseDatabase(server, d.Config.DatabaseName)
 
 	return
 
@@ -109,7 +109,7 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 		Host: server.Host,
 		Name: d.Config.DatabaseName,
 	}
-	database.Tables, e = FetchTables(server, d.Config.DatabaseName)
+	database.Tables, e = d.serverService.FetchDatabaseTables(server, d.Config.DatabaseName)
 	if e != nil {
 		return
 	}
@@ -138,7 +138,11 @@ func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e erro
 
 	server := d.initCommand()
 
-	remoteSchema, e = FetchDatabase(server, d.Config.DatabaseName)
+	remoteSchema = &Database{}
+
+	remoteSchema.Host = server.Host
+	remoteSchema.Name = d.Config.DatabaseName
+	remoteSchema.Tables, e = d.serverService.FetchDatabaseTables(server, d.Config.DatabaseName)
 
 	if e != nil {
 		return
@@ -183,10 +187,12 @@ func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e erro
 
 	sql = ""
 
+	query := &Query{}
+
 	if reverse == true {
-		sql, e = QueryCreateChangeSQL(remoteSchema, localSchema)
+		sql, e = query.CreateChangeSQL(remoteSchema, localSchema)
 	} else {
-		sql, e = QueryCreateChangeSQL(localSchema, remoteSchema)
+		sql, e = query.CreateChangeSQL(localSchema, remoteSchema)
 	}
 
 	return
@@ -216,31 +222,7 @@ func (d *DVC) ApplyChangeset(changeset string) (e error) {
 	return
 }
 
-// PrintHelp prints the help documentation to stdout
-func (d *DVC) PrintHelp() {
-	help := PrintHelp()
-	fmt.Println(help)
-}
-
-// PrintHelp prints help documentation to stdout
-func PrintHelp() string {
-	help := "DVC Help\n"
-	help += "\timport\n"
-	help += "\t\tBuild a schema definition file based on the target database. This will overwrite any existing schema definition file.\n"
-	help += "\tgen ( models | repos | schema | all)\n"
-	help += "\t\tall\t Generate all options below\n"
-	help += "\t\tmodels\t Generate models based on imported schema information. Will fail if no imported schema file exists.\n"
-	help += "\t\trepos\t Generate repositories based on imported schema information. Will fail if no imported schema file exists.\n"
-	help += "\t\tschema\t Generate go-dal schema bootstrap code based on imported schema information. Will fail if no imported schema file exists.\n"
-	help += "\tcompare [reverse] [ ( write <path> | apply ) ]\n"
-	help += "\t\t Default behavior (no arguments) is to compare local schema as authority against remote database as target and write the resulting sql to stdout.\n"
-	help += "\t\t reverse\tOptional reverse command will swith the roles of the schemas, making the remote database the authority and the local schema the target for updating.\n"
-	help += "\t\t write\tAfter performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).\n"
-	help += "\t\t apply\tAfter performing the comparison, the resulting sequel statements will be immediately applied to the target database.\n"
-	help += "\timport\n"
-	return help
-}
-
+// Run prints help documentation to stdout
 func (d *DVC) Run() (e error) {
 
 	fmt.Println("Running Run()")

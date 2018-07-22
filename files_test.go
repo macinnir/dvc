@@ -25,7 +25,7 @@ func TestFetchLocalChangesetListSuccess(t *testing.T) {
 	sqlPaths, e := f.FetchLocalChangesetList(changesetPath)
 
 	if e != nil {
-		t.Error("should not have returned an error (should have found the changesets file)")
+		t.Errorf("should not have thrown an error: %s", e.Error())
 		return
 	}
 
@@ -40,6 +40,7 @@ func TestFetchLocalChangesetListSuccess(t *testing.T) {
 		t.Errorf("should have had `%s` in the first changeset item (found: %s)", want, sqlPaths[0])
 	}
 }
+
 func TestBuildChangeFiles(t *testing.T) {
 
 	changesetPath := "test_resources/changes"

@@ -57,7 +57,7 @@ func (q *Query) CreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql
 
 		// Column does not exist remotely
 		if _, ok := remoteTable.Columns[column.Name]; !ok {
-			query, e = q.CreateColumn(localTable, column)
+			query, e = q.AlterTableCreateColumn(localTable, column)
 			if e != nil {
 				return
 			}
@@ -86,7 +86,7 @@ func (q *Query) CreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql
 
 		// Column does not exist locally
 		if _, ok := localTable.Columns[column.Name]; !ok {
-			query, e = q.DropColumn(localTable, column)
+			query, e = q.AlterTableDropColumn(localTable, column)
 			if e != nil {
 				return
 			}
@@ -95,6 +95,110 @@ func (q *Query) CreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql
 		}
 	}
 
+	return
+}
+
+// CreateTable returns a create table sql statement
+func (q *Query) CreateTable(table *Table) (sql string, e error) {
+
+	// colLen := len(table.Columns)
+	idx := 1
+
+	// Primary Key?
+	primaryKey := ""
+
+	cols := []string{}
+
+	// Unique Keys
+	uniqueKeyColumns := []*Column{}
+
+	// Regular Keys (allows for multiple entries)
+	multiKeyColumns := []*Column{}
+
+	sortedColumns := make(SortedColumns, 0, len(table.Columns))
+
+	for _, column := range table.Columns {
+		sortedColumns = append(sortedColumns, column)
+	}
+
+	sort.Sort(sortedColumns)
+
+	for _, column := range sortedColumns {
+
+		colQuery := ""
+		colQuery, e = q.CreateColumn(column)
+		col := colQuery
+
+		idx++
+
+		switch column.ColumnKey {
+		case "PRI":
+			primaryKey = column.Name
+		case "UNI":
+			uniqueKeyColumns = append(uniqueKeyColumns, column)
+		case "MUL":
+			multiKeyColumns = append(multiKeyColumns, column)
+		}
+		cols = append(cols, col)
+	}
+
+	if len(primaryKey) > 0 {
+		cols = append(cols, fmt.Sprintf("PRIMARY KEY(`%s`)", primaryKey))
+	}
+
+	sql = fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n) ENGINE = %s;", table.Name, strings.Join(cols, ",\n\t"), table.Engine)
+
+	if len(uniqueKeyColumns) > 0 {
+		sql += "\n"
+		for _, uniqueKeyColumn := range uniqueKeyColumns {
+			t, _ := q.AddUniqueIndex(table, uniqueKeyColumn)
+			sql += t + "\n"
+		}
+	}
+
+	if len(multiKeyColumns) > 0 {
+		sql += "\n"
+		for _, multiKeyColumn := range multiKeyColumns {
+			t, _ := q.AddIndex(table, multiKeyColumn)
+			sql += t + "\n"
+		}
+	}
+
+	return
+}
+
+// DropTable returns a drop table sql statement
+func (q *Query) DropTable(table *Table) (sql string, e error) {
+	sql = fmt.Sprintf("DROP TABLE `%s`;", table.Name)
+	return
+}
+
+// CreateColumn returns a table column sql segment
+func (q *Query) CreateColumn(column *Column) (sql string, e error) {
+
+	sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
+	if !column.IsNullable {
+		sql += " NOT"
+	}
+	sql += " NULL"
+
+	if column.DataType == "char" || column.DataType == "varchar" || column.DataType == "enum" {
+		sql += fmt.Sprintf(" DEFAULT '%s'", column.Default)
+	} else if len(column.Default) > 0 {
+		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
+	}
+
+	if len(column.Extra) > 0 {
+		sql += " " + column.Extra
+	}
+
+	return
+
+}
+
+// AlterTableDropColumn returns an alter table sql statement that drops a column
+func (q *Query) AlterTableDropColumn(table *Table, column *Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
 	return
 }
 
@@ -175,12 +279,12 @@ func (q *Query) ChangeColumn(table *Table, localColumn *Column, remoteColumn *Co
 
 }
 
-// CreateColumn returns an alter table sql statement that adds a column
-func (q *Query) CreateColumn(table *Table, column *Column) (sql string, e error) {
+// AlterTableCreateColumn returns an alter table sql statement that adds a column
+func (q *Query) AlterTableCreateColumn(table *Table, column *Column) (sql string, e error) {
 
 	query := ""
 
-	query, e = QueryCreateColumn(column)
+	query, e = q.CreateColumn(column)
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query)
 
 	return
@@ -207,116 +311,5 @@ func (q *Query) DropIndex(table *Table, column *Column) (sql string, e error) {
 // DropUniqueIndex returns an alter table sql statement that drops a unique index
 func (q *Query) DropUniqueIndex(table *Table, column *Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s`;", table.Name, column.Name)
-	return
-}
-
-// DropTable returns a drop table sql statement
-func (q *Query) DropTable(table *Table) (sql string, e error) {
-	sql = fmt.Sprintf("DROP TABLE `%s`;", table.Name)
-	return
-}
-
-// CreateTable returns a create table sql statement
-func (q *Query) CreateTable(table *Table) (sql string, e error) {
-
-	// colLen := len(table.Columns)
-	idx := 1
-
-	// Primary Key?
-	primaryKey := ""
-
-	cols := []string{}
-
-	// Unique Keys
-	uniqueKeyColumns := []*Column{}
-
-	// Regular Keys (allows for multiple entries)
-	multiKeyColumns := []*Column{}
-
-	sortedColumns := make(SortedColumns, 0, len(table.Columns))
-
-	for _, column := range table.Columns {
-		sortedColumns = append(sortedColumns, column)
-	}
-
-	sort.Sort(sortedColumns)
-
-	for _, column := range sortedColumns {
-
-		colQuery := ""
-		colQuery, e = QueryCreateColumn(column)
-		col := colQuery
-
-		idx++
-
-		switch column.ColumnKey {
-		case "PRI":
-			primaryKey = column.Name
-		case "UNI":
-			uniqueKeyColumns = append(uniqueKeyColumns, column)
-		case "MUL":
-			multiKeyColumns = append(multiKeyColumns, column)
-		}
-		cols = append(cols, col)
-	}
-
-	if len(primaryKey) > 0 {
-		cols = append(cols, fmt.Sprintf("PRIMARY KEY(`%s`)", primaryKey))
-	}
-
-	sql = fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n);", table.Name, strings.Join(cols, ",\n\t"))
-
-	if len(uniqueKeyColumns) > 0 {
-		sql += "\n"
-		for _, uniqueKeyColumn := range uniqueKeyColumns {
-			t, _ := q.AddUniqueIndex(table, uniqueKeyColumn)
-			sql += t + "\n"
-		}
-	}
-
-	if len(multiKeyColumns) > 0 {
-		for _, multiKeyColumn := range multiKeyColumns {
-			t, _ := q.AddIndex(table, multiKeyColumn)
-			sql += t + "\n"
-		}
-	}
-
-	return
-}
-
-// CreateColumn returns a create table column sql statement
-func (q *Query) CreateColumn(column *Column) (sql string, e error) {
-
-	sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
-	if !column.IsNullable {
-		sql += " NOT"
-	}
-	sql += " NULL"
-
-	if len(column.Default) > 0 || column.DataType == "varchar" {
-
-		columnDefault := column.Default
-
-		switch column.DataType {
-		case "varchar":
-			columnDefault = fmt.Sprintf("'%s'", column.Default)
-		case "enum":
-			columnDefault = fmt.Sprintf("'%s'", column.Default)
-		}
-
-		sql += fmt.Sprintf(" DEFAULT %s", columnDefault)
-	}
-
-	if len(column.Extra) > 0 {
-		sql += " " + column.Extra
-	}
-
-	return
-
-}
-
-// DropColumn returns an alter table sql statement that drops a column
-func (q *Query) DropColumn(table *Table, column *Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
 	return
 }
