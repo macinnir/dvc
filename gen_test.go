@@ -19,6 +19,7 @@ func TestGenerateGoModel(t *testing.T) {
 		Type:     "int(10)",
 		DataType: "int",
 		Name:     "FooID",
+		Position: 1,
 	}
 
 	table.Columns["Bar"] = &Column{
@@ -26,6 +27,7 @@ func TestGenerateGoModel(t *testing.T) {
 		DataType:   "varchar",
 		Name:       "Bar",
 		IsNullable: true,
+		Position:   2,
 	}
 
 	model, e = GenerateGoModel(table, []string{})
