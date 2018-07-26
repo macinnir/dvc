@@ -10,6 +10,8 @@ import (
 	// "fmt"
 	"crypto/sha1"
 	"encoding/base64"
+	"github.com/macinnir/dvc/query"
+	"github.com/macinnir/dvc/types"
 	// "io/ioutil"
 	// "log"
 	// "path"
@@ -35,7 +37,7 @@ const (
 //  2. NewDvc(host, databaseName, username, password, changesetPath, databaseType)
 func NewDVC(args ...string) (dvc *DVC, e error) {
 
-	var config *Config
+	var config *types.Config
 	var configFilePath string
 
 	if len(args) == 1 {
@@ -56,7 +58,7 @@ func NewDVC(args ...string) (dvc *DVC, e error) {
 		}
 
 		// build config from arguments
-		config = &Config{
+		config = &types.Config{
 			Host:          args[0],
 			DatabaseName:  args[1],
 			Username:      args[2],
@@ -75,16 +77,16 @@ func NewDVC(args ...string) (dvc *DVC, e error) {
 
 // DVC is the core object for running Database Version Control
 type DVC struct {
-	Config             *Config        // Config is the config object
-	LocalSQLPaths      []string       // LocalSQLPaths is a list of paths pulled from the changesets.json file
-	ChangesetSignature string         // ChangesetSignature is a SHA signature for the changesets.json file
-	LocalChangeFiles   []ChangeFile   // LocalChangeFiles is a list of paths to local change files
-	Files              *Files         // Files is the injected file manager
-	serverService      *serverService // ServerService is the injected server manager
-	Databases          map[string]*Database
+	Config             *types.Config      // Config is the config object
+	LocalSQLPaths      []string           // LocalSQLPaths is a list of paths pulled from the changesets.json file
+	ChangesetSignature string             // ChangesetSignature is a SHA signature for the changesets.json file
+	LocalChangeFiles   []types.ChangeFile // LocalChangeFiles is a list of paths to local change files
+	Files              *Files             // Files is the injected file manager
+	serverService      *serverService     // ServerService is the injected server manager
+	Databases          map[string]*types.Database
 }
 
-func (d *DVC) initCommand() (server *Server) {
+func (d *DVC) initCommand() (server *types.Server) {
 
 	var e error
 	server, e = d.serverService.ConnectToServer(d.Config.Host, d.Config.Username, d.Config.Password)
@@ -105,7 +107,7 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 
 	server := d.initCommand()
 
-	database := &Database{
+	database := &types.Database{
 		Host: server.Host,
 		Name: d.Config.DatabaseName,
 	}
@@ -128,8 +130,8 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 // @command compare [reverse]
 func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e error) {
 
-	var localSchema *Database
-	var remoteSchema *Database
+	var localSchema *types.Database
+	var remoteSchema *types.Database
 
 	localSchema, e = ReadSchemaFromFile(schemaFile)
 	if e != nil {
@@ -138,7 +140,7 @@ func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e erro
 
 	server := d.initCommand()
 
-	remoteSchema = &Database{}
+	remoteSchema = &types.Database{}
 
 	remoteSchema.Host = server.Host
 	remoteSchema.Name = d.Config.DatabaseName
@@ -187,7 +189,7 @@ func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e erro
 
 	sql = ""
 
-	query := &Query{}
+	query := &query.Query{}
 
 	if reverse == true {
 		sql, e = query.CreateChangeSQL(remoteSchema, localSchema)

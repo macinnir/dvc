@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/macinnir/dvc/types"
 	"testing"
 )
 
@@ -53,7 +54,7 @@ func TestBuildChangeFiles(t *testing.T) {
 		t.Error("fetchLocalChangesetList should have not thrown an error")
 	}
 
-	var changeFiles []ChangeFile
+	var changeFiles []types.ChangeFile
 
 	changeFiles, e = f.BuildChangeFiles(sqlPaths)
 

@@ -2,8 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
+	"github.com/macinnir/dvc/types"
 	"log"
 	// "fmt"
 	// "log"
@@ -11,12 +11,12 @@ import (
 
 // serverService contains functionality for interacting with a server
 type serverService struct {
-	Config *Config
+	Config *types.Config
 }
 
 // ConnectToServer connects to a server and returns a new server object
-func (ss *serverService) ConnectToServer(host string, username string, password string) (server *Server, e error) {
-	server = &Server{Host: host}
+func (ss *serverService) ConnectToServer(host string, username string, password string) (server *types.Server, e error) {
+	server = &types.Server{Host: host}
 	var connectionString = username + ":" + password + "@tcp(" + host + ")/?charset=utf8"
 	server.Connection, e = sql.Open("mysql", connectionString)
 	return
@@ -24,10 +24,10 @@ func (ss *serverService) ConnectToServer(host string, username string, password 
 
 // FetchDatabases fetches a set of database names from the target server
 // populating the Databases property with a map of Database objects
-func (ss *serverService) FetchDatabases(server *Server) (databases map[string]*Database, e error) {
+func (ss *serverService) FetchDatabases(server *types.Server) (databases map[string]*types.Database, e error) {
 
 	var rows *sql.Rows
-	databases = map[string]*Database{}
+	databases = map[string]*types.Database{}
 
 	if rows, e = server.Connection.Query("SHOW DATABASES"); e != nil {
 		return
@@ -40,14 +40,14 @@ func (ss *serverService) FetchDatabases(server *Server) (databases map[string]*D
 	for rows.Next() {
 		databaseName := ""
 		rows.Scan(&databaseName)
-		databases[databaseName] = &Database{Name: databaseName, Host: server.Host}
+		databases[databaseName] = &types.Database{Name: databaseName, Host: server.Host}
 	}
 
 	return
 }
 
 // UseDatabase switches the connection context to the passed in database
-func (ss *serverService) UseDatabase(server *Server, databaseName string) (e error) {
+func (ss *serverService) UseDatabase(server *types.Server, databaseName string) (e error) {
 
 	if server.CurrentDatabase == databaseName {
 		return
@@ -61,7 +61,7 @@ func (ss *serverService) UseDatabase(server *Server, databaseName string) (e err
 }
 
 // FetchDatabaseTables fetches the complete set of tables from this database
-func (ss *serverService) FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error) {
+func (ss *serverService) FetchDatabaseTables(server *types.Server, databaseName string) (tables map[string]*types.Table, e error) {
 
 	var rows *sql.Rows
 	query := "select `TABLE_NAME`, `ENGINE`, `VERSION`, `ROW_FORMAT`, `TABLE_ROWS`, `DATA_LENGTH`, `TABLE_COLLATION`, `AUTO_INCREMENT` FROM information_schema.tables WHERE TABLE_SCHEMA = '" + databaseName + "'"
@@ -74,10 +74,11 @@ func (ss *serverService) FetchDatabaseTables(server *Server, databaseName string
 		defer rows.Close()
 	}
 
-	tables = map[string]*Table{}
+	tables = map[string]*types.Table{}
 
 	for rows.Next() {
-		table := &Table{}
+
+		table := &types.Table{}
 
 		rows.Scan(
 			&table.Name,
@@ -104,7 +105,7 @@ func (ss *serverService) FetchDatabaseTables(server *Server, databaseName string
 }
 
 // FetchTableColumns lists all of the columns in a table
-func (ss *serverService) FetchTableColumns(server *Server, tableName string) (columns map[string]*Column, e error) {
+func (ss *serverService) FetchTableColumns(server *types.Server, tableName string) (columns map[string]*types.Column, e error) {
 	var rows *sql.Rows
 
 	query := fmt.Sprintf(`
@@ -136,10 +137,10 @@ func (ss *serverService) FetchTableColumns(server *Server, tableName string) (co
 		defer rows.Close()
 	}
 
-	columns = map[string]*Column{}
+	columns = map[string]*types.Column{}
 
 	for rows.Next() {
-		column := Column{}
+		column := types.Column{}
 		if e = rows.Scan(
 			&column.Name,
 			&column.Position,
@@ -159,86 +160,6 @@ func (ss *serverService) FetchTableColumns(server *Server, tableName string) (co
 	}
 
 	return
-}
-
-// Server represents a server
-type Server struct {
-	Name            string `json:"name"`
-	Host            string `json:"host"`
-	Databases       map[string]*Database
-	Connection      *sql.DB
-	CurrentDatabase string
-}
-
-// DatabaseExists checks if the database `databaseName` exists in its list of databases
-func (s *Server) DatabaseExists(databaseName string) bool {
-
-	exists := false
-
-	for _, db := range s.Databases {
-		if db.Name == databaseName {
-			exists = true
-			break
-		}
-	}
-
-	return exists
-}
-
-// Database represents a database
-type Database struct {
-	RunID int64
-	Name  string
-	Host  string
-	// Sets          map[string]*ChangeSet
-	SortedSetKeys []string
-	Tables        map[string]*Table
-	// Logs          []ChangeLog
-}
-
-// FindTableByName finds a table by its name in the database
-func (d *Database) FindTableByName(tableName string) (table *Table, e error) {
-	// Search for table
-	for _, dbTable := range d.Tables {
-		if dbTable.Name == tableName {
-			table = dbTable
-			break
-		}
-	}
-
-	if table == nil {
-		e = errors.New("table not found")
-	}
-
-	return
-}
-
-// Table represents a table in a database
-type Table struct {
-	Name          string             `json:"name"`
-	Engine        string             `json:"engine"`
-	Version       int                `json:"version"`
-	RowFormat     string             `json:"rowFormat"`
-	Rows          int64              `json:"rows"`
-	DataLength    int64              `json:"dataLength"`
-	Collation     string             `json:"collation"`
-	AutoIncrement int64              `json:"autoIncrement"`
-	Columns       map[string]*Column `json:"columns"`
-}
-
-// Column represents a column in a table
-type Column struct {
-	Name       string `json:"column"`
-	Position   int    `json:"position"`
-	Default    string `json:"default"`
-	IsNullable bool   `json:"isNullable"`
-	DataType   string `json:"dataType"`
-	MaxLength  int    `json:"maxLength"`
-	Precision  int    `json:"precision"`
-	CharSet    string `json:"charSet"`
-	Type       string `json:"type"`
-	ColumnKey  string `json:"columnKey"`
-	Extra      string `json:"extra"`
 }
 
 // // FetchDatabase builds and fetches data for a database object

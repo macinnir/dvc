@@ -4,15 +4,16 @@ import (
 	"database/sql"
 	// mysql driver
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/macinnir/dvc/types"
 )
 
 // MySQL integration
 type MySQL struct {
 	conn   *sql.DB
-	config *Config
+	config *types.Config
 }
 
-func NewMySQL(config *Config) (mysql *MySQL, e error) {
+func NewMySQL(config *types.Config) (mysql *MySQL, e error) {
 
 	mysql = &MySQL{
 		config: config,

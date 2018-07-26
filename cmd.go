@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/gen"
+	"github.com/macinnir/dvc/types"
 	"io/ioutil"
 	"log"
 	"os"
@@ -9,11 +11,11 @@ import (
 
 // Cmd is a container for handling commands
 type Cmd struct {
-	Options Options
+	Options types.Options
 	errLog  *log.Logger
 	cmd     string
 	dvc     *DVC
-	config  *Config
+	config  *types.Config
 }
 
 // NewCmd returns a new Cmd instance
@@ -163,7 +165,7 @@ func (c *Cmd) CommandCompare(args []string) {
 func (c *Cmd) CommandGen(args []string) {
 
 	var e error
-	var database *Database
+	var database *types.Database
 
 	if len(args) < 3 {
 		fatal("Missing gen type [schema | model | repo]")
@@ -179,7 +181,7 @@ func (c *Cmd) CommandGen(args []string) {
 
 	switch subCmd {
 	case CommandGenSchema:
-		e = GenerateGoSchemaFile(database)
+		e = gen.GenerateGoSchemaFile(database)
 		if e != nil {
 			fatal(e.Error())
 		}
@@ -187,33 +189,33 @@ func (c *Cmd) CommandGen(args []string) {
 	case CommandGenRepos:
 
 		for _, table := range database.Tables {
-			e = GenerateGoRepoFile(table)
+			e = gen.GenerateGoRepoFile(table)
 			if e != nil {
 				fatal(e.Error())
 			}
 		}
 
-		GenerateReposBootstrapFile(database)
+		gen.GenerateReposBootstrapFile(database)
 
 	case "repo":
 		if len(args) < 4 {
 			fatal("Missing repo name")
 		}
 
-		var t *Table
+		var t *types.Table
 
 		if t, e = database.FindTableByName(args[3]); e != nil {
 			fatal(e.Error())
 		}
 
-		if e = GenerateGoRepoFile(t); e != nil {
+		if e = gen.GenerateGoRepoFile(t); e != nil {
 			fatal(e.Error())
 		}
 
 	case CommandGenModels:
 
 		for _, table := range database.Tables {
-			e = GenerateGoModelFile(table)
+			e = gen.GenerateGoModelFile(table)
 			if e != nil {
 				fatal(e.Error())
 			}
@@ -224,20 +226,20 @@ func (c *Cmd) CommandGen(args []string) {
 			fatal("missing model name")
 		}
 
-		var t *Table
+		var t *types.Table
 
 		if t, e = database.FindTableByName(args[3]); e != nil {
 			fatal(e.Error())
 		}
 
-		if e = GenerateGoModelFile(t); e != nil {
+		if e = gen.GenerateGoModelFile(t); e != nil {
 			fatal(e.Error())
 		}
 	case CommandGenAll:
 
 		// Generate schema
 		fmt.Print("Generating schema...")
-		e = GenerateGoSchemaFile(database)
+		e = gen.GenerateGoSchemaFile(database)
 		if e != nil {
 			fatal(e.Error())
 		}
@@ -246,7 +248,7 @@ func (c *Cmd) CommandGen(args []string) {
 		// Generate repos
 		fmt.Printf("Generating %d repos...", len(database.Tables))
 		for _, table := range database.Tables {
-			e = GenerateGoRepoFile(table)
+			e = gen.GenerateGoRepoFile(table)
 			if e != nil {
 				fatal(e.Error())
 			}
@@ -254,13 +256,13 @@ func (c *Cmd) CommandGen(args []string) {
 		fmt.Print("done\n")
 
 		fmt.Print("Generating repo bootstrap file...")
-		GenerateReposBootstrapFile(database)
+		gen.GenerateReposBootstrapFile(database)
 		fmt.Print("done\n")
 
 		// Generate models
 		fmt.Printf("Generating %d models...", len(database.Tables))
 		for _, table := range database.Tables {
-			e = GenerateGoModelFile(table)
+			e = gen.GenerateGoModelFile(table)
 			if e != nil {
 				fatal(e.Error())
 			}
@@ -268,7 +270,7 @@ func (c *Cmd) CommandGen(args []string) {
 		fmt.Print("done\n")
 
 	case "typescript":
-		GenerateTypescriptTypesFile(database)
+		gen.GenerateTypescriptTypesFile(database)
 	default:
 		fatal(fmt.Sprintf("Unknown output type: `%s`", subCmd))
 	}

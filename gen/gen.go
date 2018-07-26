@@ -1,8 +1,12 @@
-package main
+package gen
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/types"
 	"io/ioutil"
+	"os"
+	"os/exec"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -12,7 +16,7 @@ import (
 //
 
 // GenerateReposBootstrapFile generates a repos bootstrap file in golang
-func GenerateReposBootstrapFile(database *Database) (e error) {
+func GenerateReposBootstrapFile(database *types.Database) (e error) {
 
 	outFile := "./repos/repos.go"
 	goCode, e := GenerateReposBootstrapGoCodeFromDatabase(database)
@@ -26,8 +30,99 @@ func GenerateReposBootstrapFile(database *Database) (e error) {
 	return
 }
 
+// WriteGoCodeToFile writes a string of golang code to a file and then formats it with `go fmt`
+func WriteGoCodeToFile(goCode string, filePath string) (e error) {
+	// outFile := "./repos/repos.go"
+
+	e = ioutil.WriteFile(filePath, []byte(goCode), 0644)
+	if e != nil {
+		return
+	}
+	cmd := exec.Command("go", "fmt", filePath)
+	e = cmd.Run()
+	return
+}
+
+// scanFileParts scans a file for template parts, header, footer and import statements and returns those parts
+func scanFileParts(filePath string, trackImports bool) (fileHead string, fileFoot string, imports []string, e error) {
+
+	lineStart := -1
+	lineEnd := -1
+	var fileBytes []byte
+
+	fileHead = ""
+	fileFoot = ""
+	imports = []string{}
+
+	// Check if file exists
+	if _, e = os.Stat(filePath); os.IsNotExist(e) {
+		e = nil
+		return
+	}
+
+	fileBytes, e = ioutil.ReadFile(filePath)
+
+	if e != nil {
+		fatal(e.Error())
+	}
+
+	fileString := string(fileBytes)
+	fileLines := strings.Split(fileString, "\n")
+
+	isImports := false
+
+	for lineNum, line := range fileLines {
+
+		line = strings.Trim(line, " ")
+
+		if trackImports == true {
+
+			if line == "import (" {
+				isImports = true
+				continue
+			}
+
+			if isImports == true {
+				if line == ")" {
+					isImports = false
+					continue
+				}
+
+				imports = append(imports, line[2:len(line)-1])
+				continue
+			}
+
+		}
+
+		if line == "// #genStart" {
+			lineStart = lineNum
+			continue
+		}
+
+		if line == "// #genEnd" {
+			lineEnd = lineNum
+			continue
+		}
+
+		if lineStart == -1 {
+			fileHead += line + "\n"
+			continue
+		}
+
+		if lineEnd > -1 {
+			fileFoot += line + "\n"
+		}
+	}
+
+	if lineStart == -1 || lineEnd == -1 {
+		e = fmt.Errorf("No gen tags found in outFile at path %s", filePath)
+	}
+
+	return
+}
+
 // GenerateGoRepoFile generates a repo file in golang
-func GenerateGoRepoFile(table *Table) (e error) {
+func GenerateGoRepoFile(table *types.Table) (e error) {
 
 	fileHead := ""
 	fileFoot := ""
@@ -51,7 +146,7 @@ func GenerateGoRepoFile(table *Table) (e error) {
 }
 
 // GenerateGoSchemaFile generates a schema file in golang
-func GenerateGoSchemaFile(database *Database) (e error) {
+func GenerateGoSchemaFile(database *types.Database) (e error) {
 
 	var fileHead, fileFoot, goCode string
 
@@ -73,7 +168,7 @@ func GenerateGoSchemaFile(database *Database) (e error) {
 }
 
 // GenerateGoModelFile generates a model file in golang
-func GenerateGoModelFile(table *Table) (e error) {
+func GenerateGoModelFile(table *types.Table) (e error) {
 
 	var fileHead, fileFoot, goCode string
 	var imports []string
@@ -96,7 +191,7 @@ func GenerateGoModelFile(table *Table) (e error) {
 }
 
 // GenerateTypescriptTypesFile generates a typescript type file
-func GenerateTypescriptTypesFile(database *Database) (e error) {
+func GenerateTypescriptTypesFile(database *types.Database) (e error) {
 
 	var goCode string
 
@@ -118,7 +213,7 @@ func GenerateTypescriptTypesFile(database *Database) (e error) {
 //
 
 // GenerateGoModels generates models for golang
-func GenerateGoModels(database *Database) (goCode string, e error) {
+func GenerateGoModels(database *types.Database) (goCode string, e error) {
 
 	goCode = "// #genStart \n\n"
 
@@ -140,7 +235,7 @@ func GenerateGoModels(database *Database) (goCode string, e error) {
 
 // GenerateReposBootstrapGoCodeFromDatabase generates golang code for a Repo Bootstrap file from
 // a database object
-func GenerateReposBootstrapGoCodeFromDatabase(database *Database) (goCode string, e error) {
+func GenerateReposBootstrapGoCodeFromDatabase(database *types.Database) (goCode string, e error) {
 
 	props := ""
 	defs := ""
@@ -179,7 +274,7 @@ func GenerateReposBootstrapGoCodeFromDatabase(database *Database) (goCode string
 }
 
 // GenerateGoSchema generates golang code for a schema file
-func GenerateGoSchema(database *Database) (goCode string, e error) {
+func GenerateGoSchema(database *types.Database) (goCode string, e error) {
 
 	goCode = "\n// #genStart"
 	goCode += "\n// Schema defines the data access layer schema"
@@ -192,7 +287,7 @@ func GenerateGoSchema(database *Database) (goCode string, e error) {
 	for _, table := range database.Tables {
 		cols := ""
 
-		sortedColumns := make(SortedColumns, 0, len(table.Columns))
+		sortedColumns := make(types.SortedColumns, 0, len(table.Columns))
 
 		for _, column := range table.Columns {
 			sortedColumns = append(sortedColumns, column)
@@ -216,7 +311,7 @@ func GenerateGoSchema(database *Database) (goCode string, e error) {
 }
 
 // GenerateGoRepo returns a string for a repo in golang
-func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode string, e error) {
+func GenerateGoRepo(table *types.Table, fileFoot string, imports []string) (goCode string, e error) {
 
 	primaryKey := ""
 	primaryKeyType := ""
@@ -225,7 +320,7 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 
 	footMatches := scanStringForFuncSignature(fileFoot, funcSig)
 
-	sortedColumns := make(SortedColumns, 0, len(table.Columns))
+	sortedColumns := make(types.SortedColumns, 0, len(table.Columns))
 
 	// Find the primary key
 	for _, column := range table.Columns {
@@ -560,12 +655,12 @@ func GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode str
 }
 
 // GenerateGoModel returns a string for a model in golang
-func GenerateGoModel(table *Table, imports []string) (goCode string, e error) {
+func GenerateGoModel(table *types.Table, imports []string) (goCode string, e error) {
 
 	goCode += "// #genStart\n\n"
 	goCode += "package models\n\n"
 
-	var sortedColumns = make(SortedColumns, 0, len(table.Columns))
+	var sortedColumns = make(types.SortedColumns, 0, len(table.Columns))
 
 	for _, column := range table.Columns {
 		sortedColumns = append(sortedColumns, column)
@@ -629,7 +724,7 @@ func GenerateGoModel(table *Table, imports []string) (goCode string, e error) {
 }
 
 // GenerateTypescriptTypes returns a string for a typscript types file
-func GenerateTypescriptTypes(database *Database) (goCode string, e error) {
+func GenerateTypescriptTypes(database *types.Database) (goCode string, e error) {
 	goCode = "// #genStart \n\n"
 	for _, table := range database.Tables {
 
@@ -648,7 +743,7 @@ func GenerateTypescriptTypes(database *Database) (goCode string, e error) {
 }
 
 // GenerateTypescriptType returns a string for a type in typescript
-func GenerateTypescriptType(table *Table) (goCode string, e error) {
+func GenerateTypescriptType(table *types.Table) (goCode string, e error) {
 
 	goCode += fmt.Sprintf("/**\n * %s\n */\n", table.Name)
 	goCode += fmt.Sprintf("declare interface %s {\n", table.Name)
@@ -679,4 +774,28 @@ func GenerateTypescriptType(table *Table) (goCode string, e error) {
 
 	return
 
+}
+
+func fatal(msg string) {
+	fmt.Printf("ERROR: %s\n", msg)
+	os.Exit(1)
+}
+
+// scanStringForFuncSignature scans a string (a line of goCode) and returns matches if it is a golang function signature that matches
+// signatureRegexp
+func scanStringForFuncSignature(str string, signatureRegexp string) (matches []string) {
+
+	lines := strings.Split(str, "\n")
+
+	var validSignature = regexp.MustCompile(signatureRegexp)
+
+	matches = []string{}
+
+	for _, line := range lines {
+		if validSignature.Match([]byte(line)) {
+			matches = append(matches, line)
+		}
+	}
+
+	return
 }

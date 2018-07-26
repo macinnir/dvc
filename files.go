@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/macinnir/dvc/types"
 	"io/ioutil"
 	"os"
 )
@@ -45,13 +46,13 @@ func (f *Files) FetchLocalChangesetList(rootPath string) (sqlPaths []string, e e
 
 // BuildChangeFiles returns a collection of ChangeFile objects based on
 // a collection of sql paths
-func (f *Files) BuildChangeFiles(sqlPaths []string) (changeFiles []ChangeFile, e error) {
+func (f *Files) BuildChangeFiles(sqlPaths []string) (changeFiles []types.ChangeFile, e error) {
 
 	if len(sqlPaths) == 0 {
 		return
 	}
 
-	changeFiles = []ChangeFile{}
+	changeFiles = []types.ChangeFile{}
 
 	ordinal := 0
 
@@ -59,7 +60,7 @@ func (f *Files) BuildChangeFiles(sqlPaths []string) (changeFiles []ChangeFile, e
 
 		ordinal = ordinal + 1
 
-		var changeFile *ChangeFile
+		var changeFile *types.ChangeFile
 
 		if changeFile, e = f.BuildChangeFile(sqlPath, ordinal); e != nil {
 			return
@@ -72,7 +73,7 @@ func (f *Files) BuildChangeFiles(sqlPaths []string) (changeFiles []ChangeFile, e
 }
 
 // BuildChangeFile builds a changeFile object based on a path and an ordinal
-func (f *Files) BuildChangeFile(sqlPath string, ordinal int) (changeFile *ChangeFile, e error) {
+func (f *Files) BuildChangeFile(sqlPath string, ordinal int) (changeFile *types.ChangeFile, e error) {
 
 	var content []byte
 
@@ -90,7 +91,7 @@ func (f *Files) BuildChangeFile(sqlPath string, ordinal int) (changeFile *Change
 		return
 	}
 
-	changeFile = &ChangeFile{
+	changeFile = &types.ChangeFile{
 		Name:    sqlPath,
 		Content: string(content),
 		Ordinal: ordinal,
