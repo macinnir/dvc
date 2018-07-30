@@ -88,7 +88,7 @@ func (s *Server) DatabaseExists(databaseName string) bool {
 type Database struct {
 	RunID int64
 	Name  string
-	Host  string
+	Host  string `json:"-"`
 	// Sets          map[string]*ChangeSet
 	SortedSetKeys []string
 	Tables        map[string]*Table
@@ -118,10 +118,10 @@ type Table struct {
 	Engine        string             `json:"engine"`
 	Version       int                `json:"version"`
 	RowFormat     string             `json:"rowFormat"`
-	Rows          int64              `json:"rows"`
-	DataLength    int64              `json:"dataLength"`
+	Rows          int64              `json:"-"`
+	DataLength    int64              `json:"-"`
 	Collation     string             `json:"collation"`
-	AutoIncrement int64              `json:"autoIncrement"`
+	AutoIncrement int64              `json:"-"`
 	Columns       map[string]*Column `json:"columns"`
 }
 
@@ -139,3 +139,18 @@ type Column struct {
 	ColumnKey  string `json:"columnKey"`
 	Extra      string `json:"extra"`
 }
+
+const (
+	// OptLogInfo triggers verbose logging
+	OptLogInfo = 1 << iota
+	// OptLogDebug triggers extremely verbose logging
+	OptLogDebug
+	// OptSilent suppresses all logging
+	OptSilent
+	// OptReverse reverses the function
+	OptReverse
+	// OptSummary shows a summary of the actions instead of a raw stdout dump
+	OptSummary
+	// OptClean cleans
+	OptClean
+)
