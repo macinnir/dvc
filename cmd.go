@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/macinnir/dvc/gen"
+	"github.com/macinnir/dvc/logger"
 	"github.com/macinnir/dvc/types"
 	"io/ioutil"
-	"log"
 	"os"
 )
 
@@ -23,76 +23,70 @@ const (
 	CommandCompare       Command = "compare"
 	CommandHelp          Command = "help"
 )
+
 // Cmd is a container for handling commands
 type Cmd struct {
 	Options types.Options
-	errLog  *log.Logger
+	// errLog  *log.Logger
 	cmd    string
 	dvc    *DVC
 	config *types.Config
 }
 
-// NewCmd returns a new Cmd instance
-func NewCmd() *Cmd {
-
-	var e error
-	var dvc *DVC
-
-	if dvc, e = NewDVC(configFilePath); e != nil {
-		fatal(e.Error())
-	}
-
-	return &Cmd{
-		errLog: log.New(os.Stderr, "", 0),
-		cmd:    "",
-		dvc:    dvc,
-	}
-}
-
 // Main is the main function that handles commands arguments and routes them to their correct options and functions
 func (c *Cmd) Main(args []string) (err error) {
 
-	cmd := ""
+	args = args[1:]
+	var cmd Command
+	var arg string
 
 	for len(args) > 0 {
-
-		switch args[0] {
+		arg = args[0]
+		switch arg {
 		case "-h", "--help":
-
+			cmd = CommandHelp
 		case "-v", "--verbose":
-			c.Options &^= OptVerboseDebug | OptSilent
-			c.Options |= OptVerbose
-		case "-s", "--silent":
-			c.Options &^= OptVerboseDebug | OptVerbose
-			c.Options |= OptSilent
+			c.Options &^= types.OptLogDebug | types.OptSilent
+			c.Options |= types.OptLogInfo
 		case "-vv", "--debug":
-			c.Options &^= OptVerbose | OptSilent
-			c.Options |= OptVerboseDebug
+			c.Options &^= types.OptLogInfo | types.OptSilent
+			c.Options |= types.OptLogDebug
+		case "-s", "--silent":
+			c.Options &^= types.OptLogDebug | types.OptLogInfo
+			c.Options |= types.OptSilent
 		default:
-			arg := args[0]
+			logger.Debug(fmt.Sprintf("Arg: %s", arg), c.Options)
 			if len(arg) > 0 && arg[0] == '-' {
-				c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
+				logger.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, arg)
+				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
 				return nil
 			}
 
-			cmd = arg
-			break
-
+			cmd = Command(arg)
 		}
 
 		args = args[1:]
+
+		if len(cmd) > 0 {
+			break
+		}
+
 	}
 
 	if len(cmd) == 0 {
-		fmt.Printf("No command provided")
+		logger.Error("No command provided", c.Options)
 		return
 	}
+	logger.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
+	// fmt.Printf("cmd: %s, %v\n", cmd, args)
 
 	switch cmd {
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandCompare:
 		c.CommandCompare(args)
+	case CommandGen:
+		c.CommandGen(args)
 	case CommandHelp:
 		c.PrintHelp(args)
 	}
@@ -108,185 +102,252 @@ func (c *Cmd) CommandImport(args []string) {
 	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
 
 	if e = c.dvc.ImportSchema(schemaFile); e != nil {
-		fatal(e.Error())
+		logger.Error(e.Error(), c.Options)
+		os.Exit(1)
 	}
 
-	log.Printf("Schema `%s`.`%s` imported to %s.", c.dvc.Config.Host, c.dvc.Config.DatabaseName, schemaFile)
+	logger.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.dvc.Config.Host, c.dvc.Config.DatabaseName, schemaFile)
 }
 
 // CommandCompare handles the `compare` command
 func (c *Cmd) CommandCompare(args []string) {
 
 	var e error
+
+	cmd := "print"
 	sql := ""
-
-	nextArgIdx := 1
-
 	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
+	outfile := ""
 
-	isCompareFlipped := false
-	if len(args) > 1 && args[nextArgIdx] == "reverse" {
-		isCompareFlipped = true
-		nextArgIdx++
+	// logger.Debugf("Args: %v", c.Options, args)
+	if len(args) == 0 {
+		goto Main
 	}
 
-	if sql, e = c.dvc.CompareSchema(schemaFile, isCompareFlipped); e != nil {
-		fatal(e.Error())
+	for len(args) > 0 {
+
+		switch args[0] {
+		case "-r", "--reverse":
+			c.Options |= types.OptReverse
+		case "-u", "--summary":
+			c.Options |= types.OptSummary
+		case "apply":
+			cmd = "apply"
+		default:
+
+			if len(args[0]) > len("-o=") && args[0][0:len("-o=")] == "-o=" {
+				outfile = args[0][len("-o="):]
+				if len(outfile) == 0 {
+					logger.Error("Outfile argument cannot be empty", c.Options)
+					os.Exit(1)
+				}
+				cmd = "write"
+			} else if args[0][0] == '-' {
+				logger.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, args[0])
+				os.Exit(1)
+				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
+			}
+
+			// Check if outfile argument is non-empty
+
+			goto Main
+		}
+		args = args[1:]
+	}
+
+Main:
+
+	// Do the comparison
+	// TODO pass all options (e.g. verbose)
+	if sql, e = c.dvc.CompareSchema(schemaFile, c.Options); e != nil {
+		logger.Error(e.Error(), c.Options)
+		os.Exit(1)
 	}
 
 	if len(sql) == 0 {
-		log.Printf("No changes found.")
+		logger.Info("No changes found.", c.Options)
 		os.Exit(0)
 	}
 
-	if len(args) > nextArgIdx {
-		// "--file="
+	switch cmd {
+	case "write":
 
-		switch args[nextArgIdx] {
-		case "write":
-
-			nextArgIdx++
-
-			if len(args) > nextArgIdx {
-
-				filePath := args[nextArgIdx]
-
-				log.Printf("Writing sql to path `%s`", filePath)
-				e = ioutil.WriteFile(filePath, []byte(sql), 0644)
-				if e != nil {
-					fatal(e.Error())
-				}
-			} else {
-				fatal("Missing path to write sql to")
-			}
-		case "apply":
-			e = c.dvc.ApplyChangeset(sql)
-			if e != nil {
-				fatal(e.Error())
-			}
-
-		default:
-			fatal(fmt.Sprintf("Unknown argument: `%s`\n", args[2]))
+		if len(args) == 0 {
+			logger.Error("Missing file path for `dvc compare -o=[filePath]`", c.Options)
+			os.Exit(1)
 		}
 
+		filePath := args[0]
+
+		logger.Debugf("Writing changeset sql to path `%s`", c.Options, filePath)
+		e = ioutil.WriteFile(filePath, []byte(sql), 0644)
+		if e != nil {
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	case "apply":
+		e = c.dvc.ApplyChangeset(sql)
+		if e != nil {
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
+	case "print":
+		// Print to stdout
+		fmt.Printf("%s", sql)
+	default:
+		logger.Errorf("Unknown argument: `%s`", c.Options, cmd)
+		os.Exit(1)
 	}
 
-	// Write SQL to STDOUT
-	fmt.Printf("%s", sql)
 }
+
+// Write SQL to STDOUT
 
 // CommandGen handles the `gen` command
 func (c *Cmd) CommandGen(args []string) {
 
 	var e error
 	var database *types.Database
-
-	if len(args) < 3 {
-		fatal("Missing gen type [schema | model | repo]")
+	fmt.Printf("Args: %v", args)
+	if len(args) < 1 {
+		logger.Error("Missing gen type [schema | model | repo]", c.Options)
+		os.Exit(1)
 	}
-	subCmd := args[2]
+	subCmd := Command(args[0])
+
+	if len(args) > 1 {
+		args = args[1:]
+	}
+
+	for len(args) > 0 {
+		switch args[0] {
+		case "-c", "--clean":
+			c.Options |= types.OptClean
+		}
+		args = args[1:]
+	}
+
+	logger.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
 	// Load the schema
 	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
 	database, e = ReadSchemaFromFile(schemaFile)
 	if e != nil {
-		fatal(e.Error())
+		logger.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+
+	g := &gen.Gen{
+		Options: c.Options,
 	}
 
 	switch subCmd {
 	case CommandGenSchema:
-		e = gen.GenerateGoSchemaFile(database)
+		e = g.GenerateGoSchemaFile(database)
 		if e != nil {
-			fatal(e.Error())
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
 
 	case CommandGenRepos:
 
 		for _, table := range database.Tables {
-			e = gen.GenerateGoRepoFile(table)
+			e = g.GenerateGoRepoFile(table)
 			if e != nil {
-				fatal(e.Error())
+				logger.Error(e.Error(), c.Options)
+				os.Exit(1)
 			}
 		}
 
-		gen.GenerateReposBootstrapFile(database)
+		g.GenerateReposBootstrapFile(database)
 
 	case "repo":
 		if len(args) < 4 {
-			fatal("Missing repo name")
+			logger.Error("Missing repo name", c.Options)
+			os.Exit(1)
+
 		}
 
 		var t *types.Table
 
 		if t, e = database.FindTableByName(args[3]); e != nil {
-			fatal(e.Error())
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
 
-		if e = gen.GenerateGoRepoFile(t); e != nil {
-			fatal(e.Error())
+		if e = g.GenerateGoRepoFile(t); e != nil {
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
 
 	case CommandGenModels:
 
 		for _, table := range database.Tables {
-			e = gen.GenerateGoModelFile(table)
+			e = g.GenerateGoModelFile(table)
 			if e != nil {
-				fatal(e.Error())
+				logger.Error(e.Error(), c.Options)
+				os.Exit(1)
 			}
 		}
 
 	case "model":
 		if len(args) < 4 {
-			fatal("missing model name")
+			logger.Error("missing model name", c.Options)
+			os.Exit(1)
 		}
 
 		var t *types.Table
 
 		if t, e = database.FindTableByName(args[3]); e != nil {
-			fatal(e.Error())
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
 
-		if e = gen.GenerateGoModelFile(t); e != nil {
-			fatal(e.Error())
+		if e = g.GenerateGoModelFile(t); e != nil {
+			logger.Error(e.Error(), c.Options)
 		}
 	case CommandGenAll:
 
 		// Generate schema
-		fmt.Print("Generating schema...")
-		e = gen.GenerateGoSchemaFile(database)
+		logger.Debug("Generating schema...", c.Options)
+		e = g.GenerateGoSchemaFile(database)
 		if e != nil {
-			fatal(e.Error())
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
-		fmt.Print("done\n")
+		logger.Debug("done\n", c.Options)
 
 		// Generate repos
-		fmt.Printf("Generating %d repos...", len(database.Tables))
+		logger.Debugf("Generating %d repos...", c.Options, len(database.Tables))
 		for _, table := range database.Tables {
-			e = gen.GenerateGoRepoFile(table)
+			e = g.GenerateGoRepoFile(table)
 			if e != nil {
-				fatal(e.Error())
+				logger.Error(e.Error(), c.Options)
+				os.Exit(1)
 			}
 		}
-		fmt.Print("done\n")
-
-		fmt.Print("Generating repo bootstrap file...")
-		gen.GenerateReposBootstrapFile(database)
-		fmt.Print("done\n")
+		logger.Debug("done", c.Options)
+		logger.Debug("Generating repo bootstrap file...", c.Options)
+		g.GenerateReposBootstrapFile(database)
+		logger.Debug("done\n", c.Options)
 
 		// Generate models
-		fmt.Printf("Generating %d models...", len(database.Tables))
+		logger.Debugf("Generating %d models...", c.Options, len(database.Tables))
 		for _, table := range database.Tables {
-			e = gen.GenerateGoModelFile(table)
+			e = g.GenerateGoModelFile(table)
 			if e != nil {
-				fatal(e.Error())
+				logger.Error(e.Error(), c.Options)
+				os.Exit(1)
 			}
 		}
-		fmt.Print("done\n")
+		logger.Debug("done\n", c.Options)
 
 	case "typescript":
-		gen.GenerateTypescriptTypesFile(database)
+		g.GenerateTypescriptTypesFile(database)
 	default:
-		fatal(fmt.Sprintf("Unknown output type: `%s`", subCmd))
+		logger.Errorf("Unknown output type: `%s`", c.Options, subCmd)
+		os.Exit(1)
 	}
 }
 
@@ -294,30 +355,30 @@ func (c *Cmd) CommandGen(args []string) {
 func (c *Cmd) PrintHelp(args []string) {
 	help := `usage: dvc [OPTIONS] [COMMAND] [ARGS]
 	
-	OPTIONS: 
-		-h, --help 		Show help 
-		-v, --verbose 	Show verbose logging 
-		-vv, --debug 	Show very verbose (debug) logging
-		-s, --silent 	Disable all output 
-	
-	COMMANDS: 
-		
-		import	Build a schema definition file based on the target database. 
-				This will overwrite any existing schema definition file.
-		
-		gen 	Generate go code based on the local schema json file. 
-				Will fail if no imported schema file json file exists. 
-				Requires one (and only one) of the following sub-commands: 
+OPTIONS: 
+	-h, --help 		Show help 
+	-v, --verbose 	Show verbose logging 
+	-vv, --debug 	Show very verbose (debug) logging
+	-s, --silent 	Disable all output 
 
-			models 		Generate models. 
-			repos 		Generate repos 
-			schema 		Generate go-dal schema bootstrap code based on imported schema information. 
-			all 		Generate all above 
-		
+COMMANDS: 
+	
+	import	Build a schema definition file based on the target database. 
+			This will overwrite any existing schema definition file.
+	
+	gen 	Generate go code based on the local schema json file. 
+			Will fail if no imported schema file json file exists. 
+			Requires one (and only one) of the following sub-commands: 
+
+		models 		Generate models. 
+		repos 		Generate repos 
+		schema 		Generate go-dal schema bootstrap code based on imported schema information. 
+		all 		Generate all above 
+	
 	compare [-r|--reverse] [ ( write <path> | apply ) ]
-			
-			Default behavior (no arguments) is to compare local schema as authority against 
-			remote database as target and write the resulting sql to stdout.
+		
+		Default behavior (no arguments) is to compare local schema as authority against 
+		remote database as target and write the resulting sql to stdout.
 
 		-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority 
 						and the local schema the target for updating.
@@ -326,30 +387,21 @@ func (c *Cmd) PrintHelp(args []string) {
 						matches the structure of your local schema, in order to make it match a database with the structure 
 						of the remote.
 
-			write		After performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).
+		write		After performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).
 
-						Example: dts compare write path/to/changeset.sql
-			
-			apply 		After performing the comparison, apply the the resulting sql statements directly to the target database. 
-
-						E.g. dts compare apply 
+					Example: dts compare write path/to/changeset.sql
 		
-			import	[[path/to/local/schema.json]] 
-					
-					Generate a local schema json file based on the remote target database. 
-					
-					If no path is provided, the default path of ./[databaseName].json will be used. 
-					This overwrites any existing json schema file. 
+		apply 		After performing the comparison, apply the the resulting sql statements directly to the target database. 
+
+					E.g. dts compare apply 
+	
+		import	[[path/to/local/schema.json]] 
+				
+				Generate a local schema json file based on the remote target database. 
+				
+				If no path is provided, the default path of ./[databaseName].json will be used. 
+				This overwrites any existing json schema file. 
 
 	`
 	fmt.Printf(help)
 }
-
-const (
-	// OptVerbose triggers verbose logging
-	OptVerbose = 1 << iota
-	// OptVerboseDebug triggers extremely verbose logging
-	OptVerboseDebug
-	// OptSilent suppresses all logging
-	OptSilent
-)
