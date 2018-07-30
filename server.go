@@ -91,7 +91,7 @@ func (ss *serverService) FetchDatabaseTables(server *types.Server, databaseName 
 			&table.AutoIncrement,
 		)
 
-		table.Columns, e = ss.FetchTableColumns(server, table.Name)
+		table.Columns, e = ss.FetchTableColumns(server, databaseName, table.Name)
 
 		if e != nil {
 			log.Fatalf("ERROR: %s", e.Error())
@@ -105,7 +105,8 @@ func (ss *serverService) FetchDatabaseTables(server *types.Server, databaseName 
 }
 
 // FetchTableColumns lists all of the columns in a table
-func (ss *serverService) FetchTableColumns(server *types.Server, tableName string) (columns map[string]*types.Column, e error) {
+func (ss *serverService) FetchTableColumns(server *types.Server, databaseName string, tableName string) (columns map[string]*types.Column, e error) {
+
 	var rows *sql.Rows
 
 	query := fmt.Sprintf(`
@@ -127,7 +128,7 @@ func (ss *serverService) FetchTableColumns(server *types.Server, tableName strin
 		FROM information_schema.COLUMNS 
 		WHERE 
 			TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
-	`, server.CurrentDatabase, tableName)
+	`, databaseName, tableName)
 
 	if rows, e = server.Connection.Query(query); e != nil {
 		return
@@ -158,6 +159,8 @@ func (ss *serverService) FetchTableColumns(server *types.Server, tableName strin
 		}
 		columns[column.Name] = &column
 	}
+
+	// fmt.Printf("Fetching columns database: %s, table: %s - columns: %d\n", databaseName, tableName, len(columns))
 
 	return
 }
