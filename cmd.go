@@ -9,13 +9,27 @@ import (
 	"os"
 )
 
+type Command string
+
+// Command Names
+const (
+	CommandImport        Command = "import"
+	CommandGen           Command = "gen"
+	CommandGenSchema     Command = "schema"
+	CommandGenRepos      Command = "repos"
+	CommandGenModels     Command = "models"
+	CommandGenAll        Command = "all"
+	CommandGenTypescript Command = "typescript"
+	CommandCompare       Command = "compare"
+	CommandHelp          Command = "help"
+)
 // Cmd is a container for handling commands
 type Cmd struct {
 	Options types.Options
 	errLog  *log.Logger
-	cmd     string
-	dvc     *DVC
-	config  *types.Config
+	cmd    string
+	dvc    *DVC
+	config *types.Config
 }
 
 // NewCmd returns a new Cmd instance
