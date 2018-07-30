@@ -300,12 +300,12 @@ func (c *Cmd) PrintHelp(args []string) {
 			schema 		Generate go-dal schema bootstrap code based on imported schema information. 
 			all 		Generate all above 
 		
-		compare [reverse] [ ( write <path> | apply ) ]
+	compare [-r|--reverse] [ ( write <path> | apply ) ]
 			
 			Default behavior (no arguments) is to compare local schema as authority against 
 			remote database as target and write the resulting sql to stdout.
 
-			reverse 	Switches the roles of the schemas. The remote database becomes the authority 
+		-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority 
 						and the local schema the target for updating.
 
 						Use this option when attempting to generate sql alter statements against a database that 
