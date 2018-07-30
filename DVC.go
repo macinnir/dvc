@@ -18,19 +18,6 @@ import (
 	// "sort"
 )
 
-// Command Names
-const (
-	CommandImport        = "import"
-	CommandGen           = "gen"
-	CommandGenSchema     = "schema"
-	CommandGenRepos      = "repos"
-	CommandGenModels     = "models"
-	CommandGenAll        = "all"
-	CommandGenTypescript = "typescript"
-	CommandCompare       = "compare"
-	CommandHelp          = "help"
-)
-
 // NewDVC creates a new DVC instance
 // Can be called 2 ways:
 // 	1. NewDvc(filePath)
@@ -128,7 +115,7 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 // @param reverse bool If true, the remote and local schema comparison is flipped in that the remote schema is treated as the authority
 // 		and the local schema is treated as the schema to be updated.
 // @command compare [reverse]
-func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e error) {
+func (d *DVC) CompareSchema(schemaFile string, options types.Options) (sql string, e error) {
 
 	var localSchema *types.Database
 	var remoteSchema *types.Database
@@ -191,7 +178,7 @@ func (d *DVC) CompareSchema(schemaFile string, reverse bool) (sql string, e erro
 
 	query := &query.Query{}
 
-	if reverse == true {
+	if options&types.OptReverse == types.OptReverse {
 		sql, e = query.CreateChangeSQL(remoteSchema, localSchema)
 	} else {
 		sql, e = query.CreateChangeSQL(localSchema, remoteSchema)
