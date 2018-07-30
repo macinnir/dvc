@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -85,9 +84,4 @@ func HashFileMd5(filePath string) (string, error) {
 
 	return returnMD5String, nil
 
-}
-
-func fatal(msg string) {
-	fmt.Printf("ERROR: %s\n", msg)
-	os.Exit(1)
 }
