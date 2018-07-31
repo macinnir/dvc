@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+
 	"github.com/macinnir/dvc/gen"
 	"github.com/macinnir/dvc/logger"
 	"github.com/macinnir/dvc/types"
-	"io/ioutil"
-	"os"
 )
 
 type Command string

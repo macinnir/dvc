@@ -1,0 +1,77 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+)
+
+type Options uint
+
+const (
+	OptFoo = 1 << iota
+)
+
+func main() {
+
+	// var options Options
+	var count int
+	flag.IntVar(&count, "count", 5, "the count of items")
+	flag.IntVar(&count, "c", 5, "the count of items")
+	// optFoo := flag.Bool("foo", false, "foo is foo")
+
+	// subCommands
+
+	// Bar SubCommand
+	barCommand := flag.NewFlagSet("bar", flag.ExitOnError)
+	barOpt1 := barCommand.Bool("b1", false, "Bar option 1")
+
+	// Baz SubCommand
+	bazCommand := flag.NewFlagSet("baz", flag.ExitOnError)
+	bazOpt1 := bazCommand.String("b2", "", "Baz option 2")
+
+	if len(os.Args) < 2 {
+		fmt.Println("Bar | baz subcommand is required")
+		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case "bar":
+		barCommand.Parse(os.Args[2:])
+	case "baz":
+		bazCommand.Parse(os.Args[2:])
+	default:
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	if barCommand.Parsed() {
+		if *barOpt1 == false {
+			fmt.Println("No barOpt1")
+		} else {
+			fmt.Println("BarOpt1!!!")
+		}
+	}
+
+	if bazCommand.Parsed() {
+		if *bazOpt1 == "" {
+			fmt.Println("BazOpt1 left empty")
+		} else {
+			fmt.Printf("BazOpt1: %s\n", *bazOpt1)
+		}
+	}
+
+	// flag.Parse()
+
+	// if *optFoo == true {
+	// 	options |= OptFoo
+	// }
+
+	// fmt.Println("count value ", count)
+
+	// if options&OptFoo == OptFoo {
+	// 	fmt.Println("Foo was passed!")
+	// } else {
+	// 	fmt.Println("no foo")
+	// }
+}
