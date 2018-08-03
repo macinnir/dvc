@@ -154,3 +154,11 @@ const (
 	// OptClean cleans
 	OptClean
 )
+
+type IConnector interface {
+	ConnectToServer(host string, username string, password string) (server *Server, e error)
+	FetchDatabases(server *Server) (databases map[string]*Database, e error)
+	UseDatabase(server *Server, databaseName string) (e error)
+	FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error)
+	FetchTableColumns(server *Server, databaseName string, tableName string) (columns map[string]*Column, e error)
+}
