@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/macinnir/dvc/types"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/BurntSushi/toml"
+	"github.com/macinnir/dvc/types"
 )
 
 // FetchFile fetches a file contents
@@ -27,40 +28,6 @@ func FetchFile(filePath string) (changesetFileString string, e error) {
 	}
 
 	changesetFileString = string(fileBytes)
-	return
-}
-
-// WriteFile writes text to a file
-func WriteFile(filePath string, contents string) (newFilePath string, e error) {
-
-	// paths := []string{}
-
-	// paths, e = d.Files.ScanChangesetDir(d.Config.ChangeSetPath)
-
-	// if e != nil {
-	// 	return
-	// }
-
-	// ordinalInt := 0
-
-	// for _, p := range paths {
-
-	// 	if len(p) < 11 {
-	// 		continue
-	// 	}
-
-	// 	ordinal := p[0:6]
-
-	// 	ordinalInt, e = strconv.Atoi(ordinal)
-
-	// }
-
-	// ordinalInt++
-
-	// nextFile := fmt.Sprintf("%06d", ordinalInt) + ".sql"
-	// newFilePath = d.Config.ChangeSetPath + "/changes.sql"
-
-	e = ioutil.WriteFile(filePath, []byte(contents), 0644)
 	return
 }
 
