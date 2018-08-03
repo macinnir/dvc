@@ -10,6 +10,7 @@ import (
 	"github.com/macinnir/dvc/types"
 )
 
+// Command is a type that represents the possible commands passed in at run time
 type Command string
 
 // Command Names
