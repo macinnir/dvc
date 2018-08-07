@@ -254,15 +254,12 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenRepos:
 
-		for _, table := range database.Tables {
-			e = g.GenerateGoRepoFile(table)
-			if e != nil {
-				logger.Error(e.Error(), c.Options)
-				os.Exit(1)
-			}
-		}
+		e = g.GenerateGoRepoFiles(database)
 
-		g.GenerateReposBootstrapFile(database)
+		if e != nil {
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
 
 	case "repo":
 		if len(args) < 4 {
@@ -322,17 +319,12 @@ func (c *Cmd) CommandGen(args []string) {
 
 		// Generate repos
 		logger.Debugf("Generating %d repos...", c.Options, len(database.Tables))
-		for _, table := range database.Tables {
-			e = g.GenerateGoRepoFile(table)
-			if e != nil {
-				logger.Error(e.Error(), c.Options)
-				os.Exit(1)
-			}
+		e = g.GenerateGoRepoFiles(database)
+		if e != nil {
+			logger.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
 		logger.Debug("done", c.Options)
-		logger.Debug("Generating repo bootstrap file...", c.Options)
-		g.GenerateReposBootstrapFile(database)
-		logger.Debug("done\n", c.Options)
 
 		// Generate models
 		logger.Debugf("Generating %d models...", c.Options, len(database.Tables))

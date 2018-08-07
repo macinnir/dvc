@@ -153,6 +153,43 @@ func (g *Gen) GenerateGoRepoFile(table *types.Table) (e error) {
 	return
 }
 
+func (g *Gen) GenerateGoRepoFiles(database *types.Database) (e error) {
+
+	var files []string
+
+	files, e = FetchNonDirFileNames("./repos")
+
+	// clean out files that don't belong
+	for _, file := range files {
+
+		existsInDatabase := false
+
+		for _, table := range database.Tables {
+			if file == table.Name+".go" {
+				existsInDatabase = true
+				break
+			}
+		}
+
+		if !existsInDatabase {
+			logger.Infof("Removing repo %s", g.Options, file)
+			// os.Remove(fmt.Sprintf("./repos/%s", file))
+		}
+	}
+
+	for _, table := range database.Tables {
+
+		logger.Infof("Generating repo %s", g.Options, table.Name)
+		e = g.GenerateGoRepoFile(table)
+		if e != nil {
+			return
+		}
+	}
+
+	e = g.GenerateReposBootstrapFile(database)
+	return
+}
+
 // GenerateGoSchemaFile generates a schema file in golang
 func (g *Gen) GenerateGoSchemaFile(database *types.Database) (e error) {
 
@@ -799,6 +836,29 @@ func (g *Gen) scanStringForFuncSignature(str string, signatureRegexp string) (ma
 		if validSignature.Match([]byte(line)) {
 			matches = append(matches, line)
 		}
+	}
+
+	return
+}
+
+// FetchNonDirFileNames returns a list of files in a directory
+// that are only regular files
+func FetchNonDirFileNames(dirPath string) (files []string, e error) {
+
+	var filesInfo []os.FileInfo
+	files = []string{}
+
+	if filesInfo, e = ioutil.ReadDir(dirPath); e != nil {
+		return
+	}
+
+	for _, f := range filesInfo {
+		fileName := f.Name()
+		if fileName[0:1] == "." || f.Mode().IsDir() {
+			continue
+		}
+
+		files = append(files, f.Name())
 	}
 
 	return
