@@ -1,8 +1,7 @@
-package query
+package lib
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/types"
 	"sort"
 	"strings"
 )
@@ -11,7 +10,7 @@ import (
 type Query struct{}
 
 // CreateChangeSQL generates sql statements based off of comparing two database objects
-func (q *Query) CreateChangeSQL(localSchema *types.Database, remoteSchema *types.Database) (sql string, e error) {
+func (q *Query) CreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql string, e error) {
 
 	query := ""
 
@@ -50,7 +49,7 @@ func (q *Query) CreateChangeSQL(localSchema *types.Database, remoteSchema *types
 // CreateTableChangeSQL returns a set of statements that alter a table's structure if and only if there is a difference between
 // the local and remote tables
 // If no change is found, an empty string is returned.
-func (q *Query) CreateTableChangeSQL(localTable *types.Table, remoteTable *types.Table) (sql string, e error) {
+func (q *Query) CreateTableChangeSQL(localTable *Table, remoteTable *Table) (sql string, e error) {
 
 	var query string
 
@@ -100,7 +99,7 @@ func (q *Query) CreateTableChangeSQL(localTable *types.Table, remoteTable *types
 }
 
 // CreateTable returns a create table sql statement
-func (q *Query) CreateTable(table *types.Table) (sql string, e error) {
+func (q *Query) CreateTable(table *Table) (sql string, e error) {
 
 	// colLen := len(table.Columns)
 	idx := 1
@@ -111,12 +110,12 @@ func (q *Query) CreateTable(table *types.Table) (sql string, e error) {
 	cols := []string{}
 
 	// Unique Keys
-	uniqueKeyColumns := []*types.Column{}
+	uniqueKeyColumns := []*Column{}
 
 	// Regular Keys (allows for multiple entries)
-	multiKeyColumns := []*types.Column{}
+	multiKeyColumns := []*Column{}
 
-	sortedColumns := make(types.SortedColumns, 0, len(table.Columns))
+	sortedColumns := make(SortedColumns, 0, len(table.Columns))
 
 	for _, column := range table.Columns {
 		sortedColumns = append(sortedColumns, column)
@@ -169,13 +168,13 @@ func (q *Query) CreateTable(table *types.Table) (sql string, e error) {
 }
 
 // DropTable returns a drop table sql statement
-func (q *Query) DropTable(table *types.Table) (sql string, e error) {
+func (q *Query) DropTable(table *Table) (sql string, e error) {
 	sql = fmt.Sprintf("DROP TABLE `%s`;", table.Name)
 	return
 }
 
 // CreateColumn returns a table column sql segment
-func (q *Query) CreateColumn(column *types.Column) (sql string, e error) {
+func (q *Query) CreateColumn(column *Column) (sql string, e error) {
 
 	sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
 	if !column.IsNullable {
@@ -198,7 +197,7 @@ func (q *Query) CreateColumn(column *types.Column) (sql string, e error) {
 }
 
 // AlterTableDropColumn returns an alter table sql statement that drops a column
-func (q *Query) AlterTableDropColumn(table *types.Table, column *types.Column) (sql string, e error) {
+func (q *Query) AlterTableDropColumn(table *Table, column *Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
 	return
 }
@@ -217,7 +216,7 @@ func (q *Query) AlterTableDropColumn(table *types.Table, column *types.Column) (
 // 7. 	none	| 	none	| 	Do nothing
 // 8. 	MUL		| 	MUL		| 	Do nothing
 // 9. 	UNI		|   UNI		| 	Do nothing
-func (q *Query) ChangeColumn(table *types.Table, localColumn *types.Column, remoteColumn *types.Column) (sql string, e error) {
+func (q *Query) ChangeColumn(table *Table, localColumn *Column, remoteColumn *Column) (sql string, e error) {
 
 	t := ""
 	query := ""
@@ -281,7 +280,7 @@ func (q *Query) ChangeColumn(table *types.Table, localColumn *types.Column, remo
 }
 
 // AlterTableCreateColumn returns an alter table sql statement that adds a column
-func (q *Query) AlterTableCreateColumn(table *types.Table, column *types.Column) (sql string, e error) {
+func (q *Query) AlterTableCreateColumn(table *Table, column *Column) (sql string, e error) {
 
 	query := ""
 
@@ -292,25 +291,25 @@ func (q *Query) AlterTableCreateColumn(table *types.Table, column *types.Column)
 }
 
 // AddIndex returns an alter table sql statement that adds an index to a table
-func (q *Query) AddIndex(table *types.Table, column *types.Column) (sql string, e error) {
+func (q *Query) AddIndex(table *Table, column *Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`);", table.Name, column.Name, column.Name)
 	return
 }
 
 // AddUniqueIndex returns an alter table sql statement that adds a unique index to a table
-func (q *Query) AddUniqueIndex(table *types.Table, column *types.Column) (sql string, e error) {
+func (q *Query) AddUniqueIndex(table *Table, column *Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`);", table.Name, column.Name, column.Name)
 	return
 }
 
 // DropIndex returns an alter table sql statement that drops an index
-func (q *Query) DropIndex(table *types.Table, column *types.Column) (sql string, e error) {
+func (q *Query) DropIndex(table *Table, column *Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s`;", table.Name, column.Name)
 	return
 }
 
 // DropUniqueIndex returns an alter table sql statement that drops a unique index
-func (q *Query) DropUniqueIndex(table *types.Table, column *types.Column) (sql string, e error) {
+func (q *Query) DropUniqueIndex(table *Table, column *Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s`;", table.Name, column.Name)
 	return
 }

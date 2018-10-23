@@ -1,5 +1,36 @@
 # DVC
 
+## Rationale 
+
+1. JSON representation of a database schema 
+    - Generated based on local connection 
+    - Stored in source control (ergo versioned)
+    - Can be used in CD process when deploying to remote server and wanting to apply changes to remote database
+2. Database comparison and sql generation 
+3. Code Generation 
+
+## CLI Commands & Usage 
+
+### Import 
+
+Import a remote json schema into a local json representation
+
+```
+$ dvc import
+```
+
+### Compare
+
+Compare local json schema with remote database schema 
+
+```
+$ dvc compare 
+```  
+
+### Gen 
+
+Generate code based upon a schema 
+
 # Usage 
 
 1. Load Config 

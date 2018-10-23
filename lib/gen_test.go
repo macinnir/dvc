@@ -1,7 +1,6 @@
-package gen
+package lib
 
 import (
-	"github.com/macinnir/dvc/types"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -13,19 +12,19 @@ func TestGenerateGoModel(t *testing.T) {
 
 	g := &Gen{}
 
-	table := &types.Table{
+	table := &Table{
 		Name:    "Foo",
-		Columns: map[string]*types.Column{},
+		Columns: map[string]*Column{},
 	}
 
-	table.Columns["Foo"] = &types.Column{
+	table.Columns["Foo"] = &Column{
 		Type:     "int(10)",
 		DataType: "int",
 		Name:     "FooID",
 		Position: 1,
 	}
 
-	table.Columns["Bar"] = &types.Column{
+	table.Columns["Bar"] = &Column{
 		Type:       "varchar(32)",
 		DataType:   "varchar",
 		Name:       "Bar",

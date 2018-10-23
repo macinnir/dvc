@@ -5,9 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/macinnir/dvc/gen"
-	"github.com/macinnir/dvc/logger"
-	"github.com/macinnir/dvc/types"
+	"github.com/macinnir/dvc/lib"
 )
 
 // Command is a type that represents the possible commands passed in at run time
@@ -28,11 +26,12 @@ const (
 
 // Cmd is a container for handling commands
 type Cmd struct {
-	Options types.Options
+	Options lib.Options
+
 	// errLog  *log.Logger
 	cmd    string
-	dvc    *DVC
-	config *types.Config
+	dvc    *lib.DVC
+	config *lib.Config
 }
 
 // Main is the main function that handles commands arguments and routes them to their correct options and functions
@@ -48,18 +47,18 @@ func (c *Cmd) Main(args []string) (err error) {
 		case "-h", "--help":
 			cmd = CommandHelp
 		case "-v", "--verbose":
-			c.Options &^= types.OptLogDebug | types.OptSilent
-			c.Options |= types.OptLogInfo
+			c.Options &^= lib.OptLogDebug | lib.OptSilent
+			c.Options |= lib.OptLogInfo
 		case "-vv", "--debug":
-			c.Options &^= types.OptLogInfo | types.OptSilent
-			c.Options |= types.OptLogDebug
+			c.Options &^= lib.OptLogInfo | lib.OptSilent
+			c.Options |= lib.OptLogDebug
 		case "-s", "--silent":
-			c.Options &^= types.OptLogDebug | types.OptLogInfo
-			c.Options |= types.OptSilent
+			c.Options &^= lib.OptLogDebug | lib.OptLogInfo
+			c.Options |= lib.OptSilent
 		default:
-			logger.Debug(fmt.Sprintf("Arg: %s", arg), c.Options)
+			lib.Debug(fmt.Sprintf("Arg: %s", arg), c.Options)
 			if len(arg) > 0 && arg[0] == '-' {
-				logger.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, arg)
+				lib.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, arg)
 				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
 				return nil
 			}
@@ -76,10 +75,10 @@ func (c *Cmd) Main(args []string) (err error) {
 	}
 
 	if len(cmd) == 0 {
-		logger.Error("No command provided", c.Options)
+		lib.Error("No command provided", c.Options)
 		return
 	}
-	logger.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
+	lib.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
 	// fmt.Printf("cmd: %s, %v\n", cmd, args)
 
 	switch cmd {
@@ -104,11 +103,11 @@ func (c *Cmd) CommandImport(args []string) {
 	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
 
 	if e = c.dvc.ImportSchema(schemaFile); e != nil {
-		logger.Error(e.Error(), c.Options)
+		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
 
-	logger.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.dvc.Config.Host, c.dvc.Config.DatabaseName, schemaFile)
+	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.dvc.Config.Host, c.dvc.Config.DatabaseName, schemaFile)
 }
 
 // CommandCompare handles the `compare` command
@@ -121,7 +120,7 @@ func (c *Cmd) CommandCompare(args []string) {
 	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
 	outfile := ""
 
-	// logger.Debugf("Args: %v", c.Options, args)
+	// lib.Debugf("Args: %v", c.Options, args)
 	if len(args) == 0 {
 		goto Main
 	}
@@ -130,9 +129,9 @@ func (c *Cmd) CommandCompare(args []string) {
 
 		switch args[0] {
 		case "-r", "--reverse":
-			c.Options |= types.OptReverse
+			c.Options |= lib.OptReverse
 		case "-u", "--summary":
-			c.Options |= types.OptSummary
+			c.Options |= lib.OptSummary
 		case "apply":
 			cmd = "apply"
 		default:
@@ -140,12 +139,12 @@ func (c *Cmd) CommandCompare(args []string) {
 			if len(args[0]) > len("-o=") && args[0][0:len("-o=")] == "-o=" {
 				outfile = args[0][len("-o="):]
 				if len(outfile) == 0 {
-					logger.Error("Outfile argument cannot be empty", c.Options)
+					lib.Error("Outfile argument cannot be empty", c.Options)
 					os.Exit(1)
 				}
 				cmd = "write"
 			} else if args[0][0] == '-' {
-				logger.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, args[0])
+				lib.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, args[0])
 				os.Exit(1)
 				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
 			}
@@ -162,12 +161,12 @@ Main:
 	// Do the comparison
 	// TODO pass all options (e.g. verbose)
 	if sql, e = c.dvc.CompareSchema(schemaFile, c.Options); e != nil {
-		logger.Error(e.Error(), c.Options)
+		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
 
 	if len(sql) == 0 {
-		logger.Info("No changes found.", c.Options)
+		lib.Info("No changes found.", c.Options)
 		os.Exit(0)
 	}
 
@@ -175,22 +174,22 @@ Main:
 	case "write":
 
 		if len(args) == 0 {
-			logger.Error("Missing file path for `dvc compare -o=[filePath]`", c.Options)
+			lib.Error("Missing file path for `dvc compare -o=[filePath]`", c.Options)
 			os.Exit(1)
 		}
 
 		filePath := args[0]
 
-		logger.Debugf("Writing changeset sql to path `%s`", c.Options, filePath)
+		lib.Debugf("Writing changeset sql to path `%s`", c.Options, filePath)
 		e = ioutil.WriteFile(filePath, []byte(sql), 0644)
 		if e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 	case "apply":
 		e = c.dvc.ApplyChangeset(sql)
 		if e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
@@ -198,7 +197,7 @@ Main:
 		// Print to stdout
 		fmt.Printf("%s", sql)
 	default:
-		logger.Errorf("Unknown argument: `%s`", c.Options, cmd)
+		lib.Errorf("Unknown argument: `%s`", c.Options, cmd)
 		os.Exit(1)
 	}
 
@@ -210,10 +209,10 @@ Main:
 func (c *Cmd) CommandGen(args []string) {
 
 	var e error
-	var database *types.Database
+	var database *lib.Database
 	fmt.Printf("Args: %v", args)
 	if len(args) < 1 {
-		logger.Error("Missing gen type [schema | model | repo]", c.Options)
+		lib.Error("Missing gen type [schema | model | repo]", c.Options)
 		os.Exit(1)
 	}
 	subCmd := Command(args[0])
@@ -225,122 +224,123 @@ func (c *Cmd) CommandGen(args []string) {
 	for len(args) > 0 {
 		switch args[0] {
 		case "-c", "--clean":
-			c.Options |= types.OptClean
+			c.Options |= lib.OptClean
 		}
 		args = args[1:]
 	}
 
-	logger.Debugf("Gen Subcommand: %s", c.Options, subCmd)
+	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
 	// Load the schema
 	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
-	database, e = ReadSchemaFromFile(schemaFile)
+	database, e = lib.ReadSchemaFromFile(schemaFile)
 	if e != nil {
-		logger.Error(e.Error(), c.Options)
+		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
 
-	g := &gen.Gen{
+	g := &lib.Gen{
 		Options: c.Options,
 	}
 
 	switch subCmd {
 	case CommandGenSchema:
-		e = g.GenerateGoSchemaFile(database)
+		e = g.GenerateGoSchemaFile(c.dvc.Config.SchemaDir, database)
 		if e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
 	case CommandGenRepos:
 
-		e = g.GenerateGoRepoFiles(database)
+		fmt.Println("CommandGenRepos")
+		e = g.GenerateGoRepoFiles(c.dvc.Config.ReposDir, database)
 
 		if e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
 	case "repo":
 		if len(args) < 4 {
-			logger.Error("Missing repo name", c.Options)
+			lib.Error("Missing repo name", c.Options)
 			os.Exit(1)
 
 		}
 
-		var t *types.Table
+		var t *lib.Table
 
 		if t, e = database.FindTableByName(args[3]); e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
-		if e = g.GenerateGoRepoFile(t); e != nil {
-			logger.Error(e.Error(), c.Options)
+		if e = g.GenerateGoRepoFile(c.dvc.Config.ReposDir, t); e != nil {
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
 	case CommandGenModels:
 
 		for _, table := range database.Tables {
-			e = g.GenerateGoModelFile(table)
+			e = g.GenerateGoModelFile(c.dvc.Config.ModelsDir, table)
 			if e != nil {
-				logger.Error(e.Error(), c.Options)
+				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
 			}
 		}
 
 	case "model":
 		if len(args) < 4 {
-			logger.Error("missing model name", c.Options)
+			lib.Error("missing model name", c.Options)
 			os.Exit(1)
 		}
 
-		var t *types.Table
+		var t *lib.Table
 
 		if t, e = database.FindTableByName(args[3]); e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
-		if e = g.GenerateGoModelFile(t); e != nil {
-			logger.Error(e.Error(), c.Options)
+		if e = g.GenerateGoModelFile(c.dvc.Config.ModelsDir, t); e != nil {
+			lib.Error(e.Error(), c.Options)
 		}
 	case CommandGenAll:
 
 		// Generate schema
-		logger.Debug("Generating schema...", c.Options)
-		e = g.GenerateGoSchemaFile(database)
+		lib.Debug("Generating schema...", c.Options)
+		e = g.GenerateGoSchemaFile(c.dvc.Config.SchemaDir, database)
 		if e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-		logger.Debug("done\n", c.Options)
+		lib.Debug("done\n", c.Options)
 
 		// Generate repos
-		logger.Debugf("Generating %d repos...", c.Options, len(database.Tables))
-		e = g.GenerateGoRepoFiles(database)
+		lib.Debugf("Generating %d repos...", c.Options, len(database.Tables))
+		e = g.GenerateGoRepoFiles(c.dvc.Config.ReposDir, database)
 		if e != nil {
-			logger.Error(e.Error(), c.Options)
+			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-		logger.Debug("done", c.Options)
+		lib.Debug("done", c.Options)
 
 		// Generate models
-		logger.Debugf("Generating %d models...", c.Options, len(database.Tables))
+		lib.Debugf("Generating %d models...", c.Options, len(database.Tables))
 		for _, table := range database.Tables {
-			e = g.GenerateGoModelFile(table)
+			e = g.GenerateGoModelFile(c.dvc.Config.ModelsDir, table)
 			if e != nil {
-				logger.Error(e.Error(), c.Options)
+				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
 			}
 		}
-		logger.Debug("done\n", c.Options)
+		lib.Debug("done\n", c.Options)
 
 	case "typescript":
-		g.GenerateTypescriptTypesFile(database)
+		g.GenerateTypescriptTypesFile(c.dvc.Config.TypescriptDir, database)
 	default:
-		logger.Errorf("Unknown output type: `%s`", c.Options, subCmd)
+		lib.Errorf("Unknown output type: `%s`", c.Options, subCmd)
 		os.Exit(1)
 	}
 }

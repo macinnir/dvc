@@ -1,7 +1,6 @@
-package query
+package lib
 
 import (
-	"github.com/macinnir/dvc/types"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -11,7 +10,7 @@ func TestDropTable(t *testing.T) {
 	var e error
 	var result string
 	q := &Query{}
-	table := &types.Table{Name: "Foo"}
+	table := &Table{Name: "Foo"}
 	result, e = q.DropTable(table)
 
 	assert.Nil(t, e)
@@ -24,7 +23,7 @@ func TestCreateColumn(t *testing.T) {
 	q := &Query{}
 
 	// int
-	column := &types.Column{Name: "Foo", IsNullable: false, DataType: "int", Type: "int(10) unsigned", Extra: "auto_increment"}
+	column := &Column{Name: "Foo", IsNullable: false, DataType: "int", Type: "int(10) unsigned", Extra: "auto_increment"}
 	result, e = q.CreateColumn(column)
 	assert.Nil(t, e)
 	assert.Equal(t, "`Foo` int(10) unsigned NOT NULL auto_increment", result)
@@ -60,8 +59,8 @@ func TestAlterTableDropColumn(t *testing.T) {
 	var e error
 	var result string
 
-	table := &types.Table{Name: "Foo"}
-	column := &types.Column{Name: "Bar"}
+	table := &Table{Name: "Foo"}
+	column := &Column{Name: "Bar"}
 
 	q := &Query{}
 	result, e = q.AlterTableDropColumn(table, column)
@@ -74,8 +73,8 @@ func TestAlterTableCreateColumn(t *testing.T) {
 	var e error
 	var result string
 
-	table := &types.Table{Name: "Foo"}
-	column := &types.Column{Name: "Bar", IsNullable: false, DataType: "int", Type: "int(10) unsigned", Extra: "auto_increment"}
+	table := &Table{Name: "Foo"}
+	column := &Column{Name: "Bar", IsNullable: false, DataType: "int", Type: "int(10) unsigned", Extra: "auto_increment"}
 	q := &Query{}
 	result, e = q.AlterTableCreateColumn(table, column)
 
@@ -87,8 +86,8 @@ func TestAddIndex(t *testing.T) {
 	var e error
 	var result string
 
-	table := &types.Table{Name: "Foo"}
-	column := &types.Column{Name: "Bar"}
+	table := &Table{Name: "Foo"}
+	column := &Column{Name: "Bar"}
 
 	q := &Query{}
 
@@ -102,8 +101,8 @@ func TestAddUniqueIndex(t *testing.T) {
 	var e error
 	var result string
 
-	table := &types.Table{Name: "Foo"}
-	column := &types.Column{Name: "Bar"}
+	table := &Table{Name: "Foo"}
+	column := &Column{Name: "Bar"}
 
 	q := &Query{}
 
@@ -118,8 +117,8 @@ func TestDropIndex(t *testing.T) {
 	var e error
 	var result string
 
-	table := &types.Table{Name: "Foo"}
-	column := &types.Column{Name: "Bar"}
+	table := &Table{Name: "Foo"}
+	column := &Column{Name: "Bar"}
 
 	q := &Query{}
 
@@ -134,8 +133,8 @@ func TestDropUniqueIndex(t *testing.T) {
 	var e error
 	var result string
 
-	table := &types.Table{Name: "Foo"}
-	column := &types.Column{Name: "Bar"}
+	table := &Table{Name: "Foo"}
+	column := &Column{Name: "Bar"}
 
 	q := &Query{}
 

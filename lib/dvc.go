@@ -1,59 +1,22 @@
-package main
+package lib
 
 import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"strings"
-
-	"github.com/macinnir/dvc/connectors/mysql"
-	"github.com/macinnir/dvc/query"
-	"github.com/macinnir/dvc/types"
 )
 
 // NewDVC creates a new DVC instance
 // Can be called 2 ways:
 // 	1. NewDvc(filePath)
 //  2. NewDvc(host, databaseName, username, password, changesetPath, databaseType)
-func NewDVC(args ...string) (dvc *DVC, e error) {
-
-	var config *types.Config
-	var configFilePath string
-
-	if len(args) == 1 {
-
-		// load config from file path
-		configFilePath = args[0]
-		config, e = loadConfigFromFile(configFilePath)
-
-		if e != nil {
-			return
-		}
-
-	} else {
-
-		if len(args) < 6 {
-			e = errors.New("not enough arguments")
-			return
-		}
-
-		// build config from arguments
-		config = &types.Config{
-			Host:          args[0],
-			DatabaseName:  args[1],
-			Username:      args[2],
-			Password:      args[3],
-			ChangeSetPath: args[4],
-			DatabaseType:  args[5],
-		}
-	}
+func NewDVC(config *Config) (dvc *DVC, e error) {
 
 	dvc = &DVC{
-		Config:    config,
-		connector: &mysql.MySQL{},
+		Config: config,
 	}
 
 	return
@@ -61,25 +24,25 @@ func NewDVC(args ...string) (dvc *DVC, e error) {
 
 // DVC is the core object for running Database Version Control
 type DVC struct {
-	Config             *types.Config      // Config is the config object
-	LocalSQLPaths      []string           // LocalSQLPaths is a list of paths pulled from the changesets.json file
-	ChangesetSignature string             // ChangesetSignature is a SHA signature for the changesets.json file
-	LocalChangeFiles   []types.ChangeFile // LocalChangeFiles is a list of paths to local change files
-	Files              *Files             // Files is the injected file manager
-	connector          types.IConnector   // IConnector is the injected server manager
-	Databases          map[string]*types.Database
+	Config             *Config              // Config is the config object
+	LocalSQLPaths      []string             // LocalSQLPaths is a list of paths pulled from the changesets.json file
+	ChangesetSignature string               // ChangesetSignature is a SHA signature for the changesets.json file
+	LocalChangeFiles   []ChangeFile         // LocalChangeFiles is a list of paths to local change files
+	Files              *Files               // Files is the injected file manager
+	Connector          IConnector           // IConnector is the injected server manager
+	Databases          map[string]*Database // A map of databases
 }
 
-func (d *DVC) initCommand() (server *types.Server) {
+func (d *DVC) initCommand() (server *Server) {
 
 	var e error
-	server, e = d.connector.ConnectToServer(d.Config.Host, d.Config.Username, d.Config.Password)
+	server, e = d.Connector.ConnectToServer(d.Config.Host, d.Config.Username, d.Config.Password)
 
 	if e != nil {
 		panic(e)
 	}
 
-	e = d.connector.UseDatabase(server, d.Config.DatabaseName)
+	e = d.Connector.UseDatabase(server, d.Config.DatabaseName)
 
 	return
 
@@ -91,11 +54,11 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 
 	server := d.initCommand()
 
-	database := &types.Database{
+	database := &Database{
 		Host: server.Host,
 		Name: d.Config.DatabaseName,
 	}
-	database.Tables, e = d.connector.FetchDatabaseTables(server, d.Config.DatabaseName)
+	database.Tables, e = d.Connector.FetchDatabaseTables(server, d.Config.DatabaseName)
 	if e != nil {
 		return
 	}
@@ -112,10 +75,10 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 // @param reverse bool If true, the remote and local schema comparison is flipped in that the remote schema is treated as the authority
 // 		and the local schema is treated as the schema to be updated.
 // @command compare [reverse]
-func (d *DVC) CompareSchema(schemaFile string, options types.Options) (sql string, e error) {
+func (d *DVC) CompareSchema(schemaFile string, options Options) (sql string, e error) {
 
-	var localSchema *types.Database
-	var remoteSchema *types.Database
+	var localSchema *Database
+	var remoteSchema *Database
 
 	localSchema, e = ReadSchemaFromFile(schemaFile)
 	if e != nil {
@@ -124,11 +87,11 @@ func (d *DVC) CompareSchema(schemaFile string, options types.Options) (sql strin
 
 	server := d.initCommand()
 
-	remoteSchema = &types.Database{}
+	remoteSchema = &Database{}
 
 	remoteSchema.Host = server.Host
 	remoteSchema.Name = d.Config.DatabaseName
-	remoteSchema.Tables, e = d.connector.FetchDatabaseTables(server, d.Config.DatabaseName)
+	remoteSchema.Tables, e = d.Connector.FetchDatabaseTables(server, d.Config.DatabaseName)
 
 	if e != nil {
 		return
@@ -173,9 +136,9 @@ func (d *DVC) CompareSchema(schemaFile string, options types.Options) (sql strin
 
 	sql = ""
 
-	query := &query.Query{}
+	query := &Query{}
 
-	if options&types.OptReverse == types.OptReverse {
+	if options&OptReverse == OptReverse {
 		sql, e = query.CreateChangeSQL(remoteSchema, localSchema)
 	} else {
 		sql, e = query.CreateChangeSQL(localSchema, remoteSchema)

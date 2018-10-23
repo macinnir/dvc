@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"crypto/md5"
@@ -31,6 +31,7 @@ func FetchNonDirFileNames(dirPath string) (files []string, e error) {
 	return
 }
 
+// FetchDirFileNames fetches returns a slice of strings of the name of the files in a directory (non-recursive)
 func FetchDirFileNames(dirPath string) (dirs []string, e error) {
 
 	var filesInfo []os.FileInfo

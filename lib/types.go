@@ -1,12 +1,14 @@
-package types
+package lib
 
 import (
 	"database/sql"
 	"errors"
 )
 
+// Options are the available runtime flags
 type Options uint
 
+// Command is the command line functionality
 type Command struct {
 	Options Options
 }
@@ -40,6 +42,10 @@ type Config struct {
 	Password      string `toml:"password"`
 	ChangeSetPath string `toml:"changesetPath"`
 	DatabaseType  string `toml:"databaseType"`
+	ReposDir      string `toml:"reposDir"`
+	ModelsDir     string `toml:"modelsDir"`
+	TypescriptDir string `toml:"typescriptDir"`
+	SchemaDir     string `toml:"schemaDir"`
 }
 
 // SortedColumns is a slice of Column objects
@@ -155,6 +161,7 @@ const (
 	OptClean
 )
 
+// IConnector defines the shape of a connector to a database
 type IConnector interface {
 	ConnectToServer(host string, username string, password string) (server *Server, e error)
 	FetchDatabases(server *Server) (databases map[string]*Database, e error)

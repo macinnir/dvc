@@ -1,4 +1,4 @@
-package main
+package lib
 
 import (
 	"testing"
@@ -33,7 +33,7 @@ func TestDvcBadConfigFilePath(t *testing.T) {
 // }
 
 func TestDvcGoodConfigFilePath(t *testing.T) {
-	d, e := NewDVC("dvc.toml")
+	d, e := NewDVC("../test/dvc.toml")
 
 	if e != nil {
 		t.Errorf("dvc should not have returned an error: %s", e.Error())
@@ -56,7 +56,7 @@ func TestDvcGoodConfigFilePath(t *testing.T) {
 		t.Errorf("Wrong password `%s` should be `%s`", d.Config.Password, "root")
 	}
 
-	if d.Config.ChangeSetPath != "test_resources/changes" {
+	if d.Config.ChangeSetPath != "test/resources/changes" {
 		t.Errorf("Wrong changeSetPath `%s` should be `%s`", d.Config.ChangeSetPath, "changes")
 	}
 

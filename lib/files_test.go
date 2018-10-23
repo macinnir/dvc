@@ -1,7 +1,6 @@
-package main
+package lib
 
 import (
-	"github.com/macinnir/dvc/types"
 	"testing"
 )
 
@@ -19,7 +18,7 @@ func TestFetchLocalChangesetListChangesetFileNotFound(t *testing.T) {
 
 func TestFetchLocalChangesetListSuccess(t *testing.T) {
 
-	changesetPath := "test_resources/changes"
+	changesetPath := "../test/resources/changes"
 
 	f := &Files{}
 
@@ -35,7 +34,7 @@ func TestFetchLocalChangesetListSuccess(t *testing.T) {
 		return
 	}
 
-	want := "test_resources/changes/0000/foo.sql"
+	want := "../test/resources/changes/0000/foo.sql"
 
 	if sqlPaths[0] != want {
 		t.Errorf("should have had `%s` in the first changeset item (found: %s)", want, sqlPaths[0])
@@ -44,7 +43,7 @@ func TestFetchLocalChangesetListSuccess(t *testing.T) {
 
 func TestBuildChangeFiles(t *testing.T) {
 
-	changesetPath := "test_resources/changes"
+	changesetPath := "../test/resources/changes"
 
 	f := &Files{}
 
@@ -54,7 +53,7 @@ func TestBuildChangeFiles(t *testing.T) {
 		t.Error("fetchLocalChangesetList should have not thrown an error")
 	}
 
-	var changeFiles []types.ChangeFile
+	var changeFiles []ChangeFile
 
 	changeFiles, e = f.BuildChangeFiles(sqlPaths)
 
@@ -67,7 +66,7 @@ func TestBuildChangeFiles(t *testing.T) {
 		return
 	}
 
-	if changeFiles[0].Name != "test_resources/changes/0000/foo.sql" {
+	if changeFiles[0].Name != "../test/resources/changes/0000/foo.sql" {
 		t.Error("should have correct name to changeset sql file")
 	}
 

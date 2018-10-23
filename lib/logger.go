@@ -1,8 +1,7 @@
-package logger
+package lib
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/types"
 	"log"
 )
 
@@ -28,17 +27,17 @@ const (
 )
 
 // Log writes to a log based on its log level and the runtime options passed
-func Log(content string, logLevel LogLevel, options types.Options) {
+func Log(content string, logLevel LogLevel, options Options) {
 
 	logLevelOption := LogLevelWarning
 	logLevelName := "WARN"
 
 	// If silent, only show errors
-	if options&types.OptSilent == types.OptSilent {
+	if options&OptSilent == OptSilent {
 		logLevelOption = LogLevelError
-	} else if options&types.OptLogInfo == types.OptLogInfo {
+	} else if options&OptLogInfo == OptLogInfo {
 		logLevelOption = LogLevelInfo
-	} else if options&types.OptLogDebug == types.OptLogDebug {
+	} else if options&OptLogDebug == OptLogDebug {
 		logLevelOption = LogLevelDebug
 	}
 
@@ -58,34 +57,42 @@ func Log(content string, logLevel LogLevel, options types.Options) {
 	}
 }
 
-func Error(content string, options types.Options) {
+// Error writes an error level log
+func Error(content string, options Options) {
 	Log(content, LogLevelError, options)
 }
 
-func Errorf(content string, options types.Options, a ...interface{}) {
+// Errorf writes a formatted error level log
+func Errorf(content string, options Options, a ...interface{}) {
 	Error(fmt.Sprintf(content, a...), options)
 }
 
-func Warn(content string, options types.Options) {
+// Warn writes a warn level log
+func Warn(content string, options Options) {
 	Log(content, LogLevelWarning, options)
 }
 
-func Warnf(content string, options types.Options, a ...interface{}) {
+// Warnf writes a formatted warn level log
+func Warnf(content string, options Options, a ...interface{}) {
 	Warn(fmt.Sprintf(content, a...), options)
 }
 
-func Info(content string, options types.Options) {
+// Info writes an info level log
+func Info(content string, options Options) {
 	Log(content, LogLevelInfo, options)
 }
 
-func Infof(content string, options types.Options, a ...interface{}) {
+// Infof writes a formatted info level log
+func Infof(content string, options Options, a ...interface{}) {
 	Info(fmt.Sprintf(content, a...), options)
 }
 
-func Debug(content string, options types.Options) {
+// Debug writes a debug level log
+func Debug(content string, options Options) {
 	Log(content, LogLevelDebug, options)
 }
 
-func Debugf(content string, options types.Options, a ...interface{}) {
+// Debugf writes a formatted debug level log
+func Debugf(content string, options Options, a ...interface{}) {
 	Debug(fmt.Sprintf(content, a...), options)
 }
