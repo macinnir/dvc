@@ -7,19 +7,19 @@ import (
 
 	// mysql driver
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/macinnir/dvc/types"
+	"github.com/macinnir/dvc/lib"
 )
 
 // MySQL implementation of IConnector
 
 // MySQL contains functionality for interacting with a server
 type MySQL struct {
-	Config *types.Config
+	Config *lib.Config
 }
 
 // ConnectToServer connects to a server and returns a new server object
-func (ss *MySQL) ConnectToServer(host string, username string, password string) (server *types.Server, e error) {
-	server = &types.Server{Host: host}
+func (ss *MySQL) ConnectToServer(host string, username string, password string) (server *lib.Server, e error) {
+	server = &lib.Server{Host: host}
 	var connectionString = username + ":" + password + "@tcp(" + host + ")/?charset=utf8"
 	server.Connection, e = sql.Open("mysql", connectionString)
 	return
@@ -27,10 +27,10 @@ func (ss *MySQL) ConnectToServer(host string, username string, password string) 
 
 // FetchDatabases fetches a set of database names from the target server
 // populating the Databases property with a map of Database objects
-func (ss *MySQL) FetchDatabases(server *types.Server) (databases map[string]*types.Database, e error) {
+func (ss *MySQL) FetchDatabases(server *lib.Server) (databases map[string]*lib.Database, e error) {
 
 	var rows *sql.Rows
-	databases = map[string]*types.Database{}
+	databases = map[string]*lib.Database{}
 
 	if rows, e = server.Connection.Query("SHOW DATABASES"); e != nil {
 		return
@@ -43,14 +43,14 @@ func (ss *MySQL) FetchDatabases(server *types.Server) (databases map[string]*typ
 	for rows.Next() {
 		databaseName := ""
 		rows.Scan(&databaseName)
-		databases[databaseName] = &types.Database{Name: databaseName, Host: server.Host}
+		databases[databaseName] = &lib.Database{Name: databaseName, Host: server.Host}
 	}
 
 	return
 }
 
 // UseDatabase switches the connection context to the passed in database
-func (ss *MySQL) UseDatabase(server *types.Server, databaseName string) (e error) {
+func (ss *MySQL) UseDatabase(server *lib.Server, databaseName string) (e error) {
 
 	if server.CurrentDatabase == databaseName {
 		return
@@ -64,7 +64,7 @@ func (ss *MySQL) UseDatabase(server *types.Server, databaseName string) (e error
 }
 
 // FetchDatabaseTables fetches the complete set of tables from this database
-func (ss *MySQL) FetchDatabaseTables(server *types.Server, databaseName string) (tables map[string]*types.Table, e error) {
+func (ss *MySQL) FetchDatabaseTables(server *lib.Server, databaseName string) (tables map[string]*lib.Table, e error) {
 
 	var rows *sql.Rows
 	query := "select `TABLE_NAME`, `ENGINE`, `VERSION`, `ROW_FORMAT`, `TABLE_ROWS`, `DATA_LENGTH`, `TABLE_COLLATION`, `AUTO_INCREMENT` FROM information_schema.tables WHERE TABLE_SCHEMA = '" + databaseName + "'"
@@ -77,11 +77,11 @@ func (ss *MySQL) FetchDatabaseTables(server *types.Server, databaseName string) 
 		defer rows.Close()
 	}
 
-	tables = map[string]*types.Table{}
+	tables = map[string]*lib.Table{}
 
 	for rows.Next() {
 
-		table := &types.Table{}
+		table := &lib.Table{}
 
 		rows.Scan(
 			&table.Name,
@@ -108,7 +108,7 @@ func (ss *MySQL) FetchDatabaseTables(server *types.Server, databaseName string) 
 }
 
 // FetchTableColumns lists all of the columns in a table
-func (ss *MySQL) FetchTableColumns(server *types.Server, databaseName string, tableName string) (columns map[string]*types.Column, e error) {
+func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tableName string) (columns map[string]*lib.Column, e error) {
 
 	var rows *sql.Rows
 
@@ -141,10 +141,10 @@ func (ss *MySQL) FetchTableColumns(server *types.Server, databaseName string, ta
 		defer rows.Close()
 	}
 
-	columns = map[string]*types.Column{}
+	columns = map[string]*lib.Column{}
 
 	for rows.Next() {
-		column := types.Column{}
+		column := lib.Column{}
 		if e = rows.Scan(
 			&column.Name,
 			&column.Position,
