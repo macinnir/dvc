@@ -371,7 +371,7 @@ func (g *Gen) GenerateGoSchema(database *Database) (goCode string, e error) {
 		goCode += fmt.Sprintf("\n\n//%s", table.Name)
 		goCode += fmt.Sprintf("\n\ts.Schema.AddTable(")
 		goCode += fmt.Sprintf("\n\t\t\"%s\",", table.Name)
-		goCode += fmt.Sprintf("[]string{%s\n\t})", cols)
+		goCode += fmt.Sprintf("\n\t\t[]string{\n%s\t\t})", cols)
 	}
 
 	goCode += "\n}\n\n// #genEnd\n"
