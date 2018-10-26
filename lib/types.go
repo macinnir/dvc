@@ -43,6 +43,7 @@ type Config struct {
 	ChangeSetPath string `toml:"changesetPath"`
 	DatabaseType  string `toml:"databaseType"`
 	ReposDir      string `toml:"reposDir"`
+	CachesDir     string `toml:"cachesDir"`
 	ModelsDir     string `toml:"modelsDir"`
 	TypescriptDir string `toml:"typescriptDir"`
 	SchemaDir     string `toml:"schemaDir"`

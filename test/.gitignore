@@ -2,3 +2,4 @@ models/*
 repos/*
 schema/*
 ts/*
+cache/*

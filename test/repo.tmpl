@@ -1,0 +1,19 @@
+package repos
+
+import (
+	"database/sql"
+	"errors"
+	"github.com/macinnir/go-dal"
+	"goalgopher/models"
+)
+
+// IAccountRepo outlines the repository methods for Account objects
+type I{{.RepoName}}Repo interface {
+	Create(model *models.{{.ModelName}}) (e error)
+	Update(model *models.{{.ModelName}}) (e error)
+	Delete(model *models.{{.ModelName}}) (e error)
+	HardDelete(model *models.{{.ModelName}}) (e error)
+	GetMany(limit int, offset int, args ...string) (collection []*models.{{.ModelName}}, e error)
+	GetByID(AccountID int64) (model *models.{{.ModelName}}, e error)
+	GetSingle(args ...string) (model *models.{{.ModelName}}, e error)
+}

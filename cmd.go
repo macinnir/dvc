@@ -17,6 +17,7 @@ const (
 	CommandGen           Command = "gen"
 	CommandGenSchema     Command = "schema"
 	CommandGenRepos      Command = "repos"
+	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
 	CommandGenAll        Command = "all"
 	CommandGenTypescript Command = "typescript"
@@ -260,7 +261,14 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
+	case CommandGenCaches:
+		fmt.Println("CommandGenCaches")
+		e = g.GenerateGoCacheFiles(c.dvc.Config.CachesDir, database)
 
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
 	case "repo":
 		if len(args) < 4 {
 			lib.Error("Missing repo name", c.Options)
@@ -312,9 +320,12 @@ func (c *Cmd) CommandGen(args []string) {
 		lib.Debug("Generating schema...", c.Options)
 		e = g.GenerateGoSchemaFile(c.dvc.Config.SchemaDir, database)
 		if e != nil {
+			fmt.Println("test...")
+			fmt.Printf("E: %s\n", e.Error())
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
+
 		lib.Debug("done\n", c.Options)
 
 		// Generate repos
