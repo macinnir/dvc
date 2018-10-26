@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -24,24 +22,6 @@ func (g *Gen) EnsureDir(dir string) (e error) {
 	return
 }
 
-// GenerateReposBootstrapFile generates a repos bootstrap file in golang
-func (g *Gen) GenerateReposBootstrapFile(dir string, database *Database) (e error) {
-
-	// Make the repos dir if it does not exist.
-	g.EnsureDir(dir)
-
-	outFile := fmt.Sprintf("%s/repos.go", dir)
-	goCode, e := g.GenerateReposBootstrapGoCodeFromDatabase(database)
-	Debugf("Generating go Repos bootstrap file at path %s", g.Options, outFile)
-	if e != nil {
-		return
-	}
-
-	e = g.WriteGoCodeToFile(goCode, outFile)
-
-	return
-}
-
 // WriteGoCodeToFile writes a string of golang code to a file and then formats it with `go fmt`
 func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 	// outFile := "./repos/repos.go"
@@ -50,8 +30,16 @@ func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 	if e != nil {
 		return
 	}
-	cmd := exec.Command("go", "fmt", filePath)
-	e = cmd.Run()
+
+	_, stdError, exitCode := RunCommand("go", "fmt", filePath)
+
+	if exitCode > 0 {
+		Warnf("fmt error: %s", g.Options, stdError)
+	}
+
+	// cmd := exec.Command("go", "fmt", filePath)
+	// e = cmd.Run()
+	// fmt.Printf("WriteCodeToFile: %s\n", e.Error())
 	return
 }
 
@@ -68,6 +56,7 @@ func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string
 
 	// Check if file exists
 	if _, e = os.Stat(filePath); os.IsNotExist(e) {
+		fmt.Printf("File %s does not exist", filePath)
 		e = nil
 		return
 	}
