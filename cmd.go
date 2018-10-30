@@ -14,6 +14,7 @@ type Command string
 // Command Names
 const (
 	CommandImport        Command = "import"
+	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
 	CommandGenSchema     Command = "schema"
 	CommandGenRepos      Command = "repos"
@@ -85,6 +86,8 @@ func (c *Cmd) Main(args []string) (err error) {
 	switch cmd {
 	case CommandImport:
 		c.CommandImport(args)
+	case CommandExport:
+		c.CommandExport(args)
 	case CommandCompare:
 		c.CommandCompare(args)
 	case CommandGen:
@@ -109,6 +112,20 @@ func (c *Cmd) CommandImport(args []string) {
 	}
 
 	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.dvc.Config.Host, c.dvc.Config.DatabaseName, schemaFile)
+}
+
+func (c *Cmd) CommandExport(args []string) {
+	var e error
+	var sql string
+
+	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
+
+	if sql, e = c.dvc.ExportSchemaToSQL(schemaFile, c.Options); e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+
+	fmt.Println(sql)
 }
 
 // CommandCompare handles the `compare` command

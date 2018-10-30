@@ -36,7 +36,7 @@ type DVC struct {
 func (d *DVC) initCommand() (server *Server) {
 
 	var e error
-	server, e = d.Connector.ConnectToServer(d.Config.Host, d.Config.Username, d.Config.Password)
+	server, e = d.Connector.Connect()
 
 	if e != nil {
 		panic(e)
@@ -136,14 +136,25 @@ func (d *DVC) CompareSchema(schemaFile string, options Options) (sql string, e e
 
 	sql = ""
 
-	query := &Query{}
-
 	if options&OptReverse == OptReverse {
-		sql, e = query.CreateChangeSQL(remoteSchema, localSchema)
+		sql, e = d.Connector.CreateChangeSQL(remoteSchema, localSchema)
 	} else {
-		sql, e = query.CreateChangeSQL(localSchema, remoteSchema)
+		sql, e = d.Connector.CreateChangeSQL(localSchema, remoteSchema)
 	}
 
+	return
+}
+
+func (d *DVC) ExportSchemaToSQL(schemaFile string, options Options) (sql string, e error) {
+
+	var localSchema *Database
+	emptySchema := &Database{}
+
+	if localSchema, e = ReadSchemaFromFile(schemaFile); e != nil {
+		return
+	}
+
+	sql, e = d.Connector.CreateChangeSQL(localSchema, emptySchema)
 	return
 }
 
@@ -160,9 +171,9 @@ func (d *DVC) ApplyChangeset(changeset string) (e error) {
 		if len(sql) == 0 {
 			continue
 		}
-		fmt.Printf("Running sql: %s", sql)
+		fmt.Printf("Running sql: \n%s\n", sql)
 
-		server.Connection.Exec(sql)
+		_, e = server.Connection.Exec(sql)
 		if e != nil {
 			return
 		}

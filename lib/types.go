@@ -134,17 +134,19 @@ type Table struct {
 
 // Column represents a column in a table
 type Column struct {
-	Name       string `json:"column"`
-	Position   int    `json:"position"`
-	Default    string `json:"default"`
-	IsNullable bool   `json:"isNullable"`
-	DataType   string `json:"dataType"`
-	MaxLength  int    `json:"maxLength"`
-	Precision  int    `json:"precision"`
-	CharSet    string `json:"charSet"`
-	Type       string `json:"type"`
-	ColumnKey  string `json:"columnKey"`
-	Extra      string `json:"extra"`
+	Name         string `json:"column"`
+	Position     int    `json:"position"`
+	Default      string `json:"default"`
+	IsNullable   bool   `json:"isNullable"`
+	IsUnsigned   bool   `json:"isUnsigned"`
+	DataType     string `json:"dataType"`
+	MaxLength    int    `json:"maxLength"`
+	Precision    int    `json:"precision"`
+	CharSet      string `json:"charSet"`
+	Type         string `json:"type"`
+	ColumnKey    string `json:"columnKey"`
+	NumericScale int    `json:"numericScale"`
+	Extra        string `json:"extra"`
 }
 
 const (
@@ -164,9 +166,10 @@ const (
 
 // IConnector defines the shape of a connector to a database
 type IConnector interface {
-	ConnectToServer(host string, username string, password string) (server *Server, e error)
+	Connect() (server *Server, e error)
 	FetchDatabases(server *Server) (databases map[string]*Database, e error)
 	UseDatabase(server *Server, databaseName string) (e error)
 	FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error)
 	FetchTableColumns(server *Server, databaseName string, tableName string) (columns map[string]*Column, e error)
+	CreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql string, e error)
 }
