@@ -1,5 +1,2 @@
-models/*
-repos/*
-schema/*
-ts/*
-cache/*
+gen/* 
+!gen/.gitkeep
