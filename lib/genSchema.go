@@ -13,14 +13,22 @@ func (g *Gen) GenerateGoSchemaFile(dir string, database *Database) (e error) {
 	var fileHead, fileFoot, goCode string
 
 	outFile := fmt.Sprintf("%s/schema.go", dir)
+
 	Debugf("Generating go schema file at path %s", g.Options, outFile)
+
 	if fileHead, fileFoot, _, e = g.scanFileParts(outFile, false); e != nil {
 		return
 	}
 
 	goCode, e = g.GenerateGoSchema(database)
+
 	if e != nil {
 		return
+	}
+
+	// Add package statement
+	if !g.fileExists(outFile) {
+		fileHead = "package schema\n\n"
 	}
 
 	outFileContent := fileHead + goCode + fileFoot
@@ -55,7 +63,7 @@ func (g *Gen) GenerateGoSchema(database *Database) (goCode string, e error) {
 			cols += fmt.Sprintf("\t\t\t\"%s\",\n", column.Name)
 		}
 
-		goCode += fmt.Sprintf("\n\n//%s", table.Name)
+		goCode += fmt.Sprintf("\n\n\t// %s", table.Name)
 		goCode += fmt.Sprintf("\n\ts.Schema.AddTable(")
 		goCode += fmt.Sprintf("\n\t\t\"%s\",", table.Name)
 		goCode += fmt.Sprintf("\n\t\t[]string{\n%s\t\t})", cols)
