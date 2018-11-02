@@ -43,6 +43,17 @@ func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 	return
 }
 
+func (g *Gen) fileExists(filePath string) bool {
+	// Check if file exists
+	if _, e := os.Stat(filePath); os.IsNotExist(e) {
+		// fmt.Printf("File %s does not exist", filePath)
+		return false
+	}
+
+	return true
+
+}
+
 // scanFileParts scans a file for template parts, header, footer and import statements and returns those parts
 func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string, fileFoot string, imports []string, e error) {
 
@@ -54,10 +65,7 @@ func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string
 	fileFoot = ""
 	imports = []string{}
 
-	// Check if file exists
-	if _, e = os.Stat(filePath); os.IsNotExist(e) {
-		fmt.Printf("File %s does not exist", filePath)
-		e = nil
+	if !g.fileExists(filePath) {
 		return
 	}
 
