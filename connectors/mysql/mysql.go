@@ -21,8 +21,8 @@ type MySQL struct {
 
 // Connect connects to a server and returns a new server object
 func (ss *MySQL) Connect() (server *lib.Server, e error) {
-	server = &lib.Server{Host: ss.Config.Host}
-	var connectionString = ss.Config.Username + ":" + ss.Config.Password + "@tcp(" + ss.Config.Host + ")/?charset=utf8"
+	server = &lib.Server{Host: ss.Config.Connection.Host}
+	var connectionString = ss.Config.Connection.Username + ":" + ss.Config.Connection.Password + "@tcp(" + ss.Config.Connection.Host + ")/?charset=utf8"
 	server.Connection, e = sql.Open("mysql", connectionString)
 	return
 }

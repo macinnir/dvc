@@ -104,23 +104,20 @@ func (c *Cmd) Main(args []string) (err error) {
 func (c *Cmd) CommandImport(args []string) {
 
 	var e error
-	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
 
-	if e = c.dvc.ImportSchema(schemaFile); e != nil {
+	if e = c.dvc.ImportSchema("./" + c.dvc.Config.Connection.DatabaseName + ".schema.json"); e != nil {
 		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
 
-	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.dvc.Config.Host, c.dvc.Config.DatabaseName, schemaFile)
+	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.dvc.Config.Connection.Host, c.dvc.Config.Connection.DatabaseName, c.dvc.Config.Connection.DatabaseName+".schema.json")
 }
 
 func (c *Cmd) CommandExport(args []string) {
 	var e error
 	var sql string
 
-	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
-
-	if sql, e = c.dvc.ExportSchemaToSQL(schemaFile, c.Options); e != nil {
+	if sql, e = c.dvc.ExportSchemaToSQL(c.Options); e != nil {
 		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
@@ -135,7 +132,7 @@ func (c *Cmd) CommandCompare(args []string) {
 
 	cmd := "print"
 	sql := ""
-	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
+	schemaFile := c.dvc.Config.Connection.DatabaseName + ".schema.json"
 	outfile := ""
 
 	// lib.Debugf("Args: %v", c.Options, args)
@@ -250,7 +247,7 @@ func (c *Cmd) CommandGen(args []string) {
 	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
 	// Load the schema
-	schemaFile := c.dvc.Config.DatabaseName + ".schema.json"
+	schemaFile := c.dvc.Config.Connection.DatabaseName + ".schema.json"
 	database, e = lib.ReadSchemaFromFile(schemaFile)
 	if e != nil {
 		lib.Error(e.Error(), c.Options)
@@ -263,7 +260,7 @@ func (c *Cmd) CommandGen(args []string) {
 
 	switch subCmd {
 	case CommandGenSchema:
-		e = g.GenerateGoSchemaFile(c.dvc.Config.SchemaDir, database)
+		e = g.GenerateGoSchemaFile(c.dvc.Config.Dirs.Schema, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
@@ -272,7 +269,7 @@ func (c *Cmd) CommandGen(args []string) {
 	case CommandGenRepos:
 
 		fmt.Println("CommandGenRepos")
-		e = g.GenerateGoRepoFiles(c.dvc.Config.ReposDir, database)
+		e = g.GenerateGoRepoFiles(c.dvc.Config.Dirs.Repos, database)
 
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
@@ -280,7 +277,7 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 	case CommandGenCaches:
 		fmt.Println("CommandGenCaches")
-		e = g.GenerateGoCacheFiles(c.dvc.Config.CachesDir, database)
+		e = g.GenerateGoCacheFiles(c.dvc.Config.Dirs.Cache, database)
 
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
@@ -300,7 +297,7 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		if e = g.GenerateGoRepoFile(c.dvc.Config.ReposDir, t); e != nil {
+		if e = g.GenerateGoRepoFile(c.dvc.Config.Dirs.Repos, t); e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
@@ -308,7 +305,7 @@ func (c *Cmd) CommandGen(args []string) {
 	case CommandGenModels:
 
 		for _, table := range database.Tables {
-			e = g.GenerateGoModelFile(c.dvc.Config.ModelsDir, table)
+			e = g.GenerateGoModelFile(c.dvc.Config.Dirs.Models, table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
@@ -328,14 +325,14 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		if e = g.GenerateGoModelFile(c.dvc.Config.ModelsDir, t); e != nil {
+		if e = g.GenerateGoModelFile(c.dvc.Config.Dirs.Models, t); e != nil {
 			lib.Error(e.Error(), c.Options)
 		}
 	case CommandGenAll:
 
-		// Generate schema
+		// Schema
 		lib.Debug("Generating schema...", c.Options)
-		e = g.GenerateGoSchemaFile(c.dvc.Config.SchemaDir, database)
+		e = g.GenerateGoSchemaFile(c.dvc.Config.Dirs.Schema, database)
 		if e != nil {
 			fmt.Println("test...")
 			fmt.Printf("E: %s\n", e.Error())
@@ -345,19 +342,19 @@ func (c *Cmd) CommandGen(args []string) {
 
 		lib.Debug("done\n", c.Options)
 
-		// Generate repos
+		// Repos
 		lib.Debugf("Generating %d repos...", c.Options, len(database.Tables))
-		e = g.GenerateGoRepoFiles(c.dvc.Config.ReposDir, database)
+		e = g.GenerateGoRepoFiles(c.dvc.Config.Dirs.Repos, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 		lib.Debug("done", c.Options)
 
-		// Generate models
+		// Models
 		lib.Debugf("Generating %d models...", c.Options, len(database.Tables))
 		for _, table := range database.Tables {
-			e = g.GenerateGoModelFile(c.dvc.Config.ModelsDir, table)
+			e = g.GenerateGoModelFile(c.dvc.Config.Dirs.Models, table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
@@ -365,8 +362,23 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 		lib.Debug("done\n", c.Options)
 
+		// Cache
+		lib.Debugf("Generating %d cache files...", c.Options, len(database.Tables))
+		e = g.GenerateGoCacheFiles(c.dvc.Config.Dirs.Cache, database)
+
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+		lib.Debug("done\n", c.Options)
+
+		// Typescript
+		lib.Debug("Generating typescript types file...", c.Options)
+		g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
+		lib.Debug("done\n", c.Options)
+
 	case "typescript":
-		g.GenerateTypescriptTypesFile(c.dvc.Config.TypescriptDir, database)
+		g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
 	default:
 		lib.Errorf("Unknown output type: `%s`", c.Options, subCmd)
 		os.Exit(1)

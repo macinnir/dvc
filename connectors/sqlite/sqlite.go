@@ -26,7 +26,7 @@ func (ss *Sqlite) Connect() (server *lib.Server, e error) {
 	server = &lib.Server{}
 	// var connectionString = username + ":" + password + "@tcp(" + host + ")/?charset=utf8"
 
-	server.Connection, e = sql.Open("sqlite3", "./"+ss.Config.DatabaseName+".db")
+	server.Connection, e = sql.Open("sqlite3", "./"+ss.Config.Connection.DatabaseName+".db")
 	return
 }
 
@@ -41,7 +41,7 @@ func (ss *Sqlite) FetchDatabases(server *lib.Server) (databases map[string]*lib.
 	// var rows *sql.Rows
 	databases = map[string]*lib.Database{}
 
-	databases[ss.Config.DatabaseName] = &lib.Database{Name: ss.Config.DatabaseName, Host: ss.Config.Host}
+	databases[ss.Config.Connection.DatabaseName] = &lib.Database{Name: ss.Config.Connection.DatabaseName, Host: ss.Config.Connection.Host}
 
 	return
 

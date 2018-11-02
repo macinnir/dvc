@@ -42,7 +42,7 @@ func (d *DVC) initCommand() (server *Server) {
 		panic(e)
 	}
 
-	e = d.Connector.UseDatabase(server, d.Config.DatabaseName)
+	e = d.Connector.UseDatabase(server, d.Config.Connection.DatabaseName)
 
 	return
 
@@ -56,9 +56,9 @@ func (d *DVC) ImportSchema(fileName string) (e error) {
 
 	database := &Database{
 		Host: server.Host,
-		Name: d.Config.DatabaseName,
+		Name: d.Config.Connection.DatabaseName,
 	}
-	database.Tables, e = d.Connector.FetchDatabaseTables(server, d.Config.DatabaseName)
+	database.Tables, e = d.Connector.FetchDatabaseTables(server, d.Config.Connection.DatabaseName)
 	if e != nil {
 		return
 	}
@@ -87,15 +87,42 @@ func (d *DVC) CompareSchema(schemaFile string, options Options) (sql string, e e
 
 	server := d.initCommand()
 
+	if remoteSchema, e = d.buildRemoteSchema(server); e != nil {
+		return
+	}
+
+	sql = ""
+	same := false
+
+	if same, e = d.schemasAreSame(localSchema, remoteSchema); e != nil {
+		return
+	}
+
+	if same {
+		return
+	}
+
+	if options&OptReverse == OptReverse {
+		sql, e = d.Connector.CreateChangeSQL(remoteSchema, localSchema)
+	} else {
+		sql, e = d.Connector.CreateChangeSQL(localSchema, remoteSchema)
+	}
+
+	return
+}
+
+func (d *DVC) buildRemoteSchema(server *Server) (remoteSchema *Database, e error) {
+
 	remoteSchema = &Database{}
 
 	remoteSchema.Host = server.Host
-	remoteSchema.Name = d.Config.DatabaseName
-	remoteSchema.Tables, e = d.Connector.FetchDatabaseTables(server, d.Config.DatabaseName)
+	remoteSchema.Name = d.Config.Connection.DatabaseName
+	remoteSchema.Tables, e = d.Connector.FetchDatabaseTables(server, d.Config.Connection.DatabaseName)
 
-	if e != nil {
-		return
-	}
+	return
+}
+
+func (d *DVC) schemasAreSame(localSchema *Database, remoteSchema *Database) (same bool, e error) {
 
 	// Remote Signature
 	var localBytes []byte
@@ -129,23 +156,13 @@ func (d *DVC) CompareSchema(schemaFile string, options Options) (sql string, e e
 	remoteSha := base64.URLEncoding.EncodeToString(remoteHasher.Sum(nil))
 	// fmt.Printf("Remote SHA %s\n", remoteSha)
 
-	if localSha == remoteSha {
-		// fmt.Println("They are the same...")
-		return
-	}
-
-	sql = ""
-
-	if options&OptReverse == OptReverse {
-		sql, e = d.Connector.CreateChangeSQL(remoteSchema, localSchema)
-	} else {
-		sql, e = d.Connector.CreateChangeSQL(localSchema, remoteSchema)
-	}
-
+	same = localSha == remoteSha
 	return
 }
 
-func (d *DVC) ExportSchemaToSQL(schemaFile string, options Options) (sql string, e error) {
+func (d *DVC) ExportSchemaToSQL(options Options) (sql string, e error) {
+
+	schemaFile := d.Config.Connection.DatabaseName + ".schema.json"
 
 	var localSchema *Database
 	emptySchema := &Database{}

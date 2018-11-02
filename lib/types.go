@@ -36,17 +36,31 @@ type ChangeFile struct {
 
 // Config contains a set of configuration values used throughout the application
 type Config struct {
-	Host          string `toml:"host"`
-	DatabaseName  string `toml:"databaseName"`
-	Username      string `toml:"username"`
-	Password      string `toml:"password"`
 	ChangeSetPath string `toml:"changesetPath"`
-	DatabaseType  string `toml:"databaseType"`
-	ReposDir      string `toml:"reposDir"`
-	CachesDir     string `toml:"cachesDir"`
-	ModelsDir     string `toml:"modelsDir"`
-	TypescriptDir string `toml:"typescriptDir"`
-	SchemaDir     string `toml:"schemaDir"`
+
+	DatabaseType string `toml:"databaseType"`
+
+	Connection struct {
+		Host         string `toml:"host"`
+		DatabaseName string `toml:"databaseName"`
+		Username     string `toml:"username"`
+		Password     string `toml:"password"`
+	}
+
+	Packages struct {
+		Cache  string `toml: "cache"`
+		Models string `toml:"models"`
+		Schema string `toml: "schema"`
+		Repos  string `tomls: "repos"`
+	}
+
+	Dirs struct {
+		Repos      string `toml:"repos"`
+		Cache      string `toml:"cache"`
+		Models     string `toml:"models"`
+		Schema     string `toml:"schema"`
+		Typescript string `toml:"typescript"`
+	}
 }
 
 // SortedColumns is a slice of Column objects
