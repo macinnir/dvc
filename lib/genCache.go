@@ -63,11 +63,9 @@ func (g *Gen) GenerateGoCacheFiles(reposDir string, database *Database) (e error
 		}
 	}
 
-	fmt.Printf("CacheDir: %s %d\n", reposDir, len(files))
+	Infof("Generating %d cache files", g.Options, len(database.Tables))
 
 	for _, table := range database.Tables {
-
-		Infof("Generating cache %s", g.Options, table.Name)
 		e = g.GenerateGoCacheFile(reposDir, table)
 		if e != nil {
 			return

@@ -36,7 +36,8 @@ type Cmd struct {
 	config *lib.Config
 }
 
-// Main is the main function that handles commands arguments and routes them to their correct options and functions
+// Main is the main function that handles commands arguments
+// and routes them to their correct options and functions
 func (c *Cmd) Main(args []string) (err error) {
 
 	args = args[1:]
@@ -147,6 +148,8 @@ func (c *Cmd) CommandCompare(args []string) {
 			c.Options |= lib.OptReverse
 		case "-u", "--summary":
 			c.Options |= lib.OptSummary
+		case "print":
+			cmd = "print"
 		case "apply":
 			cmd = "apply"
 		default:
@@ -225,7 +228,7 @@ func (c *Cmd) CommandGen(args []string) {
 
 	var e error
 	var database *lib.Database
-	fmt.Printf("Args: %v", args)
+	// fmt.Printf("Args: %v", args)
 	if len(args) < 1 {
 		lib.Error("Missing gen type [schema | model | repo]", c.Options)
 		os.Exit(1)
@@ -340,19 +343,16 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		lib.Debug("done\n", c.Options)
-
 		// Repos
-		lib.Debugf("Generating %d repos...", c.Options, len(database.Tables))
+		lib.Infof("Generating %d repos...", c.Options, len(database.Tables))
 		e = g.GenerateGoRepoFiles(c.dvc.Config.Dirs.Repos, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-		lib.Debug("done", c.Options)
 
 		// Models
-		lib.Debugf("Generating %d models...", c.Options, len(database.Tables))
+		lib.Infof("Generating %d models", c.Options, len(database.Tables))
 		for _, table := range database.Tables {
 			e = g.GenerateGoModelFile(c.dvc.Config.Dirs.Models, table)
 			if e != nil {
@@ -360,22 +360,19 @@ func (c *Cmd) CommandGen(args []string) {
 				os.Exit(1)
 			}
 		}
-		lib.Debug("done\n", c.Options)
 
 		// Cache
-		lib.Debugf("Generating %d cache files...", c.Options, len(database.Tables))
+		lib.Info("Generating cache file", c.Options)
 		e = g.GenerateGoCacheFiles(c.dvc.Config.Dirs.Cache, database)
 
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-		lib.Debug("done\n", c.Options)
 
 		// Typescript
-		lib.Debug("Generating typescript types file...", c.Options)
+		lib.Info("Generating typescript types file", c.Options)
 		g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
-		lib.Debug("done\n", c.Options)
 
 	case "typescript":
 		g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)

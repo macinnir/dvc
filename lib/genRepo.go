@@ -64,11 +64,9 @@ func (g *Gen) GenerateGoRepoFiles(reposDir string, database *Database) (e error)
 		}
 	}
 
-	fmt.Printf("ReposDir: %s %d\n", reposDir, len(files))
-
 	for _, table := range database.Tables {
 
-		Infof("Generating repo %s", g.Options, table.Name)
+		Debugf("Generating repo %s", g.Options, table.Name)
 		e = g.GenerateGoRepoFile(reposDir, table)
 		if e != nil {
 			return
