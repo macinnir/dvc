@@ -165,6 +165,7 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 		"fmt",
 		"goalgopher/models",
 		"goalgopher/utils",
+		"goalgopher/repos",
 	}
 
 	if len(imports) > 0 {
@@ -205,7 +206,7 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 	)
 
 	goCode += fmt.Sprintf("type %sCache struct {\n", table.Name)
-	goCode += fmt.Sprintf("\trepo *%sRepo\n", table.Name)
+	goCode += fmt.Sprintf("\trepo repos.I%sRepo\n", table.Name)
 	goCode += fmt.Sprintf("\tcache utils.IStore\n")
 	goCode += "}\n\n"
 
@@ -251,7 +252,7 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 	if isDeleted {
 
 		goCode += fmt.Sprintf("// Delete marks an existing %s entry in the database as deleted\n", table.Name)
-		goCode += fmt.Sprintf("func (r *%sRepo) Delete(model *models.%s) (e error) {\n\n",
+		goCode += fmt.Sprintf("func (r *%sCache) Delete(model *models.%s) (e error) {\n\n",
 			table.Name,
 			table.Name,
 		)
@@ -265,7 +266,7 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 	}
 
 	goCode += fmt.Sprintf("// HardDelete performs a SQL DELETE operation on a %s entry in the database\n", table.Name)
-	goCode += fmt.Sprintf("func (r *%sRepo) HardDelete(model *models.%s) (e error) {\n\n",
+	goCode += fmt.Sprintf("func (r *%sCache) HardDelete(model *models.%s) (e error) {\n\n",
 		table.Name,
 		table.Name,
 	)
@@ -280,18 +281,18 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 	// GetByID
 
 	goCode += fmt.Sprintf("// GetByID gets a single %s object by a Primary Key\n", table.Name)
-	goCode += fmt.Sprintf("func (r *%sRepo) GetByID(%s %s) (model *models.%s, e error) {\n",
+	goCode += fmt.Sprintf("func (r *%sCache) GetByID(%s %s) (model *models.%s, e error) {\n",
 		table.Name,
 		primaryKey,
 		idType,
 		table.Name,
 	)
 
-	goCode += "\tmodel = &models.Account{}\n"
+	goCode += fmt.Sprintf("\tmodel = &models.%s{}\n", table.Name)
 	goCode += "\tkey := fmt.Sprintf(\"" + table.Name + "_%d\", " + primaryKey + ")\n"
 	goCode += "\tif e = r.cache.Get(key, model); e != nil {\n"
 	goCode += "\t\t// redis.Nil -- no rows\n"
-	goCode += "\t\tmodel, e = r.repo.GetByID(AccountID)\n"
+	goCode += fmt.Sprintf("\t\tmodel, e = r.repo.GetByID(%s)\n", primaryKey)
 	goCode += "\t\tr.cache.Set(key, model)\n"
 	goCode += "\t}\n"
 	goCode += "\treturn\n"
@@ -303,13 +304,10 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 		table.Name,
 	)
 
-	goCode += fmt.Sprintf("func (r *%sRepo) GetMany(limit int, offset int, args ...string) (collection []*models.%s, e error) {\n",
+	goCode += fmt.Sprintf("func (r *%sCache) GetMany(limit int, offset int, args ...string) (collection []*models.%s, e error) {\n",
 		table.Name,
 		table.Name,
 	)
-
-	goCode += "\n\tvar rows *sql.Rows\n\n"
-	goCode += fmt.Sprintf("\tq := r.Dal.Select(\"%s\")\n", table.Name)
 
 	goCode += `
 	collection, e = r.repo.GetMany(limit, offset, args...)
@@ -322,7 +320,7 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 		table.Name,
 	)
 
-	goCode += fmt.Sprintf("func (r *%sRepo) GetSingle(args ...string) (model *models.%s, e error) {\n",
+	goCode += fmt.Sprintf("func (r *%sCache) GetSingle(args ...string) (model *models.%s, e error) {\n",
 		table.Name,
 		table.Name,
 	)
