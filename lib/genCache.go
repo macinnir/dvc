@@ -72,7 +72,60 @@ func (g *Gen) GenerateGoCacheFiles(reposDir string, database *Database) (e error
 		}
 	}
 
-	e = g.GenerateReposBootstrapFile(reposDir, database)
+	e = g.GenerateCacheBootstrapFile(reposDir, database)
+	return
+}
+
+// GenerateCacheBootstrapFile generates a repos bootstrap file in golang
+func (g *Gen) GenerateCacheBootstrapFile(dir string, database *Database) (e error) {
+
+	// Make the repos dir if it does not exist.
+	g.EnsureDir(dir)
+
+	outFile := fmt.Sprintf("%s/repos.go", dir)
+	goCode, e := g.GenerateCacheBootstrapGoCodeFromDatabase(database)
+	Debugf("Generating go Repos bootstrap file at path %s", g.Options, outFile)
+	if e != nil {
+		return
+	}
+
+	e = g.WriteGoCodeToFile(goCode, outFile)
+
+	return
+}
+
+// GenerateCacheBootstrapGoCodeFromDatabase generates golang code for a Repo Bootstrap file from
+// a database object
+func (g *Gen) GenerateCacheBootstrapGoCodeFromDatabase(database *Database) (goCode string, e error) {
+
+	defs := ""
+
+	for _, table := range database.Tables {
+
+		cacheName := fmt.Sprintf("cache%s", table.Name)
+
+		defs += fmt.Sprintf("\t// %s\n", table.Name)
+		defs += fmt.Sprintf("\t%s := new(%sCache)\n", cacheName, table.Name)
+		defs += fmt.Sprintf("\t%s.cache = cache\n", cacheName)
+		defs += fmt.Sprintf("\t%s.repo = r.%s\n", cacheName, table.Name)
+		defs += fmt.Sprintf("\tc.%s = %s\n\n", table.Name, cacheName)
+	}
+
+	goCode = "package cache"
+	goCode += "\n\nimport("
+	goCode += "\n\tdal \"github.com/macinnir/go-dal\""
+	goCode += "\n\t \"goalgopher/repos\""
+	goCode += "\n\t \"goalgopher/utils\""
+	goCode += "\n)"
+	goCode += "\n\n//Bootstrap bootstraps all of the repositories into a single repository object"
+	goCode += "\nfunc Bootstrap(cache utils.IStore, schema dal.ISchema) *repos.Repos {"
+	goCode += "\n\n\tr := repos.Bootstrap(schema)"
+	goCode += "\n\n\tc := new(repos.Repos)"
+	goCode += "\n\n\t// Repos"
+	goCode += fmt.Sprintf("\n\n%s", defs)
+	goCode += "\n\n\treturn r"
+	goCode += "\n}"
+
 	return
 }
 
