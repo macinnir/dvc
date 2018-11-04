@@ -529,11 +529,11 @@ func dropUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error)
 
 func hasDefaultString(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case "varchar":
+	case ColTypeVarchar:
 		return true
-	case "char":
+	case ColTypeChar:
 		return true
-	case "enum":
+	case ColTypeEnum:
 		return true
 	}
 	return false
@@ -541,11 +541,11 @@ func hasDefaultString(dataType string) bool {
 
 func isString(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case "varchar":
+	case ColTypeVarchar:
 		return true
-	case "enum":
+	case ColTypeEnum:
 		return true
-	case "char":
+	case ColTypeChar:
 		return true
 	}
 
@@ -556,15 +556,15 @@ func isString(dataType string) bool {
 // Integer DataTypes: https://dev.mysql.com/doc/refman/8.0/en/integer-types.html
 func isInt(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case "tinyint":
+	case ColTypeTinyint:
 		return true
-	case "smallint":
+	case ColTypeSmallint:
 		return true
-	case "mediumint":
+	case ColTypeMediumint:
 		return true
-	case "int":
+	case ColTypeInt:
 		return true
-	case "bigint":
+	case ColTypeBigint:
 		return true
 	}
 	return false
@@ -574,9 +574,9 @@ func isInt(dataType string) bool {
 // https://dev.mysql.com/doc/refman/8.0/en/fixed-point-types.html
 func isFixedPointType(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case "decimal":
+	case ColTypeDecimal:
 		return true
-	case "numeric":
+	case ColTypeNumeric:
 		return true
 	}
 	return false
@@ -586,9 +586,9 @@ func isFixedPointType(dataType string) bool {
 // https://dev.mysql.com/doc/refman/8.0/en/floating-point-types.html
 func isFloatingPointType(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case "float":
+	case ColTypeFloat:
 		return true
-	case "double":
+	case ColTypeDouble:
 		return true
 	}
 
@@ -597,27 +597,27 @@ func isFloatingPointType(dataType string) bool {
 
 func intColLength(dataType string, isUnsigned bool) int {
 	switch dataType {
-	case "tinyint":
+	case ColTypeTinyint:
 		if isUnsigned {
 			return 3
 		}
 		return 4
-	case "smallint":
+	case ColTypeSmallint:
 		if isUnsigned {
 			return 5
 		}
 		return 6
-	case "mediumint":
+	case ColTypeMediumint:
 		if isUnsigned {
 			return 8
 		}
 		return 9
-	case "int":
+	case ColTypeInt:
 		if isUnsigned {
 			return 10
 		}
 		return 11
-	case "bigint":
+	case ColTypeBigint:
 		return 20
 	}
 
