@@ -527,41 +527,6 @@ func dropUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error)
 	return
 }
 
-// // FetchDatabase builds and fetches data for a database object
-// func FetchDatabase(server *Server, databaseName string) (database *lib.Database, e error) {
-
-// 	database = &Database{
-// 		Host: server.Host,
-// 		Name: databaseName,
-// 	}
-
-// 	database.Tables, e = FetchTables(server, databaseName)
-
-// 	return
-// }
-
-// // CreateDatabase creates a new databse
-// func (s *Server) CreateDatabase(databaseName string) (database *lib.Database, e error) {
-// 	_, e = s.conn.Exec(fmt.Sprintf("CREATE DATABASE `%s`", databaseName))
-// 	if e != nil {
-// 		return
-// 	}
-// 	s.Databases[databaseName] = &Database{name: databaseName, host: s.Name}
-// 	database = s.Databases[databaseName]
-// 	return
-// }
-
-// // NewServer creates a new instance of a Server object
-// func NewServer(host string, username string, password string) (s Server) {
-// 	s = Server{Name: host}
-// 	e := s.Connect(username, password)
-// 	if e != nil {
-// 		log.Fatal(e)
-// 	}
-
-// 	return
-// }
-
 func hasDefaultString(dataType string) bool {
 	switch strings.ToLower(dataType) {
 	case "varchar":
