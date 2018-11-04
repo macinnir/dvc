@@ -456,7 +456,7 @@ func createColumn(column *lib.Column) (sql string, e error) {
 
 		fmt.Printf("Column DataType: %s\n", column.DataType)
 		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
-		if strings.ToLower(column.DataType) == "enum" {
+		if strings.ToLower(column.DataType) == ColTypeEnum {
 			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
 		} else {
 			sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
