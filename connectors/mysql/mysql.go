@@ -1,3 +1,8 @@
+/**
+ * MySQL
+ * @implements IConnector
+ */
+
 package mysql
 
 import (
@@ -11,8 +16,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/macinnir/dvc/lib"
 )
-
-// MySQL implementation of IConnector
 
 // MySQL contains functionality for interacting with a server
 type MySQL struct {
@@ -188,12 +191,12 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 		if _, ok := remoteSchema.Tables[tableName]; !ok {
 
 			// fmt.Printf("Local table %s is not in remote\n", table.Name)
-			query, e = ss.createTable(table)
+			query, e = createTable(table)
 			// fmt.Printf("Running Query: %s\n", query)
 			sql += query + "\n"
 		} else {
 			remoteTable := remoteSchema.Tables[tableName]
-			query, e = ss.createTableChangeSQL(table, remoteTable)
+			query, e = createTableChangeSQL(table, remoteTable)
 			if len(query) > 0 {
 				sql += query + "\n"
 			}
@@ -205,7 +208,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 
 		// Table does not exist on local schema
 		if _, ok := localSchema.Tables[table.Name]; !ok {
-			query, e = ss.dropTable(table)
+			query, e = dropTable(table)
 			sql += query + "\n"
 		}
 	}
@@ -216,7 +219,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 // createTableChangeSQL returns a set of statements that alter a table's structure if and only if there is a difference between
 // the local and remote tables
 // If no change is found, an empty string is returned.
-func (ss *MySQL) createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Table) (sql string, e error) {
+func createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Table) (sql string, e error) {
 
 	var query string
 
@@ -224,7 +227,7 @@ func (ss *MySQL) createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Ta
 
 		// Column does not exist remotely
 		if _, ok := remoteTable.Columns[column.Name]; !ok {
-			query, e = ss.alterTableCreateColumn(localTable, column)
+			query, e = alterTableCreateColumn(localTable, column)
 			if e != nil {
 				return
 			}
@@ -237,7 +240,7 @@ func (ss *MySQL) createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Ta
 
 			remoteColumn := remoteTable.Columns[column.Name]
 
-			query, e = ss.changeColumn(localTable, column, remoteColumn)
+			query, e = changeColumn(localTable, column, remoteColumn)
 
 			if e != nil {
 				return
@@ -253,7 +256,7 @@ func (ss *MySQL) createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Ta
 
 		// Column does not exist locally
 		if _, ok := localTable.Columns[column.Name]; !ok {
-			query, e = ss.alterTableDropColumn(localTable, column)
+			query, e = alterTableDropColumn(localTable, column)
 			if e != nil {
 				return
 			}
@@ -266,7 +269,7 @@ func (ss *MySQL) createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Ta
 }
 
 // createTable returns a create table sql statement
-func (ss *MySQL) createTable(table *lib.Table) (sql string, e error) {
+func createTable(table *lib.Table) (sql string, e error) {
 
 	// colLen := len(table.Columns)
 	idx := 1
@@ -293,17 +296,17 @@ func (ss *MySQL) createTable(table *lib.Table) (sql string, e error) {
 	for _, column := range sortedColumns {
 
 		colQuery := ""
-		colQuery, e = ss.createColumn(column)
+		colQuery, e = createColumn(column)
 		col := colQuery
 
 		idx++
 
 		switch column.ColumnKey {
-		case "PRI":
+		case KeyPRI:
 			primaryKey = column.Name
-		case "UNI":
+		case KeyUNI:
 			uniqueKeyColumns = append(uniqueKeyColumns, column)
-		case "MUL":
+		case KeyMUL:
 			multiKeyColumns = append(multiKeyColumns, column)
 		}
 		cols = append(cols, col)
@@ -318,7 +321,7 @@ func (ss *MySQL) createTable(table *lib.Table) (sql string, e error) {
 	if len(uniqueKeyColumns) > 0 {
 		sql += "\n"
 		for _, uniqueKeyColumn := range uniqueKeyColumns {
-			t, _ := ss.addUniqueIndex(table, uniqueKeyColumn)
+			t, _ := addUniqueIndex(table, uniqueKeyColumn)
 			sql += t + "\n"
 		}
 	}
@@ -326,7 +329,7 @@ func (ss *MySQL) createTable(table *lib.Table) (sql string, e error) {
 	if len(multiKeyColumns) > 0 {
 		sql += "\n"
 		for _, multiKeyColumn := range multiKeyColumns {
-			t, _ := ss.addIndex(table, multiKeyColumn)
+			t, _ := addIndex(table, multiKeyColumn)
 			sql += t + "\n"
 		}
 	}
@@ -335,166 +338,8 @@ func (ss *MySQL) createTable(table *lib.Table) (sql string, e error) {
 }
 
 // dropTable returns a drop table sql statement
-func (ss *MySQL) dropTable(table *lib.Table) (sql string, e error) {
+func dropTable(table *lib.Table) (sql string, e error) {
 	sql = fmt.Sprintf("DROP TABLE `%s`;", table.Name)
-	return
-}
-
-// isInt
-// Integer DataTypes: https://dev.mysql.com/doc/refman/8.0/en/integer-types.html
-func (ss *MySQL) isInt(dataType string) bool {
-	switch strings.ToLower(dataType) {
-	case "tinyint":
-		return true
-	case "smallint":
-		return true
-	case "mediumint":
-		return true
-	case "int":
-		return true
-	case "bigint":
-		return true
-	}
-	return false
-}
-
-func (ss *MySQL) intColLength(dataType string, isUnsigned bool) int {
-	switch dataType {
-	case "tinyint":
-		if isUnsigned {
-			return 3
-		}
-		return 4
-	case "smallint":
-		if isUnsigned {
-			return 5
-		}
-		return 6
-	case "mediumint":
-		if isUnsigned {
-			return 8
-		}
-		return 9
-	case "int":
-		if isUnsigned {
-			return 10
-		}
-		return 11
-	case "bigint":
-		return 20
-	}
-
-	return 0
-}
-
-// Fixed Point Types
-// https://dev.mysql.com/doc/refman/8.0/en/fixed-point-types.html
-func (ss *MySQL) isFixedPointType(dataType string) bool {
-	switch strings.ToLower(dataType) {
-	case "decimal":
-		return true
-	case "numeric":
-		return true
-	}
-	return false
-}
-
-// Floating Point Types
-// https://dev.mysql.com/doc/refman/8.0/en/floating-point-types.html
-func (ss *MySQL) isFloatingPointType(dataType string) bool {
-	switch strings.ToLower(dataType) {
-	case "float":
-		return true
-	case "double":
-		return true
-	}
-
-	return false
-}
-
-func (ss *MySQL) isString(dataType string) bool {
-	switch strings.ToLower(dataType) {
-	case "varchar":
-		return true
-	case "char":
-		return true
-	}
-
-	return false
-}
-
-func (ss *MySQL) hasDefaultString(dataType string) bool {
-	switch strings.ToLower(dataType) {
-	case "varchar":
-		return true
-	case "char":
-		return true
-	case "enum":
-		return true
-	}
-	return false
-}
-
-// createColumn returns a table column sql segment
-// Data Types
-// INT SIGNED 	11 columns
-//
-
-func (ss *MySQL) createColumn(column *lib.Column) (sql string, e error) {
-
-	if ss.isInt(column.DataType) {
-
-		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, ss.intColLength(column.DataType, column.IsUnsigned))
-
-		if column.IsUnsigned == true {
-			sql += " UNSIGNED "
-		} else {
-			sql += " SIGNED "
-		}
-
-	} else if ss.isFixedPointType(column.DataType) {
-		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
-		if column.IsUnsigned == true {
-			sql += " UNSIGNED "
-		} else {
-			sql += " SIGNED "
-		}
-	} else if ss.isFloatingPointType(column.DataType) {
-		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
-		if column.IsUnsigned == true {
-			sql += " UNSIGNED "
-		} else {
-			sql += " SIGNED "
-		}
-	} else if ss.isString(column.DataType) {
-		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
-	} else {
-		sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
-	}
-
-	if !column.IsNullable {
-		sql += " NOT"
-	}
-	sql += " NULL"
-
-	// Add single quotes to string default
-	if ss.hasDefaultString(column.DataType) {
-		sql += fmt.Sprintf(" DEFAULT '%s'", column.Default)
-	} else if len(column.Default) > 0 {
-		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
-	}
-
-	if len(column.Extra) > 0 {
-		sql += " " + column.Extra
-	}
-
-	return
-
-}
-
-// alterTableDropColumn returns an alter table sql statement that drops a column
-func (ss *MySQL) alterTableDropColumn(table *lib.Table, column *lib.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
 	return
 }
 
@@ -512,7 +357,7 @@ func (ss *MySQL) alterTableDropColumn(table *lib.Table, column *lib.Column) (sql
 // 7. 	none	| 	none	| 	Do nothing
 // 8. 	MUL		| 	MUL		| 	Do nothing
 // 9. 	UNI		|   UNI		| 	Do nothing
-func (ss *MySQL) changeColumn(table *lib.Table, localColumn *lib.Column, remoteColumn *lib.Column) (sql string, e error) {
+func changeColumn(table *lib.Table, localColumn *lib.Column, remoteColumn *lib.Column) (sql string, e error) {
 
 	t := ""
 	query := ""
@@ -529,12 +374,12 @@ func (ss *MySQL) changeColumn(table *lib.Table, localColumn *lib.Column, remoteC
 		if localColumn.ColumnKey == "" {
 			switch remoteColumn.ColumnKey {
 			// 1
-			case "MUL":
-				t, _ = ss.dropIndex(table, localColumn)
+			case KeyMUL:
+				t, _ = dropIndex(table, localColumn)
 				query += t + "\n"
 			// 2
-			case "UNI":
-				t, _ = ss.dropUniqueIndex(table, localColumn)
+			case KeyUNI:
+				t, _ = dropUniqueIndex(table, localColumn)
 				query += t + "\n"
 			}
 		}
@@ -543,29 +388,29 @@ func (ss *MySQL) changeColumn(table *lib.Table, localColumn *lib.Column, remoteC
 		if remoteColumn.ColumnKey == "" {
 			switch localColumn.ColumnKey {
 			// 3
-			case "MUL":
-				t, _ = ss.addIndex(table, localColumn)
+			case KeyMUL:
+				t, _ = addIndex(table, localColumn)
 				query += t + "\n"
 			// 4
-			case "UNI":
-				t, _ = ss.addUniqueIndex(table, localColumn)
+			case KeyUNI:
+				t, _ = addUniqueIndex(table, localColumn)
 				query += t + "\n"
 			}
 		}
 
 		// 5
-		if remoteColumn.ColumnKey == "MUL" && localColumn.ColumnKey == "UNI" {
-			t, _ = ss.dropIndex(table, localColumn)
+		if remoteColumn.ColumnKey == KeyMUL && localColumn.ColumnKey == KeyUNI {
+			t, _ = dropIndex(table, localColumn)
 			query += t + "\n"
-			t, _ = ss.addUniqueIndex(table, localColumn)
+			t, _ = addUniqueIndex(table, localColumn)
 			query += t + "\n"
 		}
 
 		// 6
-		if remoteColumn.ColumnKey == "UNI" && localColumn.ColumnKey == "MUL" {
-			t, _ = ss.dropUniqueIndex(table, localColumn)
+		if remoteColumn.ColumnKey == KeyUNI && localColumn.ColumnKey == KeyMUL {
+			t, _ = dropUniqueIndex(table, localColumn)
 			query += t + "\n"
-			t, _ = ss.addIndex(table, localColumn)
+			t, _ = addIndex(table, localColumn)
 			query += t + "\n"
 		}
 	}
@@ -575,38 +420,110 @@ func (ss *MySQL) changeColumn(table *lib.Table, localColumn *lib.Column, remoteC
 
 }
 
+// createColumn returns a table column sql segment
+// Data Types
+// INT SIGNED 	11 columns
+//
+func createColumn(column *lib.Column) (sql string, e error) {
+
+	if isInt(column.DataType) {
+
+		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
+
+		if column.IsUnsigned == true {
+			sql += fmt.Sprintf(" %s ", SignedUnsigned)
+		} else {
+			sql += fmt.Sprintf(" %s ", SignedSigned)
+		}
+
+	} else if isFixedPointType(column.DataType) {
+
+		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
+
+		if column.IsUnsigned == true {
+			sql += fmt.Sprintf(" %s ", SignedUnsigned)
+		} else {
+			sql += fmt.Sprintf(" %s ", SignedSigned)
+		}
+	} else if isFloatingPointType(column.DataType) {
+		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
+		if column.IsUnsigned == true {
+			sql += fmt.Sprintf(" %s ", SignedUnsigned)
+		} else {
+			sql += fmt.Sprintf(" %s ", SignedSigned)
+		}
+	} else if isString(column.DataType) {
+
+		fmt.Printf("Column DataType: %s\n", column.DataType)
+		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
+		if strings.ToLower(column.DataType) == "enum" {
+			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
+		} else {
+			sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
+		}
+
+	} else {
+		sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+	}
+
+	if !column.IsNullable {
+		sql += " NOT"
+	}
+	sql += " NULL"
+
+	// Add single quotes to string default
+	if hasDefaultString(column.DataType) {
+		sql += fmt.Sprintf(" DEFAULT '%s'", column.Default)
+	} else if len(column.Default) > 0 {
+		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
+	}
+
+	if len(column.Extra) > 0 {
+		sql += " " + column.Extra
+	}
+
+	return
+
+}
+
 // alterTableCreateColumn returns an alter table sql statement that adds a column
-func (ss *MySQL) alterTableCreateColumn(table *lib.Table, column *lib.Column) (sql string, e error) {
+func alterTableCreateColumn(table *lib.Table, column *lib.Column) (sql string, e error) {
 
 	query := ""
 
-	query, e = ss.createColumn(column)
+	query, e = createColumn(column)
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query)
 
 	return
 }
 
+// alterTableDropColumn returns an alter table sql statement that drops a column
+func alterTableDropColumn(table *lib.Table, column *lib.Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
+	return
+}
+
 // addIndex returns an alter table sql statement that adds an index to a table
-func (ss *MySQL) addIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
+func addIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`);", table.Name, column.Name, column.Name)
 	return
 }
 
 // addUniqueIndex returns an alter table sql statement that adds a unique index to a table
-func (ss *MySQL) addUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
+func addUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`);", table.Name, column.Name, column.Name)
 	return
 }
 
 // dropIndex returns an alter table sql statement that drops an index
-func (ss *MySQL) dropIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s`;", table.Name, column.Name)
+func dropIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s_%s`;", table.Name, table.Name, column.Name)
 	return
 }
 
 // dropUniqueIndex returns an alter table sql statement that drops a unique index
-func (ss *MySQL) dropUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s`;", table.Name, column.Name)
+func dropUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error) {
+	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s_%s`;", table.Name, table.Name, column.Name)
 	return
 }
 
@@ -644,3 +561,100 @@ func (ss *MySQL) dropUniqueIndex(table *lib.Table, column *lib.Column) (sql stri
 
 // 	return
 // }
+
+func hasDefaultString(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case "varchar":
+		return true
+	case "char":
+		return true
+	case "enum":
+		return true
+	}
+	return false
+}
+
+func isString(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case "varchar":
+		return true
+	case "enum":
+		return true
+	case "char":
+		return true
+	}
+
+	return false
+}
+
+// isInt
+// Integer DataTypes: https://dev.mysql.com/doc/refman/8.0/en/integer-types.html
+func isInt(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case "tinyint":
+		return true
+	case "smallint":
+		return true
+	case "mediumint":
+		return true
+	case "int":
+		return true
+	case "bigint":
+		return true
+	}
+	return false
+}
+
+// Fixed Point Types
+// https://dev.mysql.com/doc/refman/8.0/en/fixed-point-types.html
+func isFixedPointType(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case "decimal":
+		return true
+	case "numeric":
+		return true
+	}
+	return false
+}
+
+// Floating Point Types
+// https://dev.mysql.com/doc/refman/8.0/en/floating-point-types.html
+func isFloatingPointType(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case "float":
+		return true
+	case "double":
+		return true
+	}
+
+	return false
+}
+
+func intColLength(dataType string, isUnsigned bool) int {
+	switch dataType {
+	case "tinyint":
+		if isUnsigned {
+			return 3
+		}
+		return 4
+	case "smallint":
+		if isUnsigned {
+			return 5
+		}
+		return 6
+	case "mediumint":
+		if isUnsigned {
+			return 8
+		}
+		return 9
+	case "int":
+		if isUnsigned {
+			return 10
+		}
+		return 11
+	case "bigint":
+		return 20
+	}
+
+	return 0
+}
