@@ -10,6 +10,7 @@ import (
 type Query struct{}
 
 // CreateChangeSQL generates sql statements based off of comparing two database objects
+// localSchema is authority, remoteSchema will be upgraded to match localSchema
 func (q *Query) CreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql string, e error) {
 
 	query := ""

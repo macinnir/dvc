@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/macinnir/dvc/connectors/mysql"
+	"github.com/macinnir/dvc/connectors/sqlite"
 	"github.com/macinnir/dvc/lib"
 	"os"
 )
@@ -36,7 +37,7 @@ func main() {
 		fmt.Printf("ERROR: %s", e.Error())
 	}
 
-	cmd.dvc.Connector = &mysql.MySQL{}
+	cmd.dvc.Connector = connectorFactory(config.DatabaseType, config)
 	e = cmd.Main(os.Args)
 
 	if e != nil {
@@ -56,5 +57,21 @@ func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
 
 	config = &lib.Config{}
 	_, e = toml.DecodeFile(configFilePath, config)
+	return
+}
+
+func connectorFactory(connectorName string, config *lib.Config) (connector lib.IConnector) {
+	if connectorName == "mysql" {
+		connector = &mysql.MySQL{
+			Config: config,
+		}
+	}
+
+	if connectorName == "sqlite" {
+		connector = &sqlite.Sqlite{
+			Config: config,
+		}
+	}
+
 	return
 }
