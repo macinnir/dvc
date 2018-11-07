@@ -180,8 +180,6 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 // localSchema is authority, remoteSchema will be upgraded to match localSchema
 func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Database) (sql string, e error) {
 
-	fmt.Println("Creating MySQL change SQL!!!!")
-
 	query := ""
 
 	// What tables are in local that aren't in remote?
@@ -189,10 +187,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 
 		// Table does not exist on remote schema
 		if _, ok := remoteSchema.Tables[tableName]; !ok {
-
-			// fmt.Printf("Local table %s is not in remote\n", table.Name)
 			query, e = createTable(table)
-			// fmt.Printf("Running Query: %s\n", query)
 			sql += query + "\n"
 		} else {
 			remoteTable := remoteSchema.Tables[tableName]
@@ -453,8 +448,6 @@ func createColumn(column *lib.Column) (sql string, e error) {
 			sql += fmt.Sprintf(" %s ", SignedSigned)
 		}
 	} else if isString(column.DataType) {
-
-		fmt.Printf("Column DataType: %s\n", column.DataType)
 		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
 		if strings.ToLower(column.DataType) == ColTypeEnum {
 			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
