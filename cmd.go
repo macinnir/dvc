@@ -362,13 +362,13 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 
 		// Cache
-		lib.Info("Generating cache file", c.Options)
-		e = g.GenerateGoCacheFiles(c.dvc.Config.Dirs.Cache, database)
+		// lib.Info("Generating cache file", c.Options)
+		// e = g.GenerateGoCacheFiles(c.dvc.Config.Dirs.Cache, database)
 
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+		// if e != nil {
+		// 	lib.Error(e.Error(), c.Options)
+		// 	os.Exit(1)
+		// }
 
 		// Typescript
 		lib.Info("Generating typescript types file", c.Options)
