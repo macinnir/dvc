@@ -84,6 +84,8 @@ func (c *Cmd) Main(args []string) (err error) {
 	lib.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
 	// fmt.Printf("cmd: %s, %v\n", cmd, args)
 
+	c.dvc.Options = c.Options
+
 	switch cmd {
 	case CommandImport:
 		c.CommandImport(args)

@@ -31,6 +31,7 @@ type DVC struct {
 	Files              *Files               // Files is the injected file manager
 	Connector          IConnector           // IConnector is the injected server manager
 	Databases          map[string]*Database // A map of databases
+	Options            Options
 }
 
 func (d *DVC) initCommand() (server *Server) {
@@ -42,6 +43,7 @@ func (d *DVC) initCommand() (server *Server) {
 		panic(e)
 	}
 
+	Debugf("Connecting to %s", d.Options, d.Config.Connection.DatabaseName)
 	e = d.Connector.UseDatabase(server, d.Config.Connection.DatabaseName)
 
 	return
