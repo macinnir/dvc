@@ -114,8 +114,8 @@ func (g *Gen) GenerateCacheBootstrapGoCodeFromDatabase(database *Database) (goCo
 	goCode = "package cache"
 	goCode += "\n\nimport("
 	goCode += "\n\tdal \"github.com/macinnir/go-dal\""
-	goCode += "\n\t \"goalgopher/repos\""
-	goCode += "\n\t \"goalgopher/utils\""
+	goCode += fmt.Sprintf("\n\t \"%s/repos\"", g.Config.BasePackage)
+	goCode += fmt.Sprintf("\n\t \"%s/utils\"", g.Config.BasePackage)
 	goCode += "\n)"
 	goCode += "\n\n//Bootstrap bootstraps all of the repositories into a single repository object"
 	goCode += "\nfunc Bootstrap(cache utils.IStore, schema dal.ISchema) *repos.Repos {"
@@ -163,9 +163,9 @@ func (g *Gen) GenerateGoCache(table *Table, fileFoot string, imports []string) (
 
 	defaultImports := []string{
 		"fmt",
-		"goalgopher/models",
-		"goalgopher/utils",
-		"goalgopher/repos",
+		fmt.Sprintf("%s/models", g.Config.BasePackage),
+		fmt.Sprintf("%s/utils", g.Config.BasePackage),
+		fmt.Sprintf("%s/repos", g.Config.BasePackage),
 	}
 
 	if len(imports) > 0 {
