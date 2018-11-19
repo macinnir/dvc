@@ -4,70 +4,55 @@ import (
 	"testing"
 )
 
-func TestDvcBadConfigFilePath(t *testing.T) {
+func TestDvcConfigValues(t *testing.T) {
 
-	_, e := NewDVC("badConfigPath")
+	config := &Config{}
+	config.ChangeSetPath = "test/resources/changes"
+	config.DatabaseType = "mysql"
+	config.Connection.DatabaseName = "dbTest"
+	config.Connection.Host = "127.0.0.1:3307"
+	config.Connection.Username = "root"
+	config.Connection.Password = "root"
+	config.BasePackage = "testbp"
 
-	if e == nil {
-		t.Error("Dvc should have returned an error when given a bad config file path...")
-		return
-	}
-}
-
-// func TestDvcInvalidDatabaseType(t *testing.T) {
-// 	_, e := NewDVC("./test_resources/config2.toml")
-
-// 	if e == nil {
-// 		t.Error("Dvc should have thrown an error when the config2.toml has a bad database type.")
-// 		return
-// 	}
-
-// 	err := e.Error()
-
-// 	fmt.Printf("Error: %s\n", err)
-
-// 	if err != "invalid database type" {
-// 		t.Error("Dvc should have returned a config error indicating a bad value for the database type")
-// 		return
-// 	}
-// }
-
-func TestDvcGoodConfigFilePath(t *testing.T) {
-	d, e := NewDVC("../test/dvc.toml")
+	d, e := NewDVC(config)
 
 	if e != nil {
 		t.Errorf("dvc should not have returned an error: %s", e.Error())
 		return
 	}
 
-	if d.Config.DatabaseName != "dbTest" {
-		t.Errorf("wrong database name `%s` should be `%s`", d.Config.DatabaseName, "dbTest")
+	if d.Config.Connection.DatabaseName != "dbTest" {
+		t.Errorf("wrong database name `%s` should be `%s`", d.Config.Connection.DatabaseName, "dbTest")
 	}
 
-	if d.Config.Host != "127.0.0.1:3307" {
-		t.Errorf("wrong host `%s` should be `%s`", d.Config.Host, "127.0.0.1:3307")
+	if d.Config.Connection.Host != "127.0.0.1:3307" {
+		t.Errorf("wrong host `%s` should be `%s`", d.Config.Connection.Host, "127.0.0.1:3307")
 	}
 
-	if d.Config.Username != "root" {
-		t.Errorf("Wrong username `%s` should be `%s`", d.Config.Username, "root")
+	if d.Config.Connection.Username != "root" {
+		t.Errorf("Wrong username `%s` should be `%s`", d.Config.Connection.Username, "root")
 	}
 
-	if d.Config.Password != "root" {
-		t.Errorf("Wrong password `%s` should be `%s`", d.Config.Password, "root")
+	if d.Config.Connection.Password != "root" {
+		t.Errorf("Wrong password `%s` should be `%s`", d.Config.Connection.Password, "root")
 	}
 
 	if d.Config.ChangeSetPath != "test/resources/changes" {
-		t.Errorf("Wrong changeSetPath `%s` should be `%s`", d.Config.ChangeSetPath, "changes")
+		t.Errorf("Wrong changeSetPath `%s` should be `%s`", d.Config.ChangeSetPath, "test/resources/changes")
 	}
 
 	if d.Config.DatabaseType != "mysql" {
 		t.Errorf("Wrong database type `%s` should be `%s`", d.Config.DatabaseType, "mysql")
 	}
 
+	if d.Config.BasePackage != "testbp" {
+		t.Errorf("Wrong basePackage `%s` should be `%s`", d.Config.BasePackage, "testbp")
+	}
 }
 func TestDvcMissingArguments(t *testing.T) {
 
-	_, e := NewDVC()
+	_, e := NewDVC(&Config{})
 
 	if e == nil {
 		t.Error("No error was thrown with no arguments")
@@ -78,44 +63,8 @@ func TestDvcMissingArguments(t *testing.T) {
 		t.Error("NewDVC should have returned a `not enough arguments` error")
 	}
 }
-func TestDvcMultipleArguments(t *testing.T) {
-	d, e := NewDVC("host", "name", "user", "pass", "test_resources/changes", "mysql")
 
-	if e != nil {
-		t.Error("should not have thrown an error")
-	}
-
-	if d.Config.Host != "host" || d.Config.DatabaseName != "name" || d.Config.Username != "user" || d.Config.Password != "pass" || d.Config.ChangeSetPath != "test_resources/changes" || d.Config.DatabaseType != "mysql" {
-		t.Error("config value not correctly set")
-	}
-}
-
-// func TestDvcImportSchema(t *testing.T) {
-// 	var dvcTest *DVC
-// 	var e error
-// 	if dvcTest, e = NewDVC("config.toml"); e != nil {
-// 		t.Errorf("should not have thrown an error: %s", e.Error())
-// 		return
-// 	}
-
-// 	if e = dvcTest.ImportSchema("config."); e != nil {
-// 		t.Errorf("should not have thrown an error: %s", e.Error())
-// 	}
+// func TestCompareSchema(t *testing.T) {
 // }
 
-// func TestDvcCompareSchema(t *testing.T) {
-// 	var dvcTest *DVC
-// 	var e error
-// 	if dvcTest, e = NewDVC("config.toml"); e != nil {
-// 		t.Errorf("should not have thrown an error: %s", e.Error())
-// 		return
-// 	}
-
-// 	sql := ""
-
-// 	if sql, e = dvcTest.CompareSchema(); e != nil {
-// 		t.Errorf("should not have thrown an error: %s", e.Error())
-// 	}
-
-// 	fmt.Printf(sql)
-// }
+// func TestCompareSchema(t *testing.T) {}
