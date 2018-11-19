@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/macinnir/dvc/lib"
+	"github.com/macinnir/dvc/modules/gen"
 )
 
 // Command is a type that represents the possible commands passed in at run time
@@ -33,7 +34,7 @@ type Cmd struct {
 	// errLog  *log.Logger
 	cmd    string
 	dvc    *lib.DVC
-	config *lib.Config
+	Config *lib.Config
 }
 
 // Main is the main function that handles commands arguments
@@ -257,8 +258,9 @@ func (c *Cmd) CommandGen(args []string) {
 		os.Exit(1)
 	}
 
-	g := &lib.Gen{
+	g := &gen.Gen{
 		Options: c.Options,
+		Config:  c.Config,
 	}
 
 	switch subCmd {
@@ -337,8 +339,6 @@ func (c *Cmd) CommandGen(args []string) {
 		lib.Debug("Generating schema...", c.Options)
 		e = g.GenerateGoSchemaFile(c.dvc.Config.Dirs.Schema, database)
 		if e != nil {
-			fmt.Println("test...")
-			fmt.Printf("E: %s\n", e.Error())
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}

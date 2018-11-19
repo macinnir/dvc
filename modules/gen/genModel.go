@@ -1,17 +1,18 @@
-package lib
+package gen
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/lib"
 	"sort"
 )
 
 // GenerateGoModel returns a string for a model in golang
-func (g *Gen) GenerateGoModel(table *Table, imports []string) (goCode string, e error) {
+func (g *Gen) GenerateGoModel(table *lib.Table, imports []string) (goCode string, e error) {
 
 	goCode += "// #genStart\n\n"
 	goCode += "package models\n\n"
 
-	var sortedColumns = make(SortedColumns, 0, len(table.Columns))
+	var sortedColumns = make(lib.SortedColumns, 0, len(table.Columns))
 
 	for _, column := range table.Columns {
 		sortedColumns = append(sortedColumns, column)
@@ -75,7 +76,7 @@ func (g *Gen) GenerateGoModel(table *Table, imports []string) (goCode string, e 
 }
 
 // GenerateGoModels generates models for golang
-func (g *Gen) GenerateGoModels(database *Database) (goCode string, e error) {
+func (g *Gen) GenerateGoModels(database *lib.Database) (goCode string, e error) {
 
 	goCode = "// #genStart \n\n"
 
@@ -96,7 +97,7 @@ func (g *Gen) GenerateGoModels(database *Database) (goCode string, e error) {
 }
 
 // GenerateGoModelFile generates a model file in golang
-func (g *Gen) GenerateGoModelFile(dir string, table *Table) (e error) {
+func (g *Gen) GenerateGoModelFile(dir string, table *lib.Table) (e error) {
 
 	g.EnsureDir(dir)
 
@@ -104,7 +105,7 @@ func (g *Gen) GenerateGoModelFile(dir string, table *Table) (e error) {
 	var imports []string
 
 	outFile := fmt.Sprintf("%s/%s.go", dir, table.Name)
-	Debugf("Generating model for table %s at path %s", g.Options, table.Name, outFile)
+	lib.Debugf("Generating model for table %s at path %s", g.Options, table.Name, outFile)
 
 	if fileHead, fileFoot, imports, e = g.scanFileParts(outFile, false); e != nil {
 		return

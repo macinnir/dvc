@@ -31,7 +31,9 @@ func main() {
 	// 	DatabaseType:  args[5],
 	// }
 
-	cmd := &Cmd{}
+	cmd := &Cmd{
+		Config: config,
+	}
 
 	if cmd.dvc, e = lib.NewDVC(config); e != nil {
 		fmt.Printf("ERROR: %s", e.Error())

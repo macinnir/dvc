@@ -1,7 +1,8 @@
-package lib
+package gen
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -10,7 +11,8 @@ import (
 
 // Gen conntains all of the generator functionality
 type Gen struct {
-	Options Options
+	Options lib.Options
+	Config  *lib.Config
 }
 
 // EnsureDir creates a new dir if the dir is not found
@@ -31,10 +33,10 @@ func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 		return
 	}
 
-	_, stdError, exitCode := RunCommand("go", "fmt", filePath)
+	_, stdError, exitCode := lib.RunCommand("go", "fmt", filePath)
 
 	if exitCode > 0 {
-		Warnf("fmt error: %s", g.Options, stdError)
+		lib.Warnf("fmt error: %s", g.Options, stdError)
 	}
 
 	// cmd := exec.Command("go", "fmt", filePath)
@@ -72,7 +74,7 @@ func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string
 	fileBytes, e = ioutil.ReadFile(filePath)
 
 	if e != nil {
-		Error(e.Error(), g.Options)
+		lib.Error(e.Error(), g.Options)
 		return
 	}
 
