@@ -371,8 +371,8 @@ func (c *Cmd) CommandGen(args []string) {
 		// }
 
 		// Typescript
-		lib.Info("Generating typescript types file", c.Options)
-		g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
+		// lib.Info("Generating typescript types file", c.Options)
+		// g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
 
 	case "typescript":
 		g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
