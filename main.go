@@ -35,11 +35,6 @@ func main() {
 		Config: config,
 	}
 
-	if cmd.dvc, e = lib.NewDVC(config); e != nil {
-		fmt.Printf("ERROR: %s", e.Error())
-	}
-
-	cmd.dvc.Connector = connectorFactory(config.DatabaseType, config)
 	e = cmd.Main(os.Args)
 
 	if e != nil {
