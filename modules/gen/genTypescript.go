@@ -1,12 +1,13 @@
-package lib
+package gen
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
 )
 
 // GenerateTypescriptTypes returns a string for a typscript types file
-func (g *Gen) GenerateTypescriptTypes(database *Database) (goCode string, e error) {
+func (g *Gen) GenerateTypescriptTypes(database *lib.Database) (goCode string, e error) {
 	goCode = "// #genStart \n\n"
 	for _, table := range database.Tables {
 
@@ -25,7 +26,7 @@ func (g *Gen) GenerateTypescriptTypes(database *Database) (goCode string, e erro
 }
 
 // GenerateTypescriptType returns a string for a type in typescript
-func (g *Gen) GenerateTypescriptType(table *Table) (goCode string, e error) {
+func (g *Gen) GenerateTypescriptType(table *lib.Table) (goCode string, e error) {
 
 	goCode += fmt.Sprintf("/**\n * %s\n */\n", table.Name)
 	goCode += fmt.Sprintf("declare interface %s {\n", table.Name)
@@ -59,14 +60,14 @@ func (g *Gen) GenerateTypescriptType(table *Table) (goCode string, e error) {
 }
 
 // GenerateTypescriptTypesFile generates a typescript type file
-func (g *Gen) GenerateTypescriptTypesFile(dir string, database *Database) (e error) {
+func (g *Gen) GenerateTypescriptTypesFile(dir string, database *lib.Database) (e error) {
 
 	g.EnsureDir(dir)
 
 	var goCode string
 
 	outFile := fmt.Sprintf("%s/types.d.ts", dir)
-	Debugf("Generating typescript types file at path %s", g.Options, outFile)
+	lib.Debugf("Generating typescript types file at path %s", g.Options, outFile)
 	goCode, e = g.GenerateTypescriptTypes(database)
 	if e != nil {
 		return

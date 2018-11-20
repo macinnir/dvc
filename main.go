@@ -31,13 +31,10 @@ func main() {
 	// 	DatabaseType:  args[5],
 	// }
 
-	cmd := &Cmd{}
-
-	if cmd.dvc, e = lib.NewDVC(config); e != nil {
-		fmt.Printf("ERROR: %s", e.Error())
+	cmd := &Cmd{
+		Config: config,
 	}
 
-	cmd.dvc.Connector = connectorFactory(config.DatabaseType, config)
 	e = cmd.Main(os.Args)
 
 	if e != nil {

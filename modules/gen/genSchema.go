@@ -1,12 +1,13 @@
-package lib
+package gen
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/lib"
 	"sort"
 )
 
 // GenerateGoSchemaFile generates a schema file in golang
-func (g *Gen) GenerateGoSchemaFile(dir string, database *Database) (e error) {
+func (g *Gen) GenerateGoSchemaFile(dir string, database *lib.Database) (e error) {
 
 	g.EnsureDir(dir)
 
@@ -14,7 +15,7 @@ func (g *Gen) GenerateGoSchemaFile(dir string, database *Database) (e error) {
 
 	outFile := fmt.Sprintf("%s/schema.go", dir)
 
-	Debugf("Generating go schema file at path %s", g.Options, outFile)
+	lib.Debugf("Generating go schema file at path %s", g.Options, outFile)
 
 	if fileHead, fileFoot, _, e = g.scanFileParts(outFile, false); e != nil {
 		return
@@ -38,7 +39,7 @@ func (g *Gen) GenerateGoSchemaFile(dir string, database *Database) (e error) {
 }
 
 // GenerateGoSchema generates golang code for a schema file
-func (g *Gen) GenerateGoSchema(database *Database) (goCode string, e error) {
+func (g *Gen) GenerateGoSchema(database *lib.Database) (goCode string, e error) {
 
 	goCode = "\n// #genStart"
 	goCode += "\n// Schema defines the data access layer schema"
@@ -51,7 +52,7 @@ func (g *Gen) GenerateGoSchema(database *Database) (goCode string, e error) {
 	for _, table := range database.Tables {
 		cols := ""
 
-		sortedColumns := make(SortedColumns, 0, len(table.Columns))
+		sortedColumns := make(lib.SortedColumns, 0, len(table.Columns))
 
 		for _, column := range table.Columns {
 			sortedColumns = append(sortedColumns, column)

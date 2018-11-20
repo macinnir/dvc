@@ -1,14 +1,15 @@
-package lib
+package gen
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/lib"
 	"os"
 	"sort"
 	"strings"
 )
 
 // GenerateGoRepoFile generates a repo file in golang
-func (g *Gen) GenerateGoRepoFile(dir string, table *Table) (e error) {
+func (g *Gen) GenerateGoRepoFile(dir string, table *lib.Table) (e error) {
 
 	fileHead := ""
 	fileFoot := ""
@@ -19,7 +20,7 @@ func (g *Gen) GenerateGoRepoFile(dir string, table *Table) (e error) {
 
 	outFile := fmt.Sprintf("%s/%s.go", dir, table.Name)
 
-	Debugf("Generating go repo file for table %s at path %s", g.Options, table.Name, outFile)
+	lib.Debugf("Generating go repo file for table %s at path %s", g.Options, table.Name, outFile)
 
 	if fileHead, fileFoot, imports, e = g.scanFileParts(outFile, true); e != nil {
 		return
@@ -36,11 +37,11 @@ func (g *Gen) GenerateGoRepoFile(dir string, table *Table) (e error) {
 }
 
 // GenerateGoRepoFiles generates go repository files based on the database schema
-func (g *Gen) GenerateGoRepoFiles(reposDir string, database *Database) (e error) {
+func (g *Gen) GenerateGoRepoFiles(reposDir string, database *lib.Database) (e error) {
 
 	var files []string
 
-	files, e = FetchNonDirFileNames(reposDir)
+	files, e = lib.FetchNonDirFileNames(reposDir)
 
 	// clean out files that don't belong
 	for _, file := range files {
@@ -59,14 +60,14 @@ func (g *Gen) GenerateGoRepoFiles(reposDir string, database *Database) (e error)
 		}
 
 		if !existsInDatabase {
-			Infof("Removing repo %s", g.Options, file)
+			lib.Infof("Removing repo %s", g.Options, file)
 			os.Remove(fmt.Sprintf("./%s/%s", reposDir, file))
 		}
 	}
 
 	for _, table := range database.Tables {
 
-		Debugf("Generating repo %s", g.Options, table.Name)
+		lib.Debugf("Generating repo %s", g.Options, table.Name)
 		e = g.GenerateGoRepoFile(reposDir, table)
 		if e != nil {
 			return
@@ -78,7 +79,7 @@ func (g *Gen) GenerateGoRepoFiles(reposDir string, database *Database) (e error)
 }
 
 // GenerateGoRepo returns a string for a repo in golang
-func (g *Gen) GenerateGoRepo(table *Table, fileFoot string, imports []string) (goCode string, e error) {
+func (g *Gen) GenerateGoRepo(table *lib.Table, fileFoot string, imports []string) (goCode string, e error) {
 
 	primaryKey := ""
 	primaryKeyType := ""
@@ -87,7 +88,7 @@ func (g *Gen) GenerateGoRepo(table *Table, fileFoot string, imports []string) (g
 
 	footMatches := g.scanStringForFuncSignature(fileFoot, funcSig)
 
-	sortedColumns := make(SortedColumns, 0, len(table.Columns))
+	sortedColumns := make(lib.SortedColumns, 0, len(table.Columns))
 
 	// Find the primary key
 	for _, column := range table.Columns {
@@ -423,7 +424,7 @@ func (g *Gen) GenerateGoRepo(table *Table, fileFoot string, imports []string) (g
 
 // GenerateReposBootstrapGoCodeFromDatabase generates golang code for a Repo Bootstrap file from
 // a database object
-func (g *Gen) GenerateReposBootstrapGoCodeFromDatabase(database *Database) (goCode string, e error) {
+func (g *Gen) GenerateReposBootstrapGoCodeFromDatabase(database *lib.Database) (goCode string, e error) {
 
 	props := ""
 	defs := ""
@@ -463,14 +464,14 @@ func (g *Gen) GenerateReposBootstrapGoCodeFromDatabase(database *Database) (goCo
 }
 
 // GenerateReposBootstrapFile generates a repos bootstrap file in golang
-func (g *Gen) GenerateReposBootstrapFile(dir string, database *Database) (e error) {
+func (g *Gen) GenerateReposBootstrapFile(dir string, database *lib.Database) (e error) {
 
 	// Make the repos dir if it does not exist.
 	g.EnsureDir(dir)
 
 	outFile := fmt.Sprintf("%s/repos.go", dir)
 	goCode, e := g.GenerateReposBootstrapGoCodeFromDatabase(database)
-	Debugf("Generating go Repos bootstrap file at path %s", g.Options, outFile)
+	lib.Debugf("Generating go Repos bootstrap file at path %s", g.Options, outFile)
 	if e != nil {
 		return
 	}
