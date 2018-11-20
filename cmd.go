@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
 	"os"
 
+	"github.com/macinnir/dvc/connectors/mysql"
+	"github.com/macinnir/dvc/connectors/sqlite"
 	"github.com/macinnir/dvc/lib"
 	"github.com/macinnir/dvc/modules/gen"
 )
@@ -101,10 +104,34 @@ func (c *Cmd) Main(args []string) (err error) {
 	return
 }
 
+func (c *Cmd) initCompare() *compare.Compare {
+	cmp, _ := compare.NewCompare(c.Config, c.Options)
+	cmp.Connector = c.connectorFactory()
+	return cmp
+}
+
+func (c *Cmd) connectorFactory() (connector lib.IConnector) {
+
+	if c.Config.DatabaseType == "mysql" {
+		connector = &mysql.MySQL{
+			Config: c.Config,
+		}
+	}
+
+	if c.Config.DatabaseType == "sqlite" {
+		connector = &sqlite.Sqlite{
+			Config: c.Config,
+		}
+	}
+
+	return connector
+}
+
 // CommandImport is the `import` command
 func (c *Cmd) CommandImport(args []string) {
 
 	var e error
+	cmp := c.initCompare()
 
 	if e = cmp.ImportSchema("./" + c.Config.Connection.DatabaseName + ".schema.json"); e != nil {
 		lib.Error(e.Error(), c.Options)
@@ -118,7 +145,9 @@ func (c *Cmd) CommandExport(args []string) {
 	var e error
 	var sql string
 
-	if sql, e = c.dvc.ExportSchemaToSQL(c.Options); e != nil {
+	cmp := c.initCompare()
+
+	if sql, e = cmp.ExportSchemaToSQL(); e != nil {
 		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
@@ -179,7 +208,7 @@ Main:
 
 	// Do the comparison
 	// TODO pass all options (e.g. verbose)
-	if sql, e = c.dvc.CompareSchema(schemaFile, c.Options); e != nil {
+	if sql, e = cmp.CompareSchema(schemaFile); e != nil {
 		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
@@ -206,7 +235,7 @@ Main:
 			os.Exit(1)
 		}
 	case "apply":
-		e = c.dvc.ApplyChangeset(sql)
+		e = cmp.ApplyChangeset(sql)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
