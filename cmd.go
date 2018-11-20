@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
@@ -22,6 +23,7 @@ const (
 	CommandGen           Command = "gen"
 	CommandGenSchema     Command = "schema"
 	CommandGenRepos      Command = "repos"
+	CommandGenRepo       Command = "repo"
 	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
 	CommandGenAll        Command = "all"
@@ -86,9 +88,6 @@ func (c *Cmd) Main(args []string) (err error) {
 	}
 	lib.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
 	// fmt.Printf("cmd: %s, %v\n", cmd, args)
-
-	c.dvc.Options = c.Options
-
 	switch cmd {
 	case CommandImport:
 		c.CommandImport(args)
