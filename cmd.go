@@ -108,25 +108,28 @@ func (c *Cmd) Main(args []string) (err error) {
 
 func (c *Cmd) initCompare() *compare.Compare {
 	cmp, _ := compare.NewCompare(c.Config, c.Options)
-	cmp.Connector = c.connectorFactory()
+	cmp.Connector, _ = connectorFactory(c.Config.DatabaseType, c.Config)
 	return cmp
 }
 
-func (c *Cmd) connectorFactory() (connector lib.IConnector) {
+func connectorFactory(databaseType string, config *lib.Config) (connector lib.IConnector, e error) {
 
-	if c.Config.DatabaseType == "mysql" {
+	t := lib.DatabaseType(databaseType)
+
+	switch t {
+	case lib.DatabaseTypeMysql:
 		connector = &mysql.MySQL{
-			Config: c.Config,
+			Config: config,
 		}
-	}
-
-	if c.Config.DatabaseType == "sqlite" {
+	case lib.DatabaseTypeSqlite:
 		connector = &sqlite.Sqlite{
-			Config: c.Config,
+			Config: config,
 		}
+	default:
+		e = errors.New("Invalid database type")
 	}
 
-	return connector
+	return
 }
 
 // CommandImport is the `import` command

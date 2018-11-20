@@ -5,6 +5,12 @@ import (
 	"errors"
 )
 
+type DatabaseType string
+const (
+	DatabaseTypeMysql 	DatabaseType = "mysql"
+	DatabaseTypeSqlite  DatabaseType = "sqlite"
+)
+
 // Options are the available runtime flags
 type Options uint
 
