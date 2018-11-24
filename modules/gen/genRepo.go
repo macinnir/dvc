@@ -111,7 +111,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileFoot string, imports []string
 	}
 
 	defaultImports := []string{
-		"goalgopher/models",
+		fmt.Sprintf("%s/models", g.Config.BasePackage),
 		"database/sql",
 		"github.com/macinnir/go-dal",
 		"errors",

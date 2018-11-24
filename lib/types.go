@@ -5,6 +5,12 @@ import (
 	"errors"
 )
 
+type DatabaseType string
+const (
+	DatabaseTypeMysql 	DatabaseType = "mysql"
+	DatabaseTypeSqlite  DatabaseType = "sqlite"
+)
+
 // Options are the available runtime flags
 type Options uint
 
@@ -37,8 +43,8 @@ type ChangeFile struct {
 // Config contains a set of configuration values used throughout the application
 type Config struct {
 	ChangeSetPath string `toml:"changesetPath"`
-
-	DatabaseType string `toml:"databaseType"`
+	DatabaseType  string `toml:"databaseType"`
+	BasePackage   string `toml:"basePackage"`
 
 	Connection struct {
 		Host         string `toml:"host"`
@@ -48,10 +54,10 @@ type Config struct {
 	}
 
 	Packages struct {
-		Cache  string `toml: "cache"`
+		Cache  string `toml:"cache"`
 		Models string `toml:"models"`
-		Schema string `toml: "schema"`
-		Repos  string `tomls: "repos"`
+		Schema string `toml:"schema"`
+		Repos  string `tomls:"repos"`
 	}
 
 	Dirs struct {

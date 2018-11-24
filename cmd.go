@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
@@ -22,6 +23,7 @@ const (
 	CommandGen           Command = "gen"
 	CommandGenSchema     Command = "schema"
 	CommandGenRepos      Command = "repos"
+	CommandGenRepo       Command = "repo"
 	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
 	CommandGenAll        Command = "all"
@@ -86,7 +88,6 @@ func (c *Cmd) Main(args []string) (err error) {
 	}
 	lib.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
 	// fmt.Printf("cmd: %s, %v\n", cmd, args)
-
 	switch cmd {
 	case CommandImport:
 		c.CommandImport(args)
@@ -106,25 +107,28 @@ func (c *Cmd) Main(args []string) (err error) {
 
 func (c *Cmd) initCompare() *compare.Compare {
 	cmp, _ := compare.NewCompare(c.Config, c.Options)
-	cmp.Connector = c.connectorFactory()
+	cmp.Connector, _ = connectorFactory(c.Config.DatabaseType, c.Config)
 	return cmp
 }
 
-func (c *Cmd) connectorFactory() (connector lib.IConnector) {
+func connectorFactory(databaseType string, config *lib.Config) (connector lib.IConnector, e error) {
 
-	if c.Config.DatabaseType == "mysql" {
+	t := lib.DatabaseType(databaseType)
+
+	switch t {
+	case lib.DatabaseTypeMysql:
 		connector = &mysql.MySQL{
-			Config: c.Config,
+			Config: config,
 		}
-	}
-
-	if c.Config.DatabaseType == "sqlite" {
+	case lib.DatabaseTypeSqlite:
 		connector = &sqlite.Sqlite{
-			Config: c.Config,
+			Config: config,
 		}
+	default:
+		e = errors.New("Invalid database type")
 	}
 
-	return connector
+	return
 }
 
 // CommandImport is the `import` command
@@ -400,8 +404,8 @@ func (c *Cmd) CommandGen(args []string) {
 		// }
 
 		// Typescript
-		lib.Info("Generating typescript types file", c.Options)
-		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
+		// lib.Info("Generating typescript types file", c.Options)
+		// g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
 
 	case "typescript":
 		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
