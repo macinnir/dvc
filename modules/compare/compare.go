@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
 	"strings"
@@ -169,6 +170,7 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 	}
 
 	if same {
+		fmt.Println("The schemas are the same!")
 		return
 	}
 
@@ -192,6 +194,8 @@ func (c *Compare) ImportSchema(fileName string) (e error) {
 		Name: c.Config.Connection.DatabaseName,
 	}
 	database.Tables, e = c.Connector.FetchDatabaseTables(server, c.Config.Connection.DatabaseName)
+	database.Enums = c.Connector.FetchEnums(server)
+
 	if e != nil {
 		return
 	}
@@ -209,6 +213,7 @@ func (c *Compare) buildRemoteSchema(server *lib.Server) (remoteSchema *lib.Datab
 	remoteSchema.Host = server.Host
 	remoteSchema.Name = c.Config.Connection.DatabaseName
 	remoteSchema.Tables, e = c.Connector.FetchDatabaseTables(server, c.Config.Connection.DatabaseName)
+	remoteSchema.Enums = c.Connector.FetchEnums(server)
 
 	return
 }

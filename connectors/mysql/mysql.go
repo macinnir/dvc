@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -182,13 +183,16 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 
 	query := ""
 
+	dropTableStatements := map[string]string{}
+	createTableStatements := map[string]string{}
+
 	// What tables are in local that aren't in remote?
 	for tableName, table := range localSchema.Tables {
 
 		// Table does not exist on remote schema
 		if _, ok := remoteSchema.Tables[tableName]; !ok {
 			query, e = createTable(table)
-			sql += query + "\n"
+			createTableStatements[tableName] = query
 		} else {
 			remoteTable := remoteSchema.Tables[tableName]
 			query, e = createTableChangeSQL(table, remoteTable)
@@ -204,11 +208,190 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 		// Table does not exist on local schema
 		if _, ok := localSchema.Tables[table.Name]; !ok {
 			query, e = dropTable(table)
-			sql += query + "\n"
+			dropTableStatements[table.Name] = query
+		}
+	}
+
+	// Rename Table
+
+	if len(dropTableStatements) > 0 && len(createTableStatements) > 0 {
+
+		for dropTableName := range dropTableStatements {
+
+			for createTableName := range createTableStatements {
+
+				localTable := localSchema.Tables[createTableName]
+				remoteTable := remoteSchema.Tables[dropTableName]
+
+				// # of columns
+				if len(localTable.Columns) == len(remoteTable.Columns) {
+
+					same := true
+
+					// Same column names
+					for localColumnName := range localTable.Columns {
+						if _, ok := remoteTable.Columns[localColumnName]; !ok {
+							same = false
+							break
+						}
+					}
+
+					if same == true {
+						delete(dropTableStatements, dropTableName)
+						delete(createTableStatements, createTableName)
+						sql += fmt.Sprintf("RENAME TABLE `%s` TO `%s`;\n", dropTableName, createTableName)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if len(dropTableStatements) > 0 {
+		for _, s := range dropTableStatements {
+			sql += s + "\n"
+		}
+	}
+
+	if len(createTableStatements) > 0 {
+		for _, s := range createTableStatements {
+			sql += s + "\n"
+		}
+	}
+
+	if len(ss.Config.Enums) > 0 {
+		sql += ss.compareEnums(remoteSchema, localSchema)
+	}
+
+	return
+}
+
+func (ss *MySQL) compareEnums(remoteSchema *lib.Database, localSchema *lib.Database) (sql string) {
+
+	sql += ""
+
+	// Compare remote to local
+	for tableName, localTable := range localSchema.Enums {
+
+		tableSQL := ""
+
+		// remoteTable := remoteSchema.Enums[tableName]
+		localTableSchema := localSchema.Tables[tableName]
+
+		fieldMap := []string{}
+
+		for fieldName := range localTableSchema.Columns {
+			// fmt.Println("fieldName: ", fieldName)
+			fieldMap = append(fieldMap, fieldName)
+		}
+
+		for _, localRow := range localTable {
+
+			// If out of range with remote table, create a new entry
+			fields := []string{}
+			values := []string{}
+
+			for _, fieldName := range fieldMap {
+
+				// fmt.Println("fieldName:", fieldName)
+
+				column := localTableSchema.Columns[fieldName]
+				fields = append(fields, fmt.Sprintf("`%s`", fieldName))
+				dataType := column.DataType
+				value, valueExists := localRow[fieldName]
+
+				if !valueExists {
+					panic(fmt.Sprintf("Value for field `%s`.`%s` does not exist in enumerations. Please add this field to enumerations before continuing.", tableName, fieldName))
+				}
+
+				if isFloatingPointType(dataType) || isFixedPointType(dataType) {
+					values = append(values, fmt.Sprintf("%f", value))
+				} else if isString(dataType) {
+					values = append(values, "'"+strings.Replace(fmt.Sprintf("%s", value), "'", "\\'", -1)+"'")
+				} else if isInt(dataType) {
+					values = append(values, fmt.Sprintf("%.0f", value))
+				}
+			}
+			tableSQL += fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ","))
+		}
+		if len(tableSQL) > 0 {
+			sql += fmt.Sprintf("DELETE FROM `%s`;\n", tableName) + tableSQL
 		}
 	}
 
 	return
+}
+
+// FetchEnums fetches enum data for all enums listed in config
+func (ss *MySQL) FetchEnums(server *lib.Server) (enums map[string][]map[string]interface{}) {
+
+	enums = make(map[string][]map[string]interface{})
+	for _, enum := range ss.Config.Enums {
+		// fmt.Printf("Building Enum: %s\n", enum)
+		enums[enum] = fetchEnum(server, enum)
+	}
+
+	return
+}
+
+func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{}) {
+
+	var e error
+	var rows *sql.Rows
+
+	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM `%s`", enum)); e != nil {
+		return
+	}
+
+	defer rows.Close()
+	columnNames, _ := rows.Columns()
+	columnTypes, _ := rows.ColumnTypes()
+
+	for rows.Next() {
+
+		values := make([]interface{}, len(columnNames))
+		object := map[string]interface{}{}
+		for i, column := range columnTypes {
+			switch column.ScanType().Name() {
+			case "RawBytes":
+				if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
+					v := 0.0
+					object[column.Name()] = &v
+				}
+
+				if isString(column.DatabaseTypeName()) {
+					v := ""
+					object[column.Name()] = &v
+				}
+
+				if isInt(column.DatabaseTypeName()) {
+					v := 0
+					object[column.Name()] = &v
+				}
+			default:
+				object[column.Name()] = reflect.New(column.ScanType()).Interface()
+			}
+
+			values[i] = object[column.Name()]
+		}
+
+		// Scan the result into the column pointers...
+		if err := rows.Scan(values...); err != nil {
+			panic(err)
+		}
+
+		objects = append(objects, object)
+	}
+
+	return
+}
+
+func getBytes(src interface{}) []byte {
+
+	if a, ok := src.([]uint8); ok {
+		return a
+	}
+	return nil
 }
 
 // createTableChangeSQL returns a set of statements that alter a table's structure if and only if there is a difference between
@@ -217,6 +400,9 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 func createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Table) (sql string, e error) {
 
 	var query string
+
+	createColumnStatements := map[string]string{}
+	dropColumnStatements := map[string]string{}
 
 	for _, column := range localTable.Columns {
 
@@ -228,7 +414,7 @@ func createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Table) (sql st
 			}
 
 			if len(query) > 0 {
-				sql += query + "\n"
+				createColumnStatements[column.Name] += query
 			}
 
 		} else {
@@ -256,7 +442,37 @@ func createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Table) (sql st
 				return
 			}
 
-			sql += query + "\n"
+			dropColumnStatements[column.Name] = query
+		}
+	}
+
+	if len(dropColumnStatements) > 0 && len(createColumnStatements) > 0 {
+
+		for dropColumnName := range dropColumnStatements {
+
+			for createColumnName := range createColumnStatements {
+
+				if remoteTable.Columns[dropColumnName].DataType == localTable.Columns[createColumnName].DataType {
+					sql += alterTableRenameColumn(localTable, localTable.Columns[createColumnName], dropColumnName) + "\n"
+					delete(dropColumnStatements, dropColumnName)
+					delete(createColumnStatements, createColumnName)
+					break
+				}
+			}
+
+		}
+
+	}
+
+	if len(dropColumnStatements) > 0 {
+		for _, s := range dropColumnStatements {
+			sql += s + "\n"
+		}
+	}
+
+	if len(createColumnStatements) > 0 {
+		for _, s := range createColumnStatements {
+			sql += s + "\n"
 		}
 	}
 
@@ -291,7 +507,7 @@ func createTable(table *lib.Table) (sql string, e error) {
 	for _, column := range sortedColumns {
 
 		colQuery := ""
-		colQuery, e = createColumn(column)
+		colQuery, e = createColumnSegment(column)
 		col := colQuery
 
 		idx++
@@ -415,11 +631,10 @@ func changeColumn(table *lib.Table, localColumn *lib.Column, remoteColumn *lib.C
 
 }
 
-// createColumn returns a table column sql segment
+// createColumnSegment returns a table column sql segment
 // Data Types
 // INT SIGNED 	11 columns
-//
-func createColumn(column *lib.Column) (sql string, e error) {
+func createColumnSegment(column *lib.Column) (sql string, e error) {
 
 	if isInt(column.DataType) {
 
@@ -451,8 +666,10 @@ func createColumn(column *lib.Column) (sql string, e error) {
 		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
 		if strings.ToLower(column.DataType) == ColTypeEnum {
 			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
-		} else {
+		} else if stringHasLength(column.DataType) {
 			sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
+		} else {
+			sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
 		}
 
 	} else {
@@ -479,14 +696,17 @@ func createColumn(column *lib.Column) (sql string, e error) {
 
 }
 
+func alterTableRenameColumn(table *lib.Table, newColumn *lib.Column, oldColumnName string) (sql string) {
+	query, _ := createColumnSegment(newColumn)
+	sql = fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s;", table.Name, oldColumnName, query)
+	return
+}
+
 // alterTableCreateColumn returns an alter table sql statement that adds a column
 func alterTableCreateColumn(table *lib.Table, column *lib.Column) (sql string, e error) {
-
 	query := ""
-
-	query, e = createColumn(column)
+	query, e = createColumnSegment(column)
 	sql = fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query)
-
 	return
 }
 
@@ -520,28 +740,31 @@ func dropUniqueIndex(table *lib.Table, column *lib.Column) (sql string, e error)
 	return
 }
 
-func hasDefaultString(dataType string) bool {
+// stringHasLength
+func stringHasLength(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case ColTypeVarchar:
-		return true
-	case ColTypeChar:
-		return true
-	case ColTypeEnum:
+	case ColTypeVarchar, ColTypeChar:
 		return true
 	}
 	return false
 }
 
-func isString(dataType string) bool {
+// hasDefaultString
+func hasDefaultString(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case ColTypeVarchar:
-		return true
-	case ColTypeEnum:
-		return true
-	case ColTypeChar:
+	case ColTypeVarchar, ColTypeChar, ColTypeEnum:
 		return true
 	}
+	return false
+}
 
+// isString
+// String Types: https://dev.mysql.com/doc/refman/8.0/en/string-types.html
+func isString(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText:
+		return true
+	}
 	return false
 }
 

@@ -6,9 +6,10 @@ import (
 )
 
 type DatabaseType string
+
 const (
-	DatabaseTypeMysql 	DatabaseType = "mysql"
-	DatabaseTypeSqlite  DatabaseType = "sqlite"
+	DatabaseTypeMysql  DatabaseType = "mysql"
+	DatabaseTypeSqlite DatabaseType = "sqlite"
 )
 
 // Options are the available runtime flags
@@ -42,9 +43,10 @@ type ChangeFile struct {
 
 // Config contains a set of configuration values used throughout the application
 type Config struct {
-	ChangeSetPath string `toml:"changesetPath"`
-	DatabaseType  string `toml:"databaseType"`
-	BasePackage   string `toml:"basePackage"`
+	ChangeSetPath string   `toml:"changesetPath"`
+	DatabaseType  string   `toml:"databaseType"`
+	BasePackage   string   `toml:"basePackage"`
+	Enums         []string `toml:"enums"`
 
 	Connection struct {
 		Host         string `toml:"host"`
@@ -113,12 +115,12 @@ func (s *Server) DatabaseExists(databaseName string) bool {
 
 // Database represents a database
 type Database struct {
-	RunID int64
-	Name  string
-	Host  string `json:"-"`
-	// Sets          map[string]*ChangeSet
+	RunID         int64
+	Name          string
+	Host          string `json:"-"`
 	SortedSetKeys []string
 	Tables        map[string]*Table
+	Enums         map[string][]map[string]interface{}
 	// Logs          []ChangeLog
 }
 
@@ -188,6 +190,7 @@ const (
 type IConnector interface {
 	Connect() (server *Server, e error)
 	FetchDatabases(server *Server) (databases map[string]*Database, e error)
+	FetchEnums(server *Server) (enums map[string][]map[string]interface{})
 	UseDatabase(server *Server, databaseName string) (e error)
 	FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error)
 	FetchTableColumns(server *Server, databaseName string, tableName string) (columns map[string]*Column, e error)

@@ -148,6 +148,10 @@ func (ss *Sqlite) FetchDatabaseTables(server *lib.Server, databaseName string) (
 	return
 }
 
+func (ss *Sqlite) FetchEnums(server *lib.Server) (enums map[string][]map[string]interface{}) {
+	return
+}
+
 type IndexInfo struct {
 	ColumnName string
 	IndexRank  int64
