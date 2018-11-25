@@ -113,6 +113,10 @@ func (c *Compare) ApplyChangeset(changeset string) (e error) {
 
 	statements := strings.Split(changeset, ";")
 
+	defer server.Connection.Close()
+
+	tx, _ := server.Connection.Begin()
+
 	for _, s := range statements {
 		sql := strings.Trim(strings.Trim(s, " "), "\n")
 		if len(sql) == 0 {
@@ -120,10 +124,16 @@ func (c *Compare) ApplyChangeset(changeset string) (e error) {
 		}
 		lib.Debugf("Running sql: \n%s\n", c.Options, sql)
 
-		_, e = server.Connection.Exec(sql)
+		_, e = tx.Exec(sql)
 		if e != nil {
+			tx.Rollback()
 			return
 		}
+	}
+
+	e = tx.Commit()
+	if e != nil {
+		panic(e)
 	}
 
 	return
