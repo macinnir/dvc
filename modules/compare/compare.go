@@ -10,18 +10,18 @@ import (
 	"strings"
 )
 
-func schemasAreSame(localSchema *lib.Database, remoteSchema *lib.Database) (same bool, e error) {
+func objectsAreSame(local interface{}, remote interface{}) (same bool, e error) {
 
 	// Remote Signature
 	var localBytes []byte
 	var remoteBytes []byte
 
-	localBytes, e = json.Marshal(localSchema)
+	localBytes, e = json.Marshal(local)
 	if e != nil {
 		return
 	}
 
-	remoteBytes, e = json.Marshal(remoteSchema)
+	remoteBytes, e = json.Marshal(remote)
 	if e != nil {
 		return
 	}
@@ -118,7 +118,8 @@ func (c *Compare) ApplyChangeset(changeset string) (e error) {
 
 	tx, _ := server.Connection.Begin()
 
-	for _, s := range statements {
+	for i, s := range statements {
+		fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(statements))
 		sql := strings.Trim(strings.Trim(s, " "), "\n")
 		if len(sql) == 0 {
 			continue
@@ -131,7 +132,7 @@ func (c *Compare) ApplyChangeset(changeset string) (e error) {
 			return
 		}
 	}
-
+	fmt.Print("Finished\n")
 	e = tx.Commit()
 	if e != nil {
 		panic(e)
@@ -165,7 +166,7 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 	sql = ""
 	same := false
 
-	if same, e = schemasAreSame(localSchema, remoteSchema); e != nil {
+	if same, e = objectsAreSame(localSchema, remoteSchema); e != nil {
 		return
 	}
 
@@ -174,10 +175,23 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 		return
 	}
 
+	local := localSchema
+	remote := remoteSchema
+
 	if c.Options&lib.OptReverse == lib.OptReverse {
-		sql, e = c.Connector.CreateChangeSQL(remoteSchema, localSchema)
-	} else {
-		sql, e = c.Connector.CreateChangeSQL(localSchema, remoteSchema)
+		local = remoteSchema
+		remote = localSchema
+	}
+
+	sql, e = c.Connector.CreateChangeSQL(local, remote)
+
+	if len(localSchema.Enums) > 0 {
+		// Compare remote to local
+		for tableName := range localSchema.Enums {
+			if same, _ = objectsAreSame(localSchema.Enums[tableName], remoteSchema.Enums[tableName]); !same {
+				sql += c.Connector.CompareEnums(remoteSchema, localSchema, tableName)
+			}
+		}
 	}
 
 	return
