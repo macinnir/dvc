@@ -195,4 +195,5 @@ type IConnector interface {
 	FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error)
 	FetchTableColumns(server *Server, databaseName string, tableName string) (columns map[string]*Column, e error)
 	CreateChangeSQL(localSchema *Database, remoteSchema *Database) (sql string, e error)
+	CompareEnums(remoteSchema *Database, localSchema *Database, tableName string) (sql string)
 }

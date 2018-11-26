@@ -8,6 +8,7 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
+	// "gopkg.in/guregu/null.v3"
 	"log"
 	"reflect"
 	"sort"
@@ -172,7 +173,7 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 		columns[column.Name] = &column
 	}
 
-	// fmt.Printf("Fetching columns database: %s, table: %s - columns: %d\n", databaseName, tableName, len(columns))
+	// fmt("Fetching columns database: %s, table: %s - columns: %d\n", databaseName, tableName, len(columns))
 
 	return
 }
@@ -258,65 +259,59 @@ func (ss *MySQL) CreateChangeSQL(localSchema *lib.Database, remoteSchema *lib.Da
 			sql += s + "\n"
 		}
 	}
-
-	if len(ss.Config.Enums) > 0 {
-		sql += ss.compareEnums(remoteSchema, localSchema)
-	}
-
 	return
 }
 
-func (ss *MySQL) compareEnums(remoteSchema *lib.Database, localSchema *lib.Database) (sql string) {
+// CompareEnums returns a set of sql statements based on the difference between local (authority) and remote
+func (ss *MySQL) CompareEnums(remoteSchema *lib.Database, localSchema *lib.Database, tableName string) (sql string) {
 
 	sql += ""
 
-	// Compare remote to local
-	for tableName, localTable := range localSchema.Enums {
+	localTable := localSchema.Enums[tableName]
 
-		tableSQL := ""
+	tableSQL := ""
 
-		// remoteTable := remoteSchema.Enums[tableName]
-		localTableSchema := localSchema.Tables[tableName]
+	// remoteTable := remoteSchema.Enums[tableName]
+	localTableSchema := localSchema.Tables[tableName]
 
-		fieldMap := []string{}
+	fieldMap := []string{}
 
-		for fieldName := range localTableSchema.Columns {
-			// fmt.Println("fieldName: ", fieldName)
-			fieldMap = append(fieldMap, fieldName)
-		}
+	for fieldName := range localTableSchema.Columns {
+		// fmt.Println("fieldName: ", fieldName)
+		fieldMap = append(fieldMap, fieldName)
+	}
 
-		for _, localRow := range localTable {
+	for _, localRow := range localTable {
 
-			// If out of range with remote table, create a new entry
-			fields := []string{}
-			values := []string{}
+		// If out of range with remote table, create a new entry
+		fields := []string{}
+		values := []string{}
 
-			for _, fieldName := range fieldMap {
+		for _, fieldName := range fieldMap {
 
-				// fmt.Println("fieldName:", fieldName)
+			// fmt.Println("fieldName:", fieldName)
 
-				column := localTableSchema.Columns[fieldName]
-				fields = append(fields, fmt.Sprintf("`%s`", fieldName))
-				dataType := column.DataType
-				value, valueExists := localRow[fieldName]
+			column := localTableSchema.Columns[fieldName]
+			fields = append(fields, fmt.Sprintf("`%s`", fieldName))
+			dataType := column.DataType
+			value, valueExists := localRow[fieldName]
 
-				if !valueExists {
-					panic(fmt.Sprintf("Value for field `%s`.`%s` does not exist in enumerations. Please add this field to enumerations before continuing.", tableName, fieldName))
-				}
-
-				if isFloatingPointType(dataType) || isFixedPointType(dataType) {
-					values = append(values, fmt.Sprintf("%f", value))
-				} else if isString(dataType) {
-					values = append(values, "'"+strings.Replace(fmt.Sprintf("%s", value), "'", "\\'", -1)+"'")
-				} else if isInt(dataType) {
-					values = append(values, fmt.Sprintf("%.0f", value))
-				}
+			if !valueExists {
+				panic(fmt.Sprintf("Value for field `%s`.`%s` does not exist in enumerations. Please add this field to enumerations before continuing.", tableName, fieldName))
 			}
-			tableSQL += fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ","))
+
+			if isFloatingPointType(dataType) || isFixedPointType(dataType) {
+				values = append(values, fmt.Sprintf("%f", value))
+			} else if isString(dataType) {
+				values = append(values, "'"+strings.Replace(fmt.Sprintf("%s", value), "'", "\\'", -1)+"'")
+			} else if isInt(dataType) {
+				values = append(values, fmt.Sprintf("%.0f", value))
+			}
 		}
-		if len(tableSQL) > 0 {
-			sql += fmt.Sprintf("DELETE FROM `%s`;\n", tableName) + tableSQL
-		}
+		tableSQL += fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ","))
+	}
+	if len(tableSQL) > 0 {
+		sql += fmt.Sprintf("DELETE FROM `%s`;\n", tableName) + tableSQL
 	}
 
 	return
@@ -354,6 +349,7 @@ func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{
 		for i, column := range columnTypes {
 			switch column.ScanType().Name() {
 			case "RawBytes":
+				// fmt.Println("RawBytes", column.DatabaseTypeName())
 				if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
 					v := 0.0
 					object[column.Name()] = &v
@@ -368,6 +364,10 @@ func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{
 					v := 0
 					object[column.Name()] = &v
 				}
+			case "NullTime":
+				v := ""
+				object[column.Name()] = &v
+				// fmt.Println("!!", column.ScanType().Name(), column.DatabaseTypeName())
 			default:
 				object[column.Name()] = reflect.New(column.ScanType()).Interface()
 			}
@@ -762,7 +762,7 @@ func hasDefaultString(dataType string) bool {
 // String Types: https://dev.mysql.com/doc/refman/8.0/en/string-types.html
 func isString(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText:
+	case ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText, ColTypeDate, ColTypeDateTime:
 		return true
 	}
 	return false

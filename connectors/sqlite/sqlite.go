@@ -607,6 +607,10 @@ func (ss *Sqlite) changeColumn(table *lib.Table, localColumn *lib.Column, remote
 
 }
 
+func (ss *Sqlite) CompareEnums(remoteSchema *lib.Database, localSchema *lib.Database, tableName string) (sql string) {
+	return
+}
+
 // alterTableCreateColumn returns an alter table sql statement that adds a column
 func (ss *Sqlite) alterTableCreateColumn(table *lib.Table, column *lib.Column) (sql string, e error) {
 

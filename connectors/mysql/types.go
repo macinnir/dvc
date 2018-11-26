@@ -24,4 +24,7 @@ const (
 	ColTypeMediumint  = "mediumint"
 	ColTypeInt        = "int"
 	ColTypeBigint     = "bigint"
+	ColTypeDate       = "date"
+	ColTypeDateTime   = "datetime"
+	ColTypeTime       = "time"
 )
