@@ -74,7 +74,7 @@ func TestCreateColumnEnum(t *testing.T) {
 	column.Type = "ENUM('bar','baz')"
 	column.Default = "bar"
 	column.IsNullable = false
-	result, e := createColumn(column)
+	result, e := createColumnSegment(column)
 	assert.Nil(t, e)
 	assert.Equal(t, "`foo` ENUM('bar','baz') NOT NULL DEFAULT 'bar'", result)
 }

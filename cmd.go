@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/BurntSushi/toml"
 	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
 	"os"
@@ -18,6 +19,7 @@ type Command string
 
 // Command Names
 const (
+	CommandInit          Command = "init"
 	CommandImport        Command = "import"
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
@@ -26,6 +28,7 @@ const (
 	CommandGenRepo       Command = "repo"
 	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
+	CommandGenServices   Command = "services"
 	CommandGenAll        Command = "all"
 	CommandGenTypescript Command = "typescript"
 	CommandCompare       Command = "compare"
@@ -87,7 +90,20 @@ func (c *Cmd) Main(args []string) (err error) {
 		return
 	}
 	lib.Debugf("cmd: %s, %v\n", c.Options, cmd, args)
-	// fmt.Printf("cmd: %s, %v\n", cmd, args)
+
+	if cmd != CommandInit {
+		var e error
+		c.Config, e = loadConfigFromFile("./dvc.toml")
+
+		if e != nil {
+			fmt.Println("Could not load config file.")
+			// fmt.Printf("ERROR: %s\n", e.Error())
+			// os.Exit(1)
+			return
+		}
+
+	}
+
 	switch cmd {
 	case CommandImport:
 		c.CommandImport(args)
@@ -99,6 +115,8 @@ func (c *Cmd) Main(args []string) (err error) {
 		c.CommandGen(args)
 	case CommandHelp:
 		c.PrintHelp(args)
+	case CommandInit:
+		c.CommandInit(args)
 	}
 
 	os.Exit(0)
@@ -129,6 +147,25 @@ func connectorFactory(databaseType string, config *lib.Config) (connector lib.IC
 	}
 
 	return
+}
+
+func (c *Cmd) CommandInit(args []string) {
+
+	var e error
+
+	if _, e = os.Stat("./dvc.toml"); os.IsNotExist(e) {
+
+		content := "databaseType = \"mysql\"\nbasePackage = \"myPackage\"\n\nenums = []\n\n"
+		content += "[connection]\nhost = \"\"\ndatabaseName = \"\"\nusername = \"\"\npassword = \"\"\n\n"
+		content += "[packages]\ncache = \"myPackage/cache\"\nmodels = \"myPackage/models\"\nschema = \"myPackage/schema\"\nrepos = \"myPackage/repos\"\n\n"
+		content += "[dirs]\nrepos = \"repos\"\ncache = \"cache\"\nmodels = \"models\"\nschema = \"schema\"\ntypescript = \"ts\""
+
+		ioutil.WriteFile("./dvc.toml", []byte(content), 0644)
+
+	} else {
+		fmt.Println("dvc.toml already exists in this directory")
+	}
+
 }
 
 // CommandImport is the `import` command
@@ -218,6 +255,7 @@ Main:
 	}
 
 	if len(sql) == 0 {
+		fmt.Println("No changes found")
 		lib.Info("No changes found.", c.Options)
 		os.Exit(0)
 	}
@@ -264,7 +302,7 @@ func (c *Cmd) CommandGen(args []string) {
 	var database *lib.Database
 	// fmt.Printf("Args: %v", args)
 	if len(args) < 1 {
-		lib.Error("Missing gen type [schema | model | repo]", c.Options)
+		lib.Error("Missing gen type [schema | models | repos | caches | ts]", c.Options)
 		os.Exit(1)
 	}
 	subCmd := Command(args[0])
@@ -317,6 +355,12 @@ func (c *Cmd) CommandGen(args []string) {
 		fmt.Println("CommandGenCaches")
 		e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
 
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	case CommandGenServices:
+		e = g.GenerateGoServiceFiles(c.Config.Dirs.Services, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
@@ -407,7 +451,7 @@ func (c *Cmd) CommandGen(args []string) {
 		// lib.Info("Generating typescript types file", c.Options)
 		// g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
 
-	case "typescript":
+	case "ts":
 		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
 	default:
 		lib.Errorf("Unknown output type: `%s`", c.Options, subCmd)
@@ -427,6 +471,8 @@ OPTIONS:
 
 COMMANDS: 
 	
+	init 	Initialize a dvc.toml configuration file. 
+
 	import	Build a schema definition file based on the target database. 
 			This will overwrite any existing schema definition file.
 	
@@ -459,13 +505,27 @@ COMMANDS:
 
 					E.g. dts compare apply 
 	
-		import	[[path/to/local/schema.json]] 
-				
-				Generate a local schema json file based on the remote target database. 
-				
-				If no path is provided, the default path of ./[databaseName].json will be used. 
-				This overwrites any existing json schema file. 
+	import	[[path/to/local/schema.json]] 
+			
+			Generate a local schema json file based on the remote target database. 
+			
+			If no path is provided, the default path of ./[databaseName].json will be used. 
+			This overwrites any existing json schema file. 
 
 	`
 	fmt.Printf(help)
+}
+
+// loadConfigFromFile loads a config file
+func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
+
+	// fmt.Printf("Looking for config at path %s\n", configFilePath)
+	if _, e = os.Stat(configFilePath); os.IsNotExist(e) {
+		e = fmt.Errorf("Config file `%s` not found", configFilePath)
+		return
+	}
+
+	config = &lib.Config{}
+	_, e = toml.DecodeFile(configFilePath, config)
+	return
 }

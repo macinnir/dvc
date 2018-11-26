@@ -4,23 +4,24 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
 	"strings"
 )
 
-func schemasAreSame(localSchema *lib.Database, remoteSchema *lib.Database) (same bool, e error) {
+func objectsAreSame(local interface{}, remote interface{}) (same bool, e error) {
 
 	// Remote Signature
 	var localBytes []byte
 	var remoteBytes []byte
 
-	localBytes, e = json.Marshal(localSchema)
+	localBytes, e = json.Marshal(local)
 	if e != nil {
 		return
 	}
 
-	remoteBytes, e = json.Marshal(remoteSchema)
+	remoteBytes, e = json.Marshal(remote)
 	if e != nil {
 		return
 	}
@@ -113,17 +114,28 @@ func (c *Compare) ApplyChangeset(changeset string) (e error) {
 
 	statements := strings.Split(changeset, ";")
 
-	for _, s := range statements {
+	defer server.Connection.Close()
+
+	tx, _ := server.Connection.Begin()
+
+	for i, s := range statements {
+		fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(statements))
 		sql := strings.Trim(strings.Trim(s, " "), "\n")
 		if len(sql) == 0 {
 			continue
 		}
 		lib.Debugf("Running sql: \n%s\n", c.Options, sql)
 
-		_, e = server.Connection.Exec(sql)
+		_, e = tx.Exec(sql)
 		if e != nil {
+			tx.Rollback()
 			return
 		}
+	}
+	fmt.Print("Finished\n")
+	e = tx.Commit()
+	if e != nil {
+		panic(e)
 	}
 
 	return
@@ -154,18 +166,32 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 	sql = ""
 	same := false
 
-	if same, e = schemasAreSame(localSchema, remoteSchema); e != nil {
+	if same, e = objectsAreSame(localSchema, remoteSchema); e != nil {
 		return
 	}
 
 	if same {
+		fmt.Println("The schemas are the same!")
 		return
 	}
 
+	local := localSchema
+	remote := remoteSchema
+
 	if c.Options&lib.OptReverse == lib.OptReverse {
-		sql, e = c.Connector.CreateChangeSQL(remoteSchema, localSchema)
-	} else {
-		sql, e = c.Connector.CreateChangeSQL(localSchema, remoteSchema)
+		local = remoteSchema
+		remote = localSchema
+	}
+
+	sql, e = c.Connector.CreateChangeSQL(local, remote)
+
+	if len(localSchema.Enums) > 0 {
+		// Compare remote to local
+		for tableName := range localSchema.Enums {
+			if same, _ = objectsAreSame(localSchema.Enums[tableName], remoteSchema.Enums[tableName]); !same {
+				sql += c.Connector.CompareEnums(remoteSchema, localSchema, tableName)
+			}
+		}
 	}
 
 	return
@@ -182,6 +208,8 @@ func (c *Compare) ImportSchema(fileName string) (e error) {
 		Name: c.Config.Connection.DatabaseName,
 	}
 	database.Tables, e = c.Connector.FetchDatabaseTables(server, c.Config.Connection.DatabaseName)
+	database.Enums = c.Connector.FetchEnums(server)
+
 	if e != nil {
 		return
 	}
@@ -199,6 +227,7 @@ func (c *Compare) buildRemoteSchema(server *lib.Server) (remoteSchema *lib.Datab
 	remoteSchema.Host = server.Host
 	remoteSchema.Name = c.Config.Connection.DatabaseName
 	remoteSchema.Tables, e = c.Connector.FetchDatabaseTables(server, c.Config.Connection.DatabaseName)
+	remoteSchema.Enums = c.Connector.FetchEnums(server)
 
 	return
 }
