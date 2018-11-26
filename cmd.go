@@ -321,6 +321,12 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
+	case CommandGenServices:
+		e = g.GenerateGoServiceFiles(c.Config.Dirs.Services, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
 	case "repo":
 		if len(args) < 4 {
 			lib.Error("Missing repo name", c.Options)

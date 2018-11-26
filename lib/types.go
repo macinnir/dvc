@@ -56,10 +56,11 @@ type Config struct {
 	}
 
 	Packages struct {
-		Cache  string `toml:"cache"`
-		Models string `toml:"models"`
-		Schema string `toml:"schema"`
-		Repos  string `tomls:"repos"`
+		Cache    string `toml:"cache"`
+		Models   string `toml:"models"`
+		Schema   string `toml:"schema"`
+		Repos    string `toml:"repos"`
+		Services string `toml:"services"`
 	}
 
 	Dirs struct {
@@ -68,6 +69,7 @@ type Config struct {
 		Models     string `toml:"models"`
 		Schema     string `toml:"schema"`
 		Typescript string `toml:"typescript"`
+		Services   string `toml:"services"`
 	}
 }
 
