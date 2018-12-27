@@ -24,6 +24,19 @@ func (g *Gen) EnsureDir(dir string) (e error) {
 	return
 }
 
+func (g *Gen) WriteJsonToFile(json string, filePath string) (e error) {
+	e = ioutil.WriteFile(filePath, []byte(json), 0644)
+	return
+}
+
+func (g *Gen) FmtGoCode(filePath string) {
+	_, stdError, exitCode := lib.RunCommand("go", "fmt", filePath)
+
+	if exitCode > 0 {
+		lib.Warnf("fmt error: %s", g.Options, stdError)
+	}
+}
+
 // WriteGoCodeToFile writes a string of golang code to a file and then formats it with `go fmt`
 func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 	// outFile := "./repos/repos.go"
@@ -33,12 +46,7 @@ func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 		return
 	}
 
-	_, stdError, exitCode := lib.RunCommand("go", "fmt", filePath)
-
-	if exitCode > 0 {
-		lib.Warnf("fmt error: %s", g.Options, stdError)
-	}
-
+	g.FmtGoCode(filePath)
 	// cmd := exec.Command("go", "fmt", filePath)
 	// e = cmd.Run()
 	// fmt.Printf("WriteCodeToFile: %s\n", e.Error())
