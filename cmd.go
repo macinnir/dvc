@@ -7,6 +7,7 @@ import (
 	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
 	"os"
+	"path"
 
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
@@ -23,11 +24,14 @@ const (
 	CommandImport        Command = "import"
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
+	CommandGenApp        Command = "app"
+	CommandGenApi        Command = "api"
 	CommandGenSchema     Command = "schema"
 	CommandGenRepos      Command = "repos"
 	CommandGenRepo       Command = "repo"
 	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
+	CommandGenModel      Command = "model"
 	CommandGenServices   Command = "services"
 	CommandGenAll        Command = "all"
 	CommandGenTypescript Command = "typescript"
@@ -84,7 +88,6 @@ func (c *Cmd) Main(args []string) (err error) {
 		}
 
 	}
-
 	if len(cmd) == 0 {
 		lib.Error("No command provided", c.Options)
 		return
@@ -247,6 +250,8 @@ func (c *Cmd) CommandCompare(args []string) {
 
 Main:
 
+	cmp.Options = c.Options
+
 	// Do the comparison
 	// TODO pass all options (e.g. verbose)
 	if sql, e = cmp.CompareSchema(schemaFile); e != nil {
@@ -306,18 +311,29 @@ func (c *Cmd) CommandGen(args []string) {
 		os.Exit(1)
 	}
 	subCmd := Command(args[0])
+	cwd, _ := os.Getwd()
 
 	if len(args) > 1 {
 		args = args[1:]
 	}
 
-	for len(args) > 0 {
-		switch args[0] {
-		case "-c", "--clean":
+	argLen := len(args)
+	n := 0
+	for n < argLen {
+		switch args[n] {
+		case "-c":
 			c.Options |= lib.OptClean
 		}
-		args = args[1:]
+		n++
 	}
+
+	// for len(args) > 0 {
+	// 	switch args[0] {
+	// 	case "-c", "--clean":
+	// 		c.Options |= lib.OptClean
+	// 	}
+	// 	args = args[1:]
+	// }
 
 	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
@@ -341,115 +357,119 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-
-	case CommandGenRepos:
-
-		fmt.Println("CommandGenRepos")
-		e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
-
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
 	case CommandGenCaches:
 		fmt.Println("CommandGenCaches")
 		e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
-
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 	case CommandGenServices:
+
+		if c.Options&lib.OptClean == lib.OptClean {
+			g.CleanGoServices(c.Config.Dirs.Services, database)
+		}
+
 		e = g.GenerateGoServiceFiles(c.Config.Dirs.Services, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-	case "repo":
-		if len(args) < 4 {
-			lib.Error("Missing repo name", c.Options)
-			os.Exit(1)
+	case CommandGenRepos:
 
+		if c.Options&lib.OptClean == lib.OptClean {
+			g.CleanGoRepos(c.Config.Dirs.Repos, database)
 		}
 
-		var t *lib.Table
+		for _, table := range database.Tables {
 
-		if t, e = database.FindTableByName(args[3]); e != nil {
+			lib.Debugf("Generating repo %s", g.Options, table.Name)
+			e = g.GenerateGoRepo(table, c.Config.Dirs.Repos)
+			if e != nil {
+				return
+			}
+		}
+
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
-		if e = g.GenerateGoRepoFile(c.Config.Dirs.Repos, t); e != nil {
+		e = g.GenerateRepoInterfaces(database, "services")
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	case CommandGenRepo:
+
+		if len(args) < 1 {
+			lib.Error("Missing repo name", c.Options)
+			os.Exit(1)
+		}
+
+		var t *lib.Table
+
+		if t, e = database.FindTableByName(args[0]); e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
+		if e = g.GenerateGoRepo(t, c.Config.Dirs.Repos); e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
 	case CommandGenModels:
 
+		if c.Options&lib.OptClean == lib.OptClean {
+			g.CleanGoModels(c.Config.Dirs.Models, database)
+		}
+
 		for _, table := range database.Tables {
-			e = g.GenerateGoModelFile(c.Config.Dirs.Models, table)
+			e = g.GenerateGoModel(c.Config.Dirs.Models, table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
 			}
 		}
 
-	case "model":
-		if len(args) < 4 {
+		if _, e = os.Stat(c.Config.Dirs.Models + "/Config.go"); os.IsNotExist(e) {
+			g.GenerateDefaultConfigModelFile(c.Config.Dirs.Models)
+		}
+
+		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
+			g.GenerateDefaultConfigJsonFile(cwd)
+		}
+	case CommandGenModel:
+		if len(args) < 1 {
 			lib.Error("missing model name", c.Options)
 			os.Exit(1)
 		}
 
 		var t *lib.Table
 
-		if t, e = database.FindTableByName(args[3]); e != nil {
+		if t, e = database.FindTableByName(args[0]); e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
-		if e = g.GenerateGoModelFile(c.Config.Dirs.Models, t); e != nil {
+		if e = g.GenerateGoModel(c.Config.Dirs.Models, t); e != nil {
 			lib.Error(e.Error(), c.Options)
 		}
-	case CommandGenAll:
-
-		// Schema
-		lib.Debug("Generating schema...", c.Options)
-		e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		// Repos
-		lib.Infof("Generating %d repos...", c.Options, len(database.Tables))
-		e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		// Models
-		lib.Infof("Generating %d models", c.Options, len(database.Tables))
-		for _, table := range database.Tables {
-			e = g.GenerateGoModelFile(c.Config.Dirs.Models, table)
-			if e != nil {
-				lib.Error(e.Error(), c.Options)
-				os.Exit(1)
-			}
-		}
-
-		// Cache
-		// lib.Info("Generating cache file", c.Options)
-		// e = g.GenerateGoCacheFiles(c.dvc.Config.Dirs.Cache, database)
-
-		// if e != nil {
-		// 	lib.Error(e.Error(), c.Options)
-		// 	os.Exit(1)
-		// }
-
-		// Typescript
-		// lib.Info("Generating typescript types file", c.Options)
-		// g.GenerateTypescriptTypesFile(c.dvc.Config.Dirs.Typescript, database)
+	case CommandGenApp:
+		g.GenerateGoApp(cwd)
+	case CommandGenApi:
+		g.GenerateGoAPI(cwd)
 
 	case "ts":
 		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
@@ -525,7 +545,18 @@ func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
 		return
 	}
 
-	config = &lib.Config{}
+	config = &lib.Config{
+		OneToMany: map[string]string{},
+		ManyToOne: map[string]string{},
+	}
 	_, e = toml.DecodeFile(configFilePath, config)
+
+	if len(config.OneToMany) > 0 {
+
+		for col, subCol := range config.OneToMany {
+			config.ManyToOne[subCol] = col
+		}
+	}
+
 	return
 }
