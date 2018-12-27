@@ -43,18 +43,19 @@ type ChangeFile struct {
 
 // Config contains a set of configuration values used throughout the application
 type Config struct {
-	ChangeSetPath string   `toml:"changesetPath"`
-	DatabaseType  string   `toml:"databaseType"`
-	BasePackage   string   `toml:"basePackage"`
-	Enums         []string `toml:"enums"`
-
-	Connection struct {
+	ChangeSetPath string            `toml:"changesetPath"`
+	DatabaseType  string            `toml:"databaseType"`
+	BasePackage   string            `toml:"basePackage"`
+	Enums         []string          `toml:"enums"`
+	OneToMany     map[string]string `toml:"onetomany"`
+	OneToOne      map[string]string `toml:"onetoone"`
+	ManyToOne     map[string]string `toml:"manytoone"`
+	Connection    struct {
 		Host         string `toml:"host"`
 		DatabaseName string `toml:"databaseName"`
 		Username     string `toml:"username"`
 		Password     string `toml:"password"`
 	}
-
 	Packages struct {
 		Cache    string `toml:"cache"`
 		Models   string `toml:"models"`
