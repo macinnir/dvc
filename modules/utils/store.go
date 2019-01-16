@@ -68,6 +68,7 @@ func (s *Store) Connect(host string, password string, db int) {
 // Subscribe subscribes to a channel on redis
 func (s *Store) Subscribe(channelNames ...string) {
 
+	log.Println("Subscribed to...", channelNames[0])
 	s.pubSub = s.Client.PSubscribe(channelNames...)
 
 	_, err := s.pubSub.ReceiveTimeout(time.Second)
