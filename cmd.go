@@ -400,7 +400,9 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		e = g.GenerateRepoInterfaces(database, "services")
+		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Services, c.Options)
+
+		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Services)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)

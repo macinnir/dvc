@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io/ioutil"
-	"log"
+	// "log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -92,7 +92,7 @@ func GetUserIDFromAuthString(authString string) (userID int64, e error) {
 	var subject string
 	var ok bool
 
-	log.Printf(authString)
+	// log.Printf(authString)
 	if authToken, e = validateToken(authString); e != nil {
 		return
 	}
