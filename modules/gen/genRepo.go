@@ -250,7 +250,7 @@ func (r *{{.Table.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[s
 	for field, val := range args {
 
 		likePrefix := "#LIKE#"
-		if len(field) > len(likePrefix) && field[0:len(likePrefix)] = "#LIKE#" {
+		if len(field) > len(likePrefix) && field[0:len(likePrefix)] == "#LIKE#" {
 			field = field[len(likePrefix):]
 			where = append(where, field + " LIKE ?") 
 			whereArgs = append(whereArgs, val) 
