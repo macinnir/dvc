@@ -248,8 +248,17 @@ func (r *{{.Table.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[s
 	where := []string{"1=1"} 
 	whereArgs := []interface{}{} 
 	for field, val := range args {
-		where = append(where, field + " = ?")
-		whereArgs = append(whereArgs, val)
+
+		likePrefix := "#LIKE#"
+		if len(field) > len(likePrefix) && field[0:len(likePrefix)] == "#LIKE#" {
+			field = field[len(likePrefix):]
+			where = append(where, field + " LIKE ?") 
+			whereArgs = append(whereArgs, val) 
+		} else {
+			where = append(where, field + " = ?")
+			whereArgs = append(whereArgs, val)
+		}
+
 		n++
 	}
 	query := "SELECT * FROM ` + "`{{.Table.Name}}`" + ` WHERE " + strings.Join(where, " AND ") 
