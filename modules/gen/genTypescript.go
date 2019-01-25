@@ -20,6 +20,7 @@ func (g *Gen) GenerateTypescriptTypes(database *lib.Database) (goCode string, e 
 		goCode += str
 	}
 
+	goCode += "}\n"
 	goCode += "// #genEnd\n"
 
 	return
