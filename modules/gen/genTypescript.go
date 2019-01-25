@@ -8,7 +8,7 @@ import (
 
 // GenerateTypescriptTypes returns a string for a typscript types file
 func (g *Gen) GenerateTypescriptTypes(database *lib.Database) (goCode string, e error) {
-	goCode = "// #genStart \n\n"
+	goCode = "// #genStart \n\ndeclare namespace Models {\n\n"
 	for _, table := range database.Tables {
 
 		str := ""
@@ -28,8 +28,8 @@ func (g *Gen) GenerateTypescriptTypes(database *lib.Database) (goCode string, e 
 // GenerateTypescriptType returns a string for a type in typescript
 func (g *Gen) GenerateTypescriptType(table *lib.Table) (goCode string, e error) {
 
-	goCode += fmt.Sprintf("/**\n * %s\n */\n", table.Name)
-	goCode += fmt.Sprintf("declare interface %s {\n", table.Name)
+	goCode += fmt.Sprintf("\t/**\n * %s\n */\n", table.Name)
+	goCode += fmt.Sprintf("\tdeclare interface %s {\n", table.Name)
 	for _, column := range table.Columns {
 
 		fieldType := "number"
@@ -50,10 +50,10 @@ func (g *Gen) GenerateTypescriptType(table *lib.Table) (goCode string, e error) 
 		// decimal
 		//
 
-		goCode += fmt.Sprintf("\t%s: %s;\n", column.Name, fieldType)
+		goCode += fmt.Sprintf("\t\t%s: %s;\n", column.Name, fieldType)
 	}
 
-	goCode += "}\n\n"
+	goCode += "\t}\n\n"
 
 	return
 
