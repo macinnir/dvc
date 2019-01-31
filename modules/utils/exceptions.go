@@ -19,3 +19,36 @@ func NewRecordNotFoundError(tableName string, key string) RecordNotFoundError {
 		Key:       key,
 	}
 }
+
+// ForbiddenError - 403
+type ForbiddenError struct{}
+
+func (e ForbiddenError) Error() string {
+	return fmt.Sprintf("Forbidden")
+}
+
+// InternalServerError - 500
+func NewInternalError(s string) InternalError {
+	return InternalError{s}
+}
+
+type InternalError struct {
+	s string
+}
+
+func (e InternalError) Error() string {
+	return e.s
+}
+
+// BadRequest - 400
+func NewArgumentError(s string) ArgumentError {
+	return ArgumentError{s}
+}
+
+type ArgumentError struct {
+	s string
+}
+
+func (e ArgumentError) Error() string {
+	return e.s
+}
