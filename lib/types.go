@@ -65,6 +65,7 @@ type Config struct {
 	}
 
 	Dirs struct {
+		Dal        string `toml:"dal"`
 		Repos      string `toml:"repos"`
 		Cache      string `toml:"cache"`
 		Models     string `toml:"models"`
