@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func NewLogger(appName string, logFilePath string) *Logger {
+func NewLogger(logFilePath string) *Logger {
 
 	f, e := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
@@ -14,8 +14,7 @@ func NewLogger(appName string, logFilePath string) *Logger {
 	}
 
 	return &Logger{
-		file:    f,
-		appName: appName,
+		file: f,
 	}
 }
 
