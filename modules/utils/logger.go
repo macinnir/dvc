@@ -26,7 +26,7 @@ type Logger struct {
 
 func (l *Logger) Write(p []byte) (n int, e error) {
 
-	s := l.appName + "> " + string(p)
+	s := string(p)
 	n, e = l.file.Write([]byte(s))
 	return
 }
