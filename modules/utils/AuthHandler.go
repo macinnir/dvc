@@ -59,11 +59,11 @@ func (a *AuthHandler) IsAnonymousRoute(r *http.Request) bool {
 
 func (a *AuthHandler) LogRoute(r *http.Request, anonymous bool) {
 
-	anonymousString := "Auth"
+	anonymousString := "AUTH"
 	if anonymous {
-		anonymousString = "Anon"
+		anonymousString = "ANON"
 	}
-	log.Println(r.Method + " " + r.RequestURI + " [" + anonymousString + "]")
+	log.Println("INF HTTP > " + r.Method + " " + r.RequestURI + " [" + anonymousString + "]")
 }
 
 func (a *AuthHandler) SetAuthCallback(cb func(userID int64) (interface{}, error)) {
@@ -86,13 +86,13 @@ func (a *AuthHandler) CreateRouteAuthHandler(h http.Handler) http.HandlerFunc {
 
 		if userID, e = GetUserIDFromAuthHeader(r); e != nil {
 			a.LogRoute(r, false)
-			Unauthorized(w)
+			Unauthorized(r, w)
 			return
 		}
 
 		if user, e = a.authCallback(userID); e != nil {
 			a.LogRoute(r, false)
-			Unauthorized(w)
+			Unauthorized(r, w)
 			return
 		}
 

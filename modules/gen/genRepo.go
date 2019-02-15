@@ -50,11 +50,13 @@ func (g *Gen) GenerateGoRepoFiles(dir string, database *lib.Database) (e error) 
 func (g *Gen) GenerateRepoInterfaces(database *lib.Database, dir string) (e error) {
 
 	var data = struct {
-		Imports []string
-		Tables  map[string]*lib.Table
+		BasePackage string
+		Imports     []string
+		Tables      map[string]*lib.Table
 	}{
+		BasePackage: g.Config.BasePackage,
 		Imports: []string{
-			fmt.Sprintf("%s/models", g.Config.BasePackage),
+			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
 		},
 		Tables: database.Tables,
 	}
@@ -74,12 +76,13 @@ func (g *Gen) GenerateRepoInterfaces(database *lib.Database, dir string) (e erro
 	}})
 
 	tpl := `
-// #genStart
-package services 
+// Package definitions outlines objects and functionality used in the {{.BasePackage}} application
+package definitions
 import ({{range .Imports}}
 	"{{.}}"{{end}}
 )
 
+// Repos defines the container for all repository layer structs
 type Repos struct {
 	{{range .Tables}}
 	{{.Name}} I{{.Name}}Repo{{end}}
@@ -148,9 +151,11 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 	}
 
 	defaultImports := []string{
-		fmt.Sprintf("%s/models", g.Config.BasePackage),
+		fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
+		fmt.Sprintf("%s/definitions", g.Config.BasePackage),
 		"github.com/macinnir/dvc/modules/utils",
 		"fmt",
+		"log",
 	}
 
 	if len(imports) > 0 {
@@ -222,12 +227,12 @@ import ({{range .Imports}}
 // {{.Name}}Repo is a repository for {{.Name}} objects 
 type {{.Name}}Repo struct {
 	config *models.Config
-	dal *Dal 
+	dal *definitions.Dal 
 	store utils.IStore
 }
 
 // New{{.Name}}Repo returns a new instance of the {{.Name}}Repo
-func New{{.Name}}Repo(config *models.Config, dal *Dal, store utils.IStore) *{{.Name}}Repo {
+func New{{.Name}}Repo(config *models.Config, dal *definitions.Dal, store utils.IStore) *{{.Name}}Repo {
 	return &{{.Name}}Repo{config, dal, store}
 }
 
@@ -235,6 +240,9 @@ func New{{.Name}}Repo(config *models.Config, dal *Dal, store utils.IStore) *{{.N
 func (r *{{.Name}}Repo) Create(model *models.{{.Name}}) (e error) {
 	e = r.dal.{{.Name}}.Create(model) 
 	if e != nil {
+		log.Printf("ERR {{.Name}}Repo.Create > %s", e.Error())
+	} else {
+		log.Printf("INF {{.Name}}Repo.Create > #%d", model.{{.PrimaryKey}})
 		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
 	}
 	return 
@@ -244,7 +252,10 @@ func (r *{{.Name}}Repo) Create(model *models.{{.Name}}) (e error) {
 func (r *{{.Name}}Repo) Update(model *models.{{.Name}}) (e error) {
 	// Has Permission? -- CreatedBy? InGroup?
 	e = r.dal.{{.Name}}.Update(model)
-	if e == nil {
+	if e != nil {
+		log.Printf("ERR {{.Name}}Repo.Update > %s", e.Error()) 
+	} else {
+		log.Printf("INF {{.Name}}Repo.Update > #%d", model.{{.PrimaryKey}})
 		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
 	}
 	return 
@@ -253,7 +264,12 @@ func (r *{{.Name}}Repo) Update(model *models.{{.Name}}) (e error) {
 // Delete marks an existing {{.Name}} object as deleted
 func (r *{{.Name}}Repo) Delete(model *models.{{.Name}}) (e error) {
 	e = r.dal.{{.Name}}.Delete(model)
-	r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+	if e == nil {
+		log.Printf("INF {{.Name}}Repo.Delete > #%d", model.{{.PrimaryKey}}) 
+		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+	} else {
+		log.Printf("ERR {{.Name}}Repo.Delete > %s", e.Error()) 
+	}
 	return 
 }
 {{end}}
@@ -261,18 +277,30 @@ func (r *{{.Name}}Repo) Delete(model *models.{{.Name}}) (e error) {
 // HardDelete performs a SQL DELETE operation on a {{.Name}} entry in the database
 func (r *{{.Name}}Repo) HardDelete(model *models.{{.Name}}) (e error) {
 	e = r.dal.{{.Name}}.HardDelete(model)
-	r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+	if e != nil {
+		log.Printf("ERR {{.Name}}Repo.HardDelete > %s", e.Error()) 
+	} else {
+		log.Printf("INF {{.Name}}Repo.HardDelete > #%d", model.{{.PrimaryKey}}) 
+		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+	}
+
 	return
 }
 
 // GetByID gets a single {{.Name}} object by a Primary Key
 func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *models.{{.Name}}, e error) {
 	model = &models.{{.Name}}{}
-	if e = r.store.Get(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model); e != nil {
-		fmt.Println("Getting model from database...")
+	
+	e = r.store.Get(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
+	
+	if e == nil {
+		log.Printf("INF {{.Name}}Repo.GetByID > #%d [From Cache]", model.{{.PrimaryKey}})
+	} else {
 		if model, e = r.dal.{{.Name}}.GetByID({{.PrimaryKey}}); e == nil {
+			log.Printf("INF {{.Name}}Repo.GetByID > #%d", model.{{.PrimaryKey}})
 			r.store.Set(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
 		} else {
+			log.Printf("ERR {{.Name}}Repo.GetByID > #%d > %s", model.{{.PrimaryKey}}, e.Error())
 			return 
 		}
 	} 
@@ -289,6 +317,7 @@ func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *model
 
 // GetMany gets {{.Name}} objects\n",
 func (r *{{.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) {
+	log.Println("INF {{.Name}}Repo.GetMany")
 	return r.dal.{{.Name}}.GetMany(args, orderBy, limit)
 }
 
@@ -334,14 +363,14 @@ func (g *Gen) GenerateReposBootstrapGoCodeFromDatabase(database *lib.Database, d
 package repos
 
 import (
-	"{{.BasePackage}}/models"
-	"{{.BasePackage}}/services"
+	"{{.BasePackage}}/definitions"
+	"{{.BasePackage}}/definitions/models"
 	"github.com/macinnir/dvc/modules/utils" 
 )
 
 // Bootstrap bootstraps all of the repos into a single repo object 
-func Bootstrap (config *models.Config, dal *Dal, store utils.IStore) *services.Repos {
-	r := new(services.Repos) 
+func Bootstrap (config *models.Config, dal *definitions.Dal, store utils.IStore) *definitions.Repos {
+	r := new(definitions.Repos) 
 	{{range .Tables}}
 	r.{{.Name}} = New{{.Name}}Repo(config, dal, store)
 	{{end}} 

@@ -37,6 +37,7 @@ const (
 	CommandGenTypescript Command = "typescript"
 	CommandCompare       Command = "compare"
 	CommandHelp          Command = "help"
+	CommandRefresh       Command = "refresh"
 )
 
 // Cmd is a container for handling commands
@@ -108,6 +109,12 @@ func (c *Cmd) Main(args []string) (err error) {
 	}
 
 	switch cmd {
+	case CommandRefresh:
+		c.CommandImport(args)
+		c.CommandGen([]string{"models"})
+		c.CommandGen([]string{"dal"})
+		c.CommandGen([]string{"repos"})
+		c.CommandGen([]string{"services"})
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandExport:
@@ -382,8 +389,9 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		g.EnsureDir(c.Config.Dirs.Services)
-		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Services)
+		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
+		g.EnsureDir(c.Config.Dirs.Definitions)
+		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
@@ -415,9 +423,9 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Repos, c.Options)
-		g.EnsureDir(c.Config.Dirs.Repos)
-		e = g.GenerateDALInterfaces(database, c.Config.Dirs.Repos)
+		lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
+		g.EnsureDir(c.Config.Dirs.Definitions)
+		e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
@@ -430,7 +438,7 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 
 		for _, table := range database.Tables {
-			e = g.GenerateGoModel(c.Config.Dirs.Models, table)
+			e = g.GenerateGoModel(path.Join(c.Config.Dirs.Definitions, "models"), table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
@@ -444,6 +452,11 @@ func (c *Cmd) CommandGen(args []string) {
 		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
 			g.GenerateDefaultConfigJsonFile(cwd)
 		}
+
+	case CommandGenServices:
+		g.GenerateServiceInterfaces(c.Config.Dirs.Definitions, c.Config.Dirs.Services)
+		g.GenerateServiceBootstrapFile(c.Config.Dirs.Services)
+
 	case CommandGenApp:
 		g.GenerateGoApp(cwd)
 	case CommandGenApi:

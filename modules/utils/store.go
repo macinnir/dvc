@@ -109,7 +109,9 @@ func (s *Store) Publish(channel string, content interface{}) {
 	}
 }
 
+// PublishEvent publishes an event to the store pub/sub mechanism
 func (s *Store) PublishEvent(eventType string, recipient int64, obj interface{}) {
+	log.Printf("INF PUBLISH EVENT %s => %d", eventType, recipient)
 	event := &StoreEvent{
 		EventType: eventType,
 		Recipient: recipient,

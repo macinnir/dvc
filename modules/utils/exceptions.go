@@ -5,19 +5,25 @@ import (
 )
 
 type RecordNotFoundError struct {
-	TableName string
-	Key       string
 }
 
 func (e RecordNotFoundError) Error() string {
-	return fmt.Sprintf("No record in table `%s` found at key %s", e.TableName, e.Key)
+	return "Not Found"
 }
 
-func NewRecordNotFoundError(tableName string, key string) RecordNotFoundError {
-	return RecordNotFoundError{
-		TableName: tableName,
-		Key:       key,
-	}
+func NewRecordNotFoundError() RecordNotFoundError {
+	return RecordNotFoundError{}
+}
+
+type NotAuthorizedError struct {
+}
+
+func (e NotAuthorizedError) Error() string {
+	return "Not Authorized"
+}
+
+func NewNotAuthorizedError() NotAuthorizedError {
+	return NotAuthorizedError{}
 }
 
 // ForbiddenError - 403
@@ -25,6 +31,10 @@ type ForbiddenError struct{}
 
 func (e ForbiddenError) Error() string {
 	return fmt.Sprintf("Forbidden")
+}
+
+func NewForbiddenError() ForbiddenError {
+	return ForbiddenError{}
 }
 
 // InternalServerError - 500

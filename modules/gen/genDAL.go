@@ -84,7 +84,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 
 	p := path.Join(dir, table.Name+".go")
 
-	lib.Debugf("Generating go repo file for table %s at path %s", g.Options, table.Name, p)
+	lib.Debugf("Generating go dal file for table %s at path %s", g.Options, table.Name, p)
 
 	data := struct {
 		Table          *lib.Table
@@ -108,6 +108,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	}
 
 	if data.FileHead, data.FileFoot, imports, e = g.scanFileParts(p, true); e != nil {
+		lib.Errorf("ERROR: %s", g.Options, e.Error())
 		return
 	}
 
@@ -137,7 +138,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	}
 
 	defaultImports := []string{
-		fmt.Sprintf("%s/models", g.Config.BasePackage),
+		fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
 		"database/sql",
 		"github.com/jmoiron/sqlx",
 		"log",
@@ -174,6 +175,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 
 	tpl := `{{.FileHead}}
 // #genStart
+// Package dal is the Data Access Layer
 package dal
 
 import ({{range .Imports}}
@@ -197,47 +199,62 @@ func (r {{.Table.Name}}Dal) Create(model *models.{{.Table.Name}}) (e error) {
 	result, e = r.db.NamedExec("INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})", model)
 
 	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.Insert > %s", e.Error())
 		return 
 	}
 
 	model.{{.PrimaryKey}}, e = result.LastInsertId()
+
+	log.Printf("INF {{.Table.Name}}Dal.Insert > #%d", model.{{.PrimaryKey}})
 	return 
 }
-
-	// if len(footMatches) > 0 {
-	// 	footMatchPrefixLen := len(fmt.Sprintf("func (r *%sRepo) ", table.Name))
-	// 	for _, footMatch := range footMatches {
-	// 		footMatch = strings.Trim(footMatch, " ")
-	// 		footMatchLen := len(footMatch)
-	// 		goCode += "\t" + footMatch[footMatchPrefixLen:footMatchLen-1] + "\n"
-	// 	}
-	// }
 
 // Update updates an existing {{.Table.Name}} entry in the database 
 func (r *{{.Table.Name}}Dal) Update(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}`" + ` SET {{.Columns | updateFields}} WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
+	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.Update > %s", e.Error())
+	} else {
+		log.Printf("INF {{.Table.Name}}Dal.Update > #%d", model.{{.PrimaryKey}})
+	}
 	return 
 }{{if .IsDeleted}}
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
 func (r *{{.Table.Name}}Dal) Delete(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
+	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.Delete > %s", e.Error())
+	} else {
+		log.Printf("INF {{.Table.Name}}Dal.Delete > #%d", model.{{.PrimaryKey}})
+	}
 	return 
 }{{end}} 
 
 // HardDelete performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
 func (r *{{.Table.Name}}Dal) HardDelete(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model) 
+	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.HardDelete > %s", e.Error())
+	} else {
+		log.Printf("INF {{.Table.Name}}Dal.HardDelete > #%d", model.{{.PrimaryKey}})
+	}
 	return 
 }
 
 // GetByID gets a single {{.Table.Name}} object by a Primary Key
 func (r *{{.Table.Name}}Dal) GetByID({{.PrimaryKey}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
-	log.Println("Getting {{.Table.Name}} at ID ", {{.PrimaryKey}})
 	model = &models.{{.Table.Name}}{}
 	if e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey}}); e == sql.ErrNoRows {
-		e = utils.NewRecordNotFoundError("{{.Table.Name}}", strconv.Itoa(int({{.PrimaryKey}})))
+		e = utils.NewRecordNotFoundError()
 	}
+
+	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.GetByID > %s", e.Error())
+	} else {
+		log.Printf("INF {{.Table.Name}}Dal.GetByID > #%d", model.{{.PrimaryKey}})
+	}
+
 	return 
 }
 
@@ -285,6 +302,12 @@ func (r *{{.Table.Name}}Dal) GetMany(args map[string]interface{}, orderBy map[st
 	}
 
 	e = r.db.Select(&collection, query, whereArgs...) 
+
+	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.GetMany > %s", e.Error())
+	} else {
+		log.Println("INF {{.Table.Name}}Dal.GetMany")
+	}
 
 	return 
 }
@@ -358,11 +381,13 @@ func (r *{{.Table.Name}}Dal) GetMany(args map[string]interface{}, orderBy map[st
 func (g *Gen) GenerateDALInterfaces(database *lib.Database, dir string) (e error) {
 
 	var data = struct {
-		Imports []string
-		Tables  map[string]*lib.Table
+		BasePackage string
+		Imports     []string
+		Tables      map[string]*lib.Table
 	}{
+		BasePackage: g.Config.BasePackage,
 		Imports: []string{
-			fmt.Sprintf("%s/models", g.Config.BasePackage),
+			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
 		},
 		Tables: database.Tables,
 	}
@@ -381,13 +406,13 @@ func (g *Gen) GenerateDALInterfaces(database *lib.Database, dir string) (e error
 	}})
 
 	tpl := `
-// #genStart
-package repos 
+// Package definitions outlines objects and functionality used in the {{.BasePackage}} application
+package definitions
 import ({{range .Imports}}
 	"{{.}}"{{end}}
 )	
 
-// Dal is the container for all data access layer structs
+// Dal defines the container for all data access layer structs
 type Dal struct {
 	{{range .Tables}}
 	{{.Name}} I{{.Name}}Dal{{end}}
@@ -433,15 +458,18 @@ func (g *Gen) GenerateDALsBootstrapFile(dir string, database *lib.Database) (e e
 	}
 
 	tpl := `
+// Package dal is the Data Access Layer
 package dal
 import (
+	"log" 
 	"github.com/jmoiron/sqlx"
-	"{{.BasePackage}}/repos"
+	"{{.BasePackage}}/definitions"
 )
 
 // Bootstrap instantiates a collection of repositories
-func Bootstrap(db *sqlx.DB) *repos.Dal {
-	r := new(repos.Dal) 
+func Bootstrap(db *sqlx.DB) *definitions.Dal {
+	log.Println("INF Bootstrapping DAL") 
+	r := new(definitions.Dal) 
 	{{range .Tables}}
 	// {{.Name}}
 	r.{{.Name}} = New{{.Name}}Dal(db)

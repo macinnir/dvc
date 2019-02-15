@@ -9,24 +9,29 @@ func NewLogger(logFilePath string) *Logger {
 
 	f, e := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
+	// log.SetFlags()
+
 	if e != nil {
 		log.Fatalf("error opening log file %s", logFilePath)
 	}
 
-	return &Logger{
+	logger := &Logger{
 		file: f,
 	}
+
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.SetOutput(logger)
+
+	return logger
 }
 
 type Logger struct {
-	appName string
-	file    *os.File
+	file *os.File
+	n    int64
 }
 
 func (l *Logger) Write(p []byte) (n int, e error) {
-
-	s := string(p)
-	n, e = l.file.Write([]byte(s))
+	n, e = l.file.Write(p)
 	return
 }
 

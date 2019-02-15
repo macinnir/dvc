@@ -17,7 +17,7 @@ import (
 	"path"
 	"{{ .BasePackage }}/repos"
 	"{{ .BasePackage }}/services"
-	"{{ .BasePackage }}/models"
+	"{{ .BasePackage }}/definitions/models"
 	"github.com/macinnir/dvc/modules/utils"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
