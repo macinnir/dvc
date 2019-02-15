@@ -24,11 +24,7 @@ func (g *Gen) EnsureDir(dir string) (e error) {
 	return
 }
 
-func (g *Gen) WriteJsonToFile(json string, filePath string) (e error) {
-	e = ioutil.WriteFile(filePath, []byte(json), 0644)
-	return
-}
-
+// FmtGoCode formats a go file
 func (g *Gen) FmtGoCode(filePath string) {
 	_, stdError, exitCode := lib.RunCommand("go", "fmt", filePath)
 

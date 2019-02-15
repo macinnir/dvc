@@ -10,142 +10,152 @@ import (
 	"strings"
 )
 
-// GetOrphanedRepos gets repo files that aren't in the database.Tables map
-func (g *Gen) GetOrphanedRepos(dir string, database *lib.Database) []string {
-	dirHandle, err := os.Open(dir)
-	if err != nil {
-		panic(err)
-	}
+// GenerateGoRepoFile generates a repo file in golang
+func (g *Gen) GenerateGoRepoFile(dir string, table *lib.Table) (e error) {
 
-	defer dirHandle.Close()
-	var dirFileNames []string
-	dirFileNames, err = dirHandle.Readdirnames(-1)
-	if err != nil {
-		panic(err)
-	}
-
-	orphans := []string{}
-
-	for _, name := range dirFileNames {
-
-		// Skip tests
-		if (len(name) > 8 && name[len(name)-8:len(name)] == "_test.go") || name == "repos.go" {
-			continue
-		}
-
-		fileNameNoExt := name[0 : len(name)-3]
-		if _, ok := database.Tables[fileNameNoExt]; !ok {
-			orphans = append(orphans, name)
-		}
-	}
-
-	return orphans
-}
-
-// CleanGoRepos removes any repo files that aren't in the database.Tables map
-func (g *Gen) CleanGoRepos(dir string, database *lib.Database) (e error) {
-	dirHandle, err := os.Open(dir)
-	if err != nil {
-		panic(err)
-	}
-
-	defer dirHandle.Close()
-	var dirFileNames []string
-	dirFileNames, err = dirHandle.Readdirnames(-1)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, name := range dirFileNames {
-
-		// Skip tests
-		if (len(name) > 8 && name[len(name)-8:len(name)] == "_test.go") || name == "repos.go" {
-			continue
-		}
-
-		fileNameNoExt := name[0 : len(name)-3]
-		if _, ok := database.Tables[fileNameNoExt]; !ok {
-			if fileNameNoExt != "Config" {
-				fullFilePath := path.Join(dir, name)
-				fmt.Printf("Removing %s\n", fullFilePath)
-				os.Remove(fullFilePath)
-			}
-		}
-	}
-	return
-}
-
-// GenerateGoRepo returns a string for a repo in golang
-func (g *Gen) GenerateGoRepo(table *lib.Table, dir string) (e error) {
-
+	fileHead := ""
+	fileFoot := ""
 	imports := []string{}
 
 	g.EnsureDir(dir)
 
-	p := path.Join(dir, table.Name+".go")
+	outFile := path.Join(dir, table.Name)
 
-	lib.Debugf("Generating go repo file for table %s at path %s", g.Options, table.Name, p)
+	lib.Debugf("Generating go repo file for table %s at path %s", g.Options, table.Name, outFile)
 
-	data := struct {
-		Table          *lib.Table
-		Columns        lib.SortedColumns
-		PrimaryKey     string
-		PrimaryKeyType string
-		IDType         string
-		IsDeleted      bool
-		Imports        []string
-		FileHead       string
-		FileFoot       string
-	}{
-		Table:          table,
-		PrimaryKey:     "",
-		PrimaryKeyType: "",
-		IDType:         "int64",
-		IsDeleted:      false,
-		Imports:        []string{},
-		FileHead:       "",
-		FileFoot:       "",
-	}
-
-	if data.FileHead, data.FileFoot, imports, e = g.scanFileParts(p, true); e != nil {
+	if fileHead, fileFoot, imports, e = g.scanFileParts(outFile, true); e != nil {
 		return
 	}
 
-	// funcSig := fmt.Sprintf(`^func \(r \*%sRepo\) [A-Z].*$`, table.Name)
-	// footMatches := g.scanStringForFuncSignature(fileFoot, funcSig)
+	e = g.GenerateGoRepo(table, fileHead, fileFoot, imports, dir)
+	return
+}
+
+// GenerateGoRepoFiles generates go repository files based on the database schema
+func (g *Gen) GenerateGoRepoFiles(dir string, database *lib.Database) (e error) {
+
+	for _, table := range database.Tables {
+
+		lib.Debugf("Generating repo %s", g.Options, table.Name)
+		e = g.GenerateGoRepoFile(dir, table)
+		if e != nil {
+			return
+		}
+	}
+
+	return
+}
+
+// GenerateRepoInterfaces generates a go interfaces file for use by the services directory
+func (g *Gen) GenerateRepoInterfaces(database *lib.Database, dir string) (e error) {
+
+	var data = struct {
+		BasePackage string
+		Imports     []string
+		Tables      map[string]*lib.Table
+	}{
+		BasePackage: g.Config.BasePackage,
+		Imports: []string{
+			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
+		},
+		Tables: database.Tables,
+	}
+
+	t := template.New("repo-interfaces")
+
+	t.Funcs(template.FuncMap{"primaryKey": func(table *lib.Table) string {
+		primaryKey := ""
+		idType := "int64"
+		for _, column := range table.Columns {
+			if column.ColumnKey == "PRI" {
+				primaryKey = column.Name
+			}
+		}
+
+		return primaryKey + " " + idType
+	}})
+
+	tpl := `
+// Package definitions outlines objects and functionality used in the {{.BasePackage}} application
+package definitions
+import ({{range .Imports}}
+	"{{.}}"{{end}}
+)
+
+// Repos defines the container for all repository layer structs
+type Repos struct {
+	{{range .Tables}}
+	{{.Name}} I{{.Name}}Repo{{end}}
+}
+
+{{range .Tables}}
+// I{{.Name}}Repo outlines the repository methods on a {{.Name}} object 
+type I{{.Name}}Repo interface {
+	Create(model *models.{{.Name}}) (e error) 
+	Update(model *models.{{.Name}}) (e error) 
+	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
+	HardDelete(model *models.{{.Name}}) (e error) 
+	GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) 
+	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
+}
+{{end}}
+`
+
+	p := path.Join(dir, "repos.go")
+	f, _ := os.Create(p)
+	t, _ = t.Parse(tpl)
+	e = t.Execute(f, data)
+	if e != nil {
+		fmt.Println("Execute Error: ", e.Error())
+	}
+	f.Close()
+	g.FmtGoCode(p)
+	return
+}
+
+// GenerateGoRepo returns a string for a repo in golang
+func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string, imports []string, dir string) (e error) {
+
+	primaryKey := ""
+	primaryKeyType := ""
+
+	funcSig := fmt.Sprintf(`^func \(r \*%sRepo\) [A-Z].*$`, table.Name)
+
+	footMatches := g.scanStringForFuncSignature(fileFoot, funcSig)
 
 	sortedColumns := make(lib.SortedColumns, 0, len(table.Columns))
+
+	oneToMany := g.Config.OneToMany[table.Name]
+	oneToOne := g.Config.OneToOne[table.Name]
+
+	// fmt.Println("OneToMany", table.Name, " ==> ", oneToMany)
 
 	// Find the primary key
 	for _, column := range table.Columns {
 		if column.ColumnKey == "PRI" {
-			data.PrimaryKey = column.Name
-			data.PrimaryKeyType = column.DataType
+			primaryKey = column.Name
+			primaryKeyType = column.DataType
 		}
+
 		sortedColumns = append(sortedColumns, column)
 	}
 
 	sort.Sort(sortedColumns)
 
-	data.Columns = sortedColumns
+	_, isDeleted := table.Columns["IsDeleted"]
 
-	_, data.IsDeleted = table.Columns["IsDeleted"]
-
-	switch data.PrimaryKeyType {
+	idType := "int64"
+	switch primaryKeyType {
 	case "varchar":
-		data.IDType = "string"
+		idType = "string"
 	}
 
 	defaultImports := []string{
-		fmt.Sprintf("%s/models", g.Config.BasePackage),
-		"database/sql",
-		"github.com/jmoiron/sqlx",
-		"log",
-		"strings",
-		"strconv",
+		fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
+		fmt.Sprintf("%s/definitions", g.Config.BasePackage),
 		"github.com/macinnir/dvc/modules/utils",
 		"fmt",
-		"errors",
+		"log",
 	}
 
 	if len(imports) > 0 {
@@ -164,178 +174,160 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, dir string) (e error) {
 			if !exists {
 				imports = append(imports, di)
 			}
+
 		}
 
 	} else {
 		imports = defaultImports
 	}
 
-	data.Imports = imports
+	footMatchCode := []string{}
+	if len(footMatches) > 0 {
+		footMatchPrefixLen := len(fmt.Sprintf("func (r *%sRepo) ", table.Name))
+		for _, footMatch := range footMatches {
+			footMatch = strings.Trim(footMatch, " ")
+			footMatchLen := len(footMatch)
+			footMatchCode = append(footMatchCode, footMatch[footMatchPrefixLen:footMatchLen-1])
+		}
+	}
 
-	tpl := `{{.FileHead}}
-// #genStart
-package repos 
+	data := struct {
+		OneToMany      string
+		OneToOne       string
+		Imports        []string
+		Name           string
+		IsDeleted      bool
+		PrimaryKey     string
+		PrimaryKeyType string
+		FootMatches    []string
+		FileHead       string
+		FileFoot       string
+	}{
+		OneToMany:      oneToMany,
+		OneToOne:       oneToOne,
+		Imports:        imports,
+		Name:           table.Name,
+		IsDeleted:      isDeleted,
+		PrimaryKey:     primaryKey,
+		PrimaryKeyType: idType,
+		FootMatches:    footMatchCode,
+		FileHead:       fileHead,
+		FileFoot:       fileFoot,
+	}
+
+	tpl := `
+{{.FileHead}}
+// #genStart 
+package repos
 
 import ({{range .Imports}}
-	"{{.}}"{{end}}
+	"{{.}}"{{end}} 
 )
 
-// {{.Table.Name}}Repo is a data repository for {{.Table.Name}} objects 
-type {{.Table.Name}}Repo struct {
-	db *sqlx.DB
+// {{.Name}}Repo is a repository for {{.Name}} objects 
+type {{.Name}}Repo struct {
+	config *models.Config
+	dal *definitions.Dal 
+	store utils.IStore
 }
 
-// New{{.Table.Name}}Repo returns a new instance of {{.Table.Name}}Repo
-func New{{.Table.Name}}Repo(db *sqlx.DB) *{{.Table.Name}}Repo {
-	return &{{.Table.Name}}Repo{db}
+// New{{.Name}}Repo returns a new instance of the {{.Name}}Repo
+func New{{.Name}}Repo(config *models.Config, dal *definitions.Dal, store utils.IStore) *{{.Name}}Repo {
+	return &{{.Name}}Repo{config, dal, store}
 }
 
-// Create creates a new {{.Table.Name}} entry in the database 
-func (r {{.Table.Name}}Repo) Create(model *models.{{.Table.Name}}) (e error) {
+// Create creates a new {{.Name}} entry
+func (r *{{.Name}}Repo) Create(model *models.{{.Name}}) (e error) {
+	e = r.dal.{{.Name}}.Create(model) 
+	if e != nil {
+		log.Printf("ERR {{.Name}}Repo.Create > %s", e.Error())
+	} else {
+		log.Printf("INF {{.Name}}Repo.Create > #%d", model.{{.PrimaryKey}})
+		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
+	}
+	return 
+}
+
+// Update updates an existing {{.Name}} entry
+func (r *{{.Name}}Repo) Update(model *models.{{.Name}}) (e error) {
+	// Has Permission? -- CreatedBy? InGroup?
+	e = r.dal.{{.Name}}.Update(model)
+	if e != nil {
+		log.Printf("ERR {{.Name}}Repo.Update > %s", e.Error()) 
+	} else {
+		log.Printf("INF {{.Name}}Repo.Update > #%d", model.{{.PrimaryKey}})
+		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
+	}
+	return 
+}
+{{if .IsDeleted}}
+// Delete marks an existing {{.Name}} object as deleted
+func (r *{{.Name}}Repo) Delete(model *models.{{.Name}}) (e error) {
+	e = r.dal.{{.Name}}.Delete(model)
+	if e == nil {
+		log.Printf("INF {{.Name}}Repo.Delete > #%d", model.{{.PrimaryKey}}) 
+		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+	} else {
+		log.Printf("ERR {{.Name}}Repo.Delete > %s", e.Error()) 
+	}
+	return 
+}
+{{end}}
+
+// HardDelete performs a SQL DELETE operation on a {{.Name}} entry in the database
+func (r *{{.Name}}Repo) HardDelete(model *models.{{.Name}}) (e error) {
+	e = r.dal.{{.Name}}.HardDelete(model)
+	if e != nil {
+		log.Printf("ERR {{.Name}}Repo.HardDelete > %s", e.Error()) 
+	} else {
+		log.Printf("INF {{.Name}}Repo.HardDelete > #%d", model.{{.PrimaryKey}}) 
+		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+	}
+
+	return
+}
+
+// GetByID gets a single {{.Name}} object by a Primary Key
+func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *models.{{.Name}}, e error) {
+	model = &models.{{.Name}}{}
 	
-	var result sql.Result 
-	result, e = r.db.NamedExec("INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})", model)
-
-	if e != nil {
-		return 
-	}
-
-	model.{{.PrimaryKey}}, e = result.LastInsertId()
-	return 
-}
-
-	// if len(footMatches) > 0 {
-	// 	footMatchPrefixLen := len(fmt.Sprintf("func (r *%sRepo) ", table.Name))
-	// 	for _, footMatch := range footMatches {
-	// 		footMatch = strings.Trim(footMatch, " ")
-	// 		footMatchLen := len(footMatch)
-	// 		goCode += "\t" + footMatch[footMatchPrefixLen:footMatchLen-1] + "\n"
-	// 	}
-	// }
-
-// Update updates an existing {{.Table.Name}} entry in the database 
-func (r *{{.Table.Name}}Repo) Update(model *models.{{.Table.Name}}) (e error) {
-	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}`" + ` SET {{.Columns | updateFields}} WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
-	return 
-}{{if .IsDeleted}}
-
-// Delete marks an existing {{.Table.Name}} entry in the database as deleted
-func (r *{{.Table.Name}}Repo) Delete(model *models.{{.Table.Name}}) (e error) {
-	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
-	return 
-}{{end}} 
-
-// HardDelete performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}Repo) HardDelete(model *models.{{.Table.Name}}) (e error) {
-	_, e = r.db.NamedExec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model) 
-	return 
-}
-
-// GetByID gets a single {{.Table.Name}} object by a Primary Key
-func (r *{{.Table.Name}}Repo) GetByID({{.PrimaryKey}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
-	log.Println("Getting {{.Table.Name}} at ID ", {{.PrimaryKey}})
-	model = &models.{{.Table.Name}}{}
-	if e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey}}); e == sql.ErrNoRows {
-		e = utils.NewRecordNotFoundError("{{.Table.Name}}", strconv.Itoa(int({{.PrimaryKey}})))
-	}
-	return 
-}
-
-// GetMany gets {{.Table.Name}} objects 
-func (r *{{.Table.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Table.Name}}, e error) {
-	collection = []*models.{{.Table.Name}}{}
-	n := 1
-	where := []string{"1=1"} 
-	whereArgs := []interface{}{} 
-	for field, val := range args {
-
-		likePrefix := "#LIKE#"
-		if len(field) > len(likePrefix) && field[0:len(likePrefix)] == "#LIKE#" {
-			field = field[len(likePrefix):]
-			where = append(where, field + " LIKE ?") 
-			whereArgs = append(whereArgs, val) 
+	e = r.store.Get(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
+	
+	if e == nil {
+		log.Printf("INF {{.Name}}Repo.GetByID > #%d [From Cache]", model.{{.PrimaryKey}})
+	} else {
+		if model, e = r.dal.{{.Name}}.GetByID({{.PrimaryKey}}); e == nil {
+			log.Printf("INF {{.Name}}Repo.GetByID > #%d", model.{{.PrimaryKey}})
+			r.store.Set(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
 		} else {
-			where = append(where, field + " = ?")
-			whereArgs = append(whereArgs, val)
+			log.Printf("ERR {{.Name}}Repo.GetByID > #%d > %s", model.{{.PrimaryKey}}, e.Error())
+			return 
 		}
+	} 
 
-		n++
-	}
-	query := "SELECT * FROM ` + "`{{.Table.Name}}`" + ` WHERE " + strings.Join(where, " AND ") 
-	orderBys := []string{} 
-	if len(orderBy) > 0 {
-		for col, dir := range orderBy {
-			if dir != "ASC" && dir != "DESC" {
-				e = errors.New("Invalid order by on table {{.Table.Name}}")
-				return 
-			}
-			orderBys = append(orderBys, fmt.Sprintf("%s %s", col, dir)) 
-		}
-	}
+	{{if ne .OneToMany ""}}
+	model.{{.OneToMany}}s, _ = r.dal.{{.OneToMany}}.GetMany(map[string]interface{}{ "{{.Name}}ID": {{.Name}}ID }, map[string]string{}, []int64{})
+	{{end}}
 
-	if len(orderBys) > 0 {
-		query += " ORDER BY " + strings.Join(orderBys, ",")
-	}
-
-	if len(limit) > 0 {
-		query += " LIMIT " + strconv.Itoa(int(limit[0]));
-		if(len(limit) > 1) {
-			 query += "," + strconv.Itoa(int(limit[1])); 
-		} 
-	}
-
-	e = r.db.Select(&collection, query, whereArgs...) 
-
+	{{if ne .OneToOne ""}}
+	model.{{.OneToOne}}, _ = r.dal.{{.OneToOne}}.GetByID(model.{{.OneToOne}}ID)
+	{{end}} 
 	return 
 }
+
+// GetMany gets {{.Name}} objects\n",
+func (r *{{.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) {
+	log.Println("INF {{.Name}}Repo.GetMany")
+	return r.dal.{{.Name}}.GetMany(args, orderBy, limit)
+}
+
 // #genEnd
-{{.FileFoot}}`
+{{.FileFoot}} 
+`
 
-	t := template.New("repo-" + table.Name)
-	t.Funcs(template.FuncMap{
-		"insertFields": func(columns lib.SortedColumns) string {
-			fields := []string{}
-
-			for _, field := range columns {
-				if field.ColumnKey == "PRI" {
-					continue
-				}
-
-				fields = append(fields, "`"+field.Name+"`")
-			}
-
-			return strings.Join(fields, ",")
-		},
-		"insertValues": func(columns lib.SortedColumns) string {
-			fields := []string{}
-			for _, field := range columns {
-				if field.ColumnKey == "PRI" {
-					continue
-				}
-
-				fields = append(fields, ":"+field.Name)
-			}
-
-			return strings.Join(fields, ",")
-		},
-		"updateFields": func(columns lib.SortedColumns) string {
-			fields := []string{}
-			for _, field := range columns {
-				if field.ColumnKey == "PRI" {
-					continue
-				}
-				fields = append(fields, "`"+field.Name+"` = :"+field.Name)
-			}
-
-			return strings.Join(fields, ",")
-		},
-	})
-
-	t, e = t.Parse(tpl)
-	if e != nil {
-		panic(e)
-	}
-
+	// Store    utils.IStore
+	p := path.Join(dir, table.Name+".go")
+	t := template.Must(template.New("repo-" + table.Name).Parse(tpl))
 	f, err := os.Create(p)
 	if err != nil {
 		fmt.Println("ERROR: ", err.Error())
@@ -355,67 +347,57 @@ func (r *{{.Table.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[s
 	return
 }
 
-func (g *Gen) GenerateRepoInterfaces(database *lib.Database, dir string) (e error) {
+// GenerateReposBootstrapGoCodeFromDatabase generates golang code for a Repo Bootstrap file from
+// a database object
+func (g *Gen) GenerateReposBootstrapGoCodeFromDatabase(database *lib.Database, dir string) (e error) {
 
-	var data = struct {
-		Imports []string
-		Tables  map[string]*lib.Table
+	data := struct {
+		Tables      map[string]*lib.Table
+		BasePackage string
 	}{
-		Imports: []string{
-			fmt.Sprintf("%s/models", g.Config.BasePackage),
-		},
-		Tables: database.Tables,
+		Tables:      database.Tables,
+		BasePackage: g.Config.BasePackage,
 	}
-
-	t := template.New("repo-interface")
-	t.Funcs(template.FuncMap{"primaryKey": func(table *lib.Table) string {
-		primaryKey := ""
-		idType := "int64"
-		for _, column := range table.Columns {
-			if column.ColumnKey == "PRI" {
-				primaryKey = column.Name
-			}
-		}
-
-		return primaryKey + " " + idType
-	}})
 
 	tpl := `
-// #genStart
-package services 
-import ({{range .Imports}}
-	"{{.}}"{{end}}
-)	
+package repos
 
-// Repos is the container for all repositories
-type Repos struct {
+import (
+	"{{.BasePackage}}/definitions"
+	"{{.BasePackage}}/definitions/models"
+	"github.com/macinnir/dvc/modules/utils" 
+)
+
+// Bootstrap bootstraps all of the repos into a single repo object 
+func Bootstrap (config *models.Config, dal *definitions.Dal, store utils.IStore) *definitions.Repos {
+	r := new(definitions.Repos) 
 	{{range .Tables}}
-	{{.Name}} I{{.Name}}Repo{{end}}
+	r.{{.Name}} = New{{.Name}}Repo(config, dal, store)
+	{{end}} 
+	return r
 }
-
-{{range .Tables}}
-// I{{.Name}}Repo outlines the repository methods on a {{.Name}} object 
-type I{{.Name}}Repo interface {
-	Create(model *models.{{.Name}}) (e error) 
-	Update(model *models.{{.Name}}) (e error) 
-	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
-	HardDelete(model *models.{{.Name}}) (e error) 
-	GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) 
-	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
-}
-{{end}}
 `
-	// {{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
-	p := path.Join(dir, "repos.go")
-	f, _ := os.Create(p)
-	t, _ = t.Parse(tpl)
-	e = t.Execute(f, data)
-	if e != nil {
-		fmt.Println("Execute Error: ", e.Error())
+
+	// Store    utils.IStore
+	p := path.Join(dir, "bootstrap.go")
+	t := template.Must(template.New("repo-repos").Parse(tpl))
+	f, err := os.Create(p)
+	if err != nil {
+		fmt.Println("ERROR: ", err.Error())
+		return
 	}
+
+	err = t.Execute(f, data)
+	if err != nil {
+		fmt.Println("Execute Error: ", err.Error())
+		return
+	}
+
 	f.Close()
 	g.FmtGoCode(p)
+
 	return
+
 }
 
 // GenerateReposBootstrapFile generates a repos bootstrap file in golang
@@ -423,48 +405,75 @@ func (g *Gen) GenerateReposBootstrapFile(dir string, database *lib.Database) (e 
 
 	// Make the repos dir if it does not exist.
 	g.EnsureDir(dir)
+	e = g.GenerateReposBootstrapGoCodeFromDatabase(database, dir)
+	return
+}
 
-	data := struct {
-		Tables      map[string]*lib.Table
-		BasePackage string
-	}{
-		BasePackage: g.Config.BasePackage,
-		Tables:      database.Tables,
-	}
-
-	tpl := `
-package repos 
-import (
-	"github.com/jmoiron/sqlx"
-	"{{.BasePackage}}/services"
-)
-
-// Bootstrap instantiates a collection of repositories
-func Bootstrap(db *sqlx.DB) *services.Repos {
-	r := new(services.Repos) 
-	{{range .Tables}}
-	// {{.Name}}
-	r.{{.Name}} = New{{.Name}}Repo(db)
-	{{end}}
-	return r
-}`
-
-	p := path.Join(dir, "repos.go")
-	t := template.Must(template.New("repos-bootstrap").Parse(tpl))
-	f, err := os.Create(p)
+// GetOrphanedRepos returns a slice of service files that are not in the database.Tables map
+func (g *Gen) GetOrphanedRepos(dir string, database *lib.Database) []string {
+	dirHandle, err := os.Open(dir)
 	if err != nil {
-		fmt.Println("ERROR: ", err.Error())
-		return
+		panic(err)
 	}
 
-	err = t.Execute(f, data)
+	defer dirHandle.Close()
+	var dirFileNames []string
+	dirFileNames, err = dirHandle.Readdirnames(-1)
 	if err != nil {
-		fmt.Println("Execute Error: ", err.Error())
-		return
+		panic(err)
 	}
 
-	f.Close()
-	g.FmtGoCode(p)
+	orphans := []string{}
 
+	for _, name := range dirFileNames {
+
+		if fileInfo, e := os.Stat(name); e != nil || fileInfo.IsDir() {
+			continue
+		}
+		// Skip tests, repo definitions and service definitions
+		if (len(name) > 8 && name[len(name)-8:len(name)] == "_test.go") || name == "repos.go" || name == "services.go" {
+			continue
+		}
+
+		fileNameNoExt := name[0 : len(name)-3]
+		if _, ok := database.Tables[fileNameNoExt]; !ok {
+			orphans = append(orphans, name)
+		}
+	}
+
+	return orphans
+}
+
+// CleanGoServices removes service files not found in the database.Tables map
+func (g *Gen) CleanGoRepos(dir string, database *lib.Database) (e error) {
+	dirHandle, err := os.Open(dir)
+	if err != nil {
+		panic(err)
+	}
+
+	defer dirHandle.Close()
+	var dirFileNames []string
+	dirFileNames, err = dirHandle.Readdirnames(-1)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, name := range dirFileNames {
+
+		if fileInfo, e := os.Stat(name); e != nil || fileInfo.IsDir() {
+			continue
+		}
+		// Skip tests, repo definitions and service definitions
+		if (len(name) > 8 && name[len(name)-8:len(name)] == "_test.go") || name == "repos.go" || name == "services.go" {
+			continue
+		}
+
+		fileNameNoExt := name[0 : len(name)-3]
+		if _, ok := database.Tables[fileNameNoExt]; !ok {
+			fullFilePath := path.Join(dir, name)
+			fmt.Printf("TEST: Removing %s\n", fullFilePath)
+			os.Remove(fullFilePath)
+		}
+	}
 	return
 }

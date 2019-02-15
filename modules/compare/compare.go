@@ -118,13 +118,23 @@ func (c *Compare) ApplyChangeset(changeset string) (e error) {
 
 	tx, _ := server.Connection.Begin()
 
-	for i, s := range statements {
-		fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(statements))
+	nonEmptyStatements := []string{}
+	for _, s := range statements {
+		if len(strings.Trim(strings.Trim(s, " "), "\n")) == 0 {
+			continue
+		}
+
+		nonEmptyStatements = append(nonEmptyStatements, s)
+	}
+
+	for i, s := range nonEmptyStatements {
 		sql := strings.Trim(strings.Trim(s, " "), "\n")
 		if len(sql) == 0 {
 			continue
 		}
-		lib.Debugf("Running sql: \n%s\n", c.Options, sql)
+		// fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(nonEmptyStatements))
+		fmt.Printf("Running %d of %d: \n%s\n", i+1, len(nonEmptyStatements), sql)
+		// lib.Debugf("Running sql: \n%s\n", c.Options, sql)
 
 		_, e = tx.Exec(sql)
 		if e != nil {
@@ -171,7 +181,6 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 	}
 
 	if same {
-		fmt.Println("The schemas are the same!")
 		return
 	}
 
@@ -192,6 +201,10 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 				sql += c.Connector.CompareEnums(remoteSchema, localSchema, tableName)
 			}
 		}
+	}
+
+	if len(sql) == 0 {
+		fmt.Printf("The schema objects were not the same, but no change sql was generated.\n\n Something strange is afoot...\n")
 	}
 
 	return
