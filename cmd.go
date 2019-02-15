@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"time"
 
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
@@ -289,6 +290,7 @@ Main:
 			os.Exit(1)
 		}
 	case "apply":
+		writeSQLToLog(sql)
 		e = cmp.ApplyChangeset(sql)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
@@ -301,6 +303,28 @@ Main:
 	default:
 		lib.Errorf("Unknown argument: `%s`", c.Options, cmd)
 		os.Exit(1)
+	}
+
+}
+
+func writeSQLToLog(sql string) {
+
+	sqlLog := time.Now().Format("20060102150405") + "\n"
+	sqlLog += sql
+
+	filePath := "./dvc-changes.log"
+
+	if _, e := os.Stat(filePath); os.IsNotExist(e) {
+		ioutil.WriteFile(filePath, []byte(sqlLog), 0600)
+	} else {
+		f, err := os.OpenFile("./dvc-changes.log", os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		if _, err = f.WriteString(sqlLog); err != nil {
+			panic(err)
+		}
 	}
 
 }

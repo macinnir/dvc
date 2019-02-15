@@ -452,8 +452,9 @@ func createTableChangeSQL(localTable *lib.Table, remoteTable *lib.Table) (sql st
 
 			for createColumnName := range createColumnStatements {
 
+				// The dataTypes are the same, possibly a renamed column. Simply rename the column
 				if remoteTable.Columns[dropColumnName].DataType == localTable.Columns[createColumnName].DataType {
-					sql += alterTableRenameColumn(localTable, localTable.Columns[createColumnName], dropColumnName) + "\n"
+					sql += alterTableChangeColumn(localTable, localTable.Columns[createColumnName], dropColumnName) + "\n"
 					delete(dropColumnStatements, dropColumnName)
 					delete(createColumnStatements, createColumnName)
 					break
@@ -574,11 +575,12 @@ func changeColumn(table *lib.Table, localColumn *lib.Column, remoteColumn *lib.C
 	query := ""
 
 	// 7,8,9
-	if localColumn.ColumnKey == remoteColumn.ColumnKey {
-		return
-	}
+	// if localColumn.ColumnKey == remoteColumn.ColumnKey {
+	// 	return
+	// }
 
 	// <7
+	// The key for this column has been added/removed.
 	if localColumn.ColumnKey != remoteColumn.ColumnKey {
 
 		// 1,2: There is no indexing on the local schema
@@ -626,6 +628,9 @@ func changeColumn(table *lib.Table, localColumn *lib.Column, remoteColumn *lib.C
 		}
 	}
 
+	if localColumn.DataType != remoteColumn.DataType {
+		query += alterTableChangeColumn(table, localColumn, localColumn.Name)
+	}
 	sql = query
 	return
 
@@ -696,7 +701,7 @@ func createColumnSegment(column *lib.Column) (sql string, e error) {
 
 }
 
-func alterTableRenameColumn(table *lib.Table, newColumn *lib.Column, oldColumnName string) (sql string) {
+func alterTableChangeColumn(table *lib.Table, newColumn *lib.Column, oldColumnName string) (sql string) {
 	query, _ := createColumnSegment(newColumn)
 	sql = fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s;", table.Name, oldColumnName, query)
 	return
