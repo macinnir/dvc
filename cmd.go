@@ -27,8 +27,8 @@ const (
 	CommandGenApp        Command = "app"
 	CommandGenApi        Command = "api"
 	CommandGenSchema     Command = "schema"
+	CommandGenDal        Command = "dal"
 	CommandGenRepos      Command = "repos"
-	CommandGenRepo       Command = "repo"
 	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
 	CommandGenModel      Command = "model"
@@ -37,6 +37,7 @@ const (
 	CommandGenTypescript Command = "typescript"
 	CommandCompare       Command = "compare"
 	CommandHelp          Command = "help"
+	CommandRefresh       Command = "refresh"
 )
 
 // Cmd is a container for handling commands
@@ -108,6 +109,12 @@ func (c *Cmd) Main(args []string) (err error) {
 	}
 
 	switch cmd {
+	case CommandRefresh:
+		c.CommandImport(args)
+		c.CommandGen([]string{"models"})
+		c.CommandGen([]string{"dal"})
+		c.CommandGen([]string{"repos"})
+		c.CommandGen([]string{"services"})
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandExport:
@@ -364,27 +371,41 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-	case CommandGenServices:
-
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoServices(c.Config.Dirs.Services, database)
-		}
-
-		e = g.GenerateGoServiceFiles(c.Config.Dirs.Services, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
 	case CommandGenRepos:
 
 		if c.Options&lib.OptClean == lib.OptClean {
 			g.CleanGoRepos(c.Config.Dirs.Repos, database)
 		}
 
+		e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
+		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
+		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
+		g.EnsureDir(c.Config.Dirs.Definitions)
+		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	case CommandGenDal:
+
+		if c.Options&lib.OptClean == lib.OptClean {
+			g.CleanGoDALs(c.Config.Dirs.Dal, database)
+		}
+
 		for _, table := range database.Tables {
 
-			lib.Debugf("Generating repo %s", g.Options, table.Name)
-			e = g.GenerateGoRepo(table, c.Config.Dirs.Repos)
+			lib.Debugf("Generating dal %s", g.Options, table.Name)
+			e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
 			if e != nil {
 				return
 			}
@@ -394,38 +415,17 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
-		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+
+		// Create the dal bootstrap file in the dal repo
+		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
 
-		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Services, c.Options)
-
-		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Services)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-	case CommandGenRepo:
-
-		if len(args) < 1 {
-			lib.Error("Missing repo name", c.Options)
-			os.Exit(1)
-		}
-
-		var t *lib.Table
-
-		if t, e = database.FindTableByName(args[0]); e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		if e = g.GenerateGoRepo(t, c.Config.Dirs.Repos); e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+		lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
+		g.EnsureDir(c.Config.Dirs.Definitions)
+		e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
@@ -438,7 +438,7 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 
 		for _, table := range database.Tables {
-			e = g.GenerateGoModel(c.Config.Dirs.Models, table)
+			e = g.GenerateGoModel(path.Join(c.Config.Dirs.Definitions, "models"), table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
@@ -452,22 +452,11 @@ func (c *Cmd) CommandGen(args []string) {
 		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
 			g.GenerateDefaultConfigJsonFile(cwd)
 		}
-	case CommandGenModel:
-		if len(args) < 1 {
-			lib.Error("missing model name", c.Options)
-			os.Exit(1)
-		}
 
-		var t *lib.Table
+	case CommandGenServices:
+		g.GenerateServiceInterfaces(c.Config.Dirs.Definitions, c.Config.Dirs.Services)
+		g.GenerateServiceBootstrapFile(c.Config.Dirs.Services)
 
-		if t, e = database.FindTableByName(args[0]); e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		if e = g.GenerateGoModel(c.Config.Dirs.Models, t); e != nil {
-			lib.Error(e.Error(), c.Options)
-		}
 	case CommandGenApp:
 		g.GenerateGoApp(cwd)
 	case CommandGenApi:

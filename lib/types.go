@@ -65,12 +65,14 @@ type Config struct {
 	}
 
 	Dirs struct {
-		Repos      string `toml:"repos"`
-		Cache      string `toml:"cache"`
-		Models     string `toml:"models"`
-		Schema     string `toml:"schema"`
-		Typescript string `toml:"typescript"`
-		Services   string `toml:"services"`
+		Dal         string `toml:"dal"`
+		Repos       string `toml:"repos"`
+		Cache       string `toml:"cache"`
+		Models      string `toml:"models"`
+		Schema      string `toml:"schema"`
+		Typescript  string `toml:"typescript"`
+		Services    string `toml:"services"`
+		Definitions string `toml:"definitions"`
 	}
 }
 
