@@ -2,11 +2,12 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // Gen conntains all of the generator functionality
@@ -90,6 +91,10 @@ func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string
 	for lineNum, line := range fileLines {
 
 		line = strings.Trim(line, " ")
+
+		if len(line) == 0 {
+			continue
+		}
 
 		if trackImports == true {
 
