@@ -2,11 +2,12 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"html/template"
 	"os"
 	"path"
 	"sort"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateGoModel returns a string for a model in golang
@@ -25,8 +26,11 @@ func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 	}
 
 	type Column struct {
-		Name string
-		Type string
+		Name         string
+		Type         string
+		IsPrimaryKey bool
+		IsNull       bool
+		Ordinal      int
 	}
 
 	data := struct {
@@ -52,18 +56,43 @@ func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 // #genStart
 
 package models
+import (
+	q "github.com/macinnir/dvc/modules/query" 
+	{{if .IncludeNullPackage}}"gopkg.in/guregu/null.v3"{{end}}
+)
 
-{{if .IncludeNullPackage}}
-import "gopkg.in/guregu/null.v3"
-{{end}}
-
-// {{.Name}} represents a {{.Name}} model 
-type {{.Name}} struct { {{range .Columns}}
+// {{.Name}} represents a {{.Name}} domain object 
+type {{.Name}} struct { 
+	q.BaseDomainObject
+	{{range .Columns}}
 {{.Name}} {{.Type}} ` + "`db:\"{{.Name}}\" json:\"{{.Name}}\"`" + `{{end}}
 {{if ne .OneToMany ""}}
 	{{.OneToMany}}s []*{{.OneToMany}}{{end}}
 {{if ne .OneToOne ""}}
 	{{.OneToOne}} *{{.OneToOne}}{{end}}
+}
+
+// New{{.Name}} returns a new {{.Name}} domain object
+func New{{.Name}}() *{{.Name}} {
+	o := &{{.Name}}{}
+	o.Build()
+	return o
+}
+
+// Build builds the internal meta data for a {{.Name}} domain object
+func (o *{{.Name}}) Build() {
+	o.BaseDomainObject.TableName = "{{.Name}}"
+	o.BaseDomainObject.FieldList = map[string]*q.DomainObjectField{
+		{{range.Columns}}
+		"{{.Name}}": {
+			Name: "{{.Name}}", 
+			Type: "{{.Type}}", 
+			IsPrimaryKey: {{.IsPrimaryKey}}, 
+			IsNull: {{.IsNull}}, 
+			Ordinal: {{.Ordinal}}, 
+		}, 
+		{{end}}
+	}
 }
 // #genEnd
 {{.FileFoot}}
@@ -113,7 +142,13 @@ type {{.Name}} struct { {{range .Columns}}
 			}
 		}
 
-		data.Columns = append(data.Columns, Column{Name: column.Name, Type: fieldType})
+		data.Columns = append(data.Columns, Column{
+			Name:         column.Name,
+			Type:         fieldType,
+			IsPrimaryKey: column.ColumnKey == "PRI",
+			IsNull:       column.IsNullable,
+			Ordinal:      len(data.Columns),
+		})
 	}
 	data.IncludeNullPackage = includeNullPackage
 

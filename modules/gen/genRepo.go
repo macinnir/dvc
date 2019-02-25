@@ -2,12 +2,13 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"html/template"
 	"os"
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateGoRepoFile generates a repo file in golang
@@ -57,6 +58,7 @@ func (g *Gen) GenerateRepoInterfaces(database *lib.Database, dir string) (e erro
 		BasePackage: g.Config.BasePackage,
 		Imports: []string{
 			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
+			"github.com/macinnir/dvc/modules/query",
 		},
 		Tables: database.Tables,
 	}
@@ -95,8 +97,8 @@ type I{{.Name}}Repo interface {
 	Update(model *models.{{.Name}}) (e error) 
 	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
 	HardDelete(model *models.{{.Name}}) (e error) 
-	GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) 
 	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
+	Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) 
 }
 {{end}}
 `
@@ -154,6 +156,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 		fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
 		fmt.Sprintf("%s/definitions", g.Config.BasePackage),
 		"github.com/macinnir/dvc/modules/utils",
+		"github.com/macinnir/dvc/modules/query",
 		"fmt",
 		"log",
 	}
@@ -306,7 +309,7 @@ func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *model
 	} 
 
 	{{if ne .OneToMany ""}}
-	model.{{.OneToMany}}s, _ = r.dal.{{.OneToMany}}.GetMany(map[string]interface{}{ "{{.Name}}ID": {{.Name}}ID }, map[string]string{}, []int64{})
+	model.{{.OneToMany}}s, _ = r.dal.{{.OneToMany}}.Run(query.Select().Where(query.Equals{"{{.Name}}ID": {{.Name}}ID}))
 	{{end}}
 
 	{{if ne .OneToOne ""}}
@@ -315,10 +318,10 @@ func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *model
 	return 
 }
 
-// GetMany gets {{.Name}} objects\n",
-func (r *{{.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) {
+// Run runs the select query (from Select()) for {{.Name}} objects
+func (r *{{.Name}}Repo) Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) {
 	log.Println("INF {{.Name}}Repo.GetMany")
-	return r.dal.{{.Name}}.GetMany(args, orderBy, limit)
+	return r.dal.{{.Name}}.Run(q)
 }
 
 // #genEnd
