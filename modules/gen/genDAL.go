@@ -265,9 +265,9 @@ func (r *{{.Table.Name}}Dal) Run(q *query.SelectQuery) (collection []*models.{{.
 	e = r.db.Select(&collection, sql, args...)
 
 	if e != nil {
-		log.Printf("ERR AccountDal.GetMany > %s", e.Error())
+		log.Printf("ERR {{.Table.Name}}Dal.GetMany > %s", e.Error())
 	} else {
-		log.Println("INF AccountDal.GetMany")
+		log.Println("INF {{.Table.Name}}Dal.GetMany")
 	}
 
 	return
