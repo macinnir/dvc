@@ -31,9 +31,10 @@ func (fieldList FieldList) Less(i, j int) bool { return fieldList[i].Ordinal < f
 func (fieldList FieldList) Swap(i, j int) { fieldList[i], fieldList[j] = fieldList[j], fieldList[i] }
 
 // BaseDomainObject is the base object inherited by all domain objects
+// Note: These fields include json tags for omission when the inheriting object attempts to marshal (e.g. for a JSON response from an API)
 type BaseDomainObject struct {
-	FieldList map[string]*DomainObjectField
-	TableName string
+	FieldList map[string]*DomainObjectField `json:"-"`
+	TableName string                        `json:"-"`
 }
 
 // GetName returns the name of the domain object
