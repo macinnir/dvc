@@ -8,11 +8,13 @@ import (
 // OrderByDir is a type containing the order by string for ORDER BY sql clauses
 type OrderByDir string
 
+// Directional constants
 const (
 	ASC  OrderByDir = "ASC"
 	DESC OrderByDir = "DESC"
 )
 
+// Placeholder used for sql arguments
 const Placeholder string = "?"
 
 // Select initiates a select statement
@@ -33,6 +35,7 @@ type SelectQuery struct {
 
 // func (s *SelectQuery) Run()
 
+// Distinct sets a flag indicating that the SELECT statement will start with a DISTINCT clause
 func (s *SelectQuery) Distinct() *SelectQuery {
 	s.isDistinct = true
 	return s
@@ -93,6 +96,7 @@ func (s *SelectQuery) Or(queryParts ...IQueryPart) *SelectQuery {
 	return s
 }
 
+// Limit adds a limit clause to the sql statement
 func (s *SelectQuery) Limit(count int, offset int) *SelectQuery {
 
 	s.limit = Limit{count, offset}
@@ -100,6 +104,7 @@ func (s *SelectQuery) Limit(count int, offset int) *SelectQuery {
 	return s
 }
 
+// OrderBy adds an ORDER BY clause to the sql statement
 func (s *SelectQuery) OrderBy(fieldName string, orderByDir OrderByDir) *SelectQuery {
 	if s.orderBy == nil {
 		s.orderBy = []OrderBy{}
@@ -119,6 +124,7 @@ func (s *SelectQuery) ToSQL() (sql string, args []interface{}) {
 
 	escapedFields := []string{}
 	for _, field := range fields {
+		fmt.Println(field.Name)
 		escapedFields = append(escapedFields, escapeField(field.Name))
 	}
 

@@ -212,8 +212,10 @@ func (distinct Distinct) ToSQL() (sql string, args []interface{}) {
 	return
 }
 
+// Limit represents a LIMIT clause query part
 type Limit []int
 
+// ToSQL returns the sql representation of a LIMIT clause, along with its arguments
 func (limit Limit) ToSQL() (sql string, args []interface{}) {
 
 	l := len(limit)
@@ -233,16 +235,13 @@ func (limit Limit) ToSQL() (sql string, args []interface{}) {
 	return
 }
 
-type OrderByPart struct {
-	Field string
-	Dir   OrderByDir
-}
-
+// OrderBy represents an ORDER BY sql clause
 type OrderBy struct {
 	Field string
 	Dir   OrderByDir
 }
 
+// ToSQL returns the sql representation of an ORDER BY clause
 func (orderBy OrderBy) ToSQL() (sql string, args []interface{}) {
 
 	sql = fmt.Sprintf("%s %s", escapeField(orderBy.Field), string(orderBy.Dir))
