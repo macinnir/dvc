@@ -97,9 +97,9 @@ func (s *SelectQuery) Or(queryParts ...IQueryPart) *SelectQuery {
 }
 
 // Limit adds a limit clause to the sql statement
-func (s *SelectQuery) Limit(count int, offset int) *SelectQuery {
+func (s *SelectQuery) Limit(offset int, count int) *SelectQuery {
 
-	s.limit = Limit{count, offset}
+	s.limit = Limit{offset, count}
 
 	return s
 }
