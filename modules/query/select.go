@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -173,5 +174,6 @@ func (s *SelectQuery) ToSQL() (sql string, args []interface{}) {
 
 	sql = fmt.Sprintf("SELECT%s%s FROM %s %s", distinct, strings.Join(escapedFields, ","), escapeField(s.Object.GetName()), where)
 
+	log.Printf("INF SQL: %s -- %v\n", sql, args)
 	return
 }
