@@ -195,6 +195,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 	}
 
 	data := struct {
+		BasePackage    string
 		OneToMany      string
 		OneToOne       string
 		Imports        []string
@@ -206,6 +207,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 		FileHead       string
 		FileFoot       string
 	}{
+		BasePackage:    g.Config.BasePackage,
 		OneToMany:      oneToMany,
 		OneToOne:       oneToOne,
 		Imports:        imports,
@@ -246,20 +248,19 @@ func (r *{{.Name}}Repo) Create(model *models.{{.Name}}) (e error) {
 		log.Printf("ERR {{.Name}}Repo.Create > %s", e.Error())
 	} else {
 		log.Printf("INF {{.Name}}Repo.Create > #%d", model.{{.PrimaryKey}})
-		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
+		r.store.Set(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
 	}
 	return 
 }
 
 // Update updates an existing {{.Name}} entry
 func (r *{{.Name}}Repo) Update(model *models.{{.Name}}) (e error) {
-	// Has Permission? -- CreatedBy? InGroup?
 	e = r.dal.{{.Name}}.Update(model)
 	if e != nil {
 		log.Printf("ERR {{.Name}}Repo.Update > %s", e.Error()) 
 	} else {
 		log.Printf("INF {{.Name}}Repo.Update > #%d", model.{{.PrimaryKey}})
-		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
+		r.store.Set(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
 	}
 	return 
 }
@@ -269,7 +270,7 @@ func (r *{{.Name}}Repo) Delete(model *models.{{.Name}}) (e error) {
 	e = r.dal.{{.Name}}.Delete(model)
 	if e == nil {
 		log.Printf("INF {{.Name}}Repo.Delete > #%d", model.{{.PrimaryKey}}) 
-		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+		r.store.Delete(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}))
 	} else {
 		log.Printf("ERR {{.Name}}Repo.Delete > %s", e.Error()) 
 	}
@@ -284,7 +285,7 @@ func (r *{{.Name}}Repo) HardDelete(model *models.{{.Name}}) (e error) {
 		log.Printf("ERR {{.Name}}Repo.HardDelete > %s", e.Error()) 
 	} else {
 		log.Printf("INF {{.Name}}Repo.HardDelete > #%d", model.{{.PrimaryKey}}) 
-		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+		r.store.Delete(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}))
 	}
 
 	return
@@ -294,14 +295,14 @@ func (r *{{.Name}}Repo) HardDelete(model *models.{{.Name}}) (e error) {
 func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *models.{{.Name}}, e error) {
 	model = &models.{{.Name}}{}
 	
-	e = r.store.Get(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
+	e = r.store.Get(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", {{.PrimaryKey}}), model)
 	
 	if e == nil {
 		log.Printf("INF {{.Name}}Repo.GetByID > #%d [From Cache]", model.{{.PrimaryKey}})
 	} else {
 		if model, e = r.dal.{{.Name}}.GetByID({{.PrimaryKey}}); e == nil {
 			log.Printf("INF {{.Name}}Repo.GetByID > #%d", model.{{.PrimaryKey}})
-			r.store.Set(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
+			r.store.Set(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", {{.PrimaryKey}}), model)
 		} else {
 			log.Printf("ERR {{.Name}}Repo.GetByID > #%d > %s", model.{{.PrimaryKey}}, e.Error())
 			return 
