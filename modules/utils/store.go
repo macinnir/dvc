@@ -2,13 +2,15 @@ package utils
 
 import (
 	"encoding/json"
-	"github.com/go-redis/redis"
 	"log"
 	"strings"
 	"time"
+
+	"github.com/go-redis/redis"
 )
 
 const (
+
 	// UserEvent is an event created by a user
 	UserEvent = "userEvent"
 )

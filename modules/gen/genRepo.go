@@ -2,12 +2,13 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"html/template"
 	"os"
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateGoRepoFile generates a repo file in golang
@@ -57,6 +58,7 @@ func (g *Gen) GenerateRepoInterfaces(database *lib.Database, dir string) (e erro
 		BasePackage: g.Config.BasePackage,
 		Imports: []string{
 			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
+			"github.com/macinnir/dvc/modules/query",
 		},
 		Tables: database.Tables,
 	}
@@ -95,8 +97,8 @@ type I{{.Name}}Repo interface {
 	Update(model *models.{{.Name}}) (e error) 
 	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
 	HardDelete(model *models.{{.Name}}) (e error) 
-	GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) 
 	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
+	Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) 
 }
 {{end}}
 `
@@ -154,6 +156,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 		fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
 		fmt.Sprintf("%s/definitions", g.Config.BasePackage),
 		"github.com/macinnir/dvc/modules/utils",
+		"github.com/macinnir/dvc/modules/query",
 		"fmt",
 		"log",
 	}
@@ -192,6 +195,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 	}
 
 	data := struct {
+		BasePackage    string
 		OneToMany      string
 		OneToOne       string
 		Imports        []string
@@ -203,6 +207,7 @@ func (g *Gen) GenerateGoRepo(table *lib.Table, fileHead string, fileFoot string,
 		FileHead       string
 		FileFoot       string
 	}{
+		BasePackage:    g.Config.BasePackage,
 		OneToMany:      oneToMany,
 		OneToOne:       oneToOne,
 		Imports:        imports,
@@ -243,20 +248,19 @@ func (r *{{.Name}}Repo) Create(model *models.{{.Name}}) (e error) {
 		log.Printf("ERR {{.Name}}Repo.Create > %s", e.Error())
 	} else {
 		log.Printf("INF {{.Name}}Repo.Create > #%d", model.{{.PrimaryKey}})
-		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
+		r.store.Set(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
 	}
 	return 
 }
 
 // Update updates an existing {{.Name}} entry
 func (r *{{.Name}}Repo) Update(model *models.{{.Name}}) (e error) {
-	// Has Permission? -- CreatedBy? InGroup?
 	e = r.dal.{{.Name}}.Update(model)
 	if e != nil {
 		log.Printf("ERR {{.Name}}Repo.Update > %s", e.Error()) 
 	} else {
 		log.Printf("INF {{.Name}}Repo.Update > #%d", model.{{.PrimaryKey}})
-		r.store.Set(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
+		r.store.Set(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}), model) 
 	}
 	return 
 }
@@ -266,7 +270,7 @@ func (r *{{.Name}}Repo) Delete(model *models.{{.Name}}) (e error) {
 	e = r.dal.{{.Name}}.Delete(model)
 	if e == nil {
 		log.Printf("INF {{.Name}}Repo.Delete > #%d", model.{{.PrimaryKey}}) 
-		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+		r.store.Delete(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}))
 	} else {
 		log.Printf("ERR {{.Name}}Repo.Delete > %s", e.Error()) 
 	}
@@ -281,7 +285,7 @@ func (r *{{.Name}}Repo) HardDelete(model *models.{{.Name}}) (e error) {
 		log.Printf("ERR {{.Name}}Repo.HardDelete > %s", e.Error()) 
 	} else {
 		log.Printf("INF {{.Name}}Repo.HardDelete > #%d", model.{{.PrimaryKey}}) 
-		r.store.Delete(fmt.Sprintf("{{.Name}}_%d", model.{{.PrimaryKey}}))
+		r.store.Delete(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", model.{{.PrimaryKey}}))
 	}
 
 	return
@@ -291,14 +295,14 @@ func (r *{{.Name}}Repo) HardDelete(model *models.{{.Name}}) (e error) {
 func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *models.{{.Name}}, e error) {
 	model = &models.{{.Name}}{}
 	
-	e = r.store.Get(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
+	e = r.store.Get(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", {{.PrimaryKey}}), model)
 	
 	if e == nil {
 		log.Printf("INF {{.Name}}Repo.GetByID > #%d [From Cache]", model.{{.PrimaryKey}})
 	} else {
 		if model, e = r.dal.{{.Name}}.GetByID({{.PrimaryKey}}); e == nil {
 			log.Printf("INF {{.Name}}Repo.GetByID > #%d", model.{{.PrimaryKey}})
-			r.store.Set(fmt.Sprintf("{{.Name}}_%d", {{.PrimaryKey}}), model)
+			r.store.Set(fmt.Sprintf("{{.BasePackage}}_{{.Name}}_%d", {{.PrimaryKey}}), model)
 		} else {
 			log.Printf("ERR {{.Name}}Repo.GetByID > #%d > %s", model.{{.PrimaryKey}}, e.Error())
 			return 
@@ -306,7 +310,7 @@ func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *model
 	} 
 
 	{{if ne .OneToMany ""}}
-	model.{{.OneToMany}}s, _ = r.dal.{{.OneToMany}}.GetMany(map[string]interface{}{ "{{.Name}}ID": {{.Name}}ID }, map[string]string{}, []int64{})
+	model.{{.OneToMany}}s, _ = r.dal.{{.OneToMany}}.Run(query.Select().Where(query.Equals{"{{.Name}}ID": {{.Name}}ID}))
 	{{end}}
 
 	{{if ne .OneToOne ""}}
@@ -315,10 +319,10 @@ func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *model
 	return 
 }
 
-// GetMany gets {{.Name}} objects\n",
-func (r *{{.Name}}Repo) GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) {
+// Run runs the select query (from Select()) for {{.Name}} objects
+func (r *{{.Name}}Repo) Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) {
 	log.Println("INF {{.Name}}Repo.GetMany")
-	return r.dal.{{.Name}}.GetMany(args, orderBy, limit)
+	return r.dal.{{.Name}}.Run(q)
 }
 
 // #genEnd

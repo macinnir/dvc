@@ -2,12 +2,13 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"html/template"
 	"os"
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GetOrphanedDals gets repo files that aren't in the database.Tables map
@@ -142,11 +143,8 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		"database/sql",
 		"github.com/jmoiron/sqlx",
 		"log",
-		"strings",
-		"strconv",
 		"github.com/macinnir/dvc/modules/utils",
-		"fmt",
-		"errors",
+		"github.com/macinnir/dvc/modules/query",
 	}
 
 	if len(imports) > 0 {
@@ -258,50 +256,13 @@ func (r *{{.Table.Name}}Dal) GetByID({{.PrimaryKey}} {{.IDType}}) (model *models
 	return 
 }
 
-// GetMany gets {{.Table.Name}} objects 
-func (r *{{.Table.Name}}Dal) GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Table.Name}}, e error) {
+func (r *{{.Table.Name}}Dal) Run(q *query.SelectQuery) (collection []*models.{{.Table.Name}}, e error) {
+
 	collection = []*models.{{.Table.Name}}{}
-	n := 1
-	where := []string{"1=1"} 
-	whereArgs := []interface{}{} 
-	for field, val := range args {
+	q.Object = models.New{{.Table.Name}}()
+	sql, args := q.ToSQL()
 
-		likePrefix := "#LIKE#"
-		if len(field) > len(likePrefix) && field[0:len(likePrefix)] == "#LIKE#" {
-			field = field[len(likePrefix):]
-			where = append(where, field + " LIKE ?") 
-			whereArgs = append(whereArgs, val) 
-		} else {
-			where = append(where, field + " = ?")
-			whereArgs = append(whereArgs, val)
-		}
-
-		n++
-	}
-	query := "SELECT * FROM ` + "`{{.Table.Name}}`" + ` WHERE " + strings.Join(where, " AND ") 
-	orderBys := []string{} 
-	if len(orderBy) > 0 {
-		for col, dir := range orderBy {
-			if dir != "ASC" && dir != "DESC" {
-				e = errors.New("Invalid order by on table {{.Table.Name}}")
-				return 
-			}
-			orderBys = append(orderBys, fmt.Sprintf("%s %s", col, dir)) 
-		}
-	}
-
-	if len(orderBys) > 0 {
-		query += " ORDER BY " + strings.Join(orderBys, ",")
-	}
-
-	if len(limit) > 0 {
-		query += " LIMIT " + strconv.Itoa(int(limit[0]));
-		if(len(limit) > 1) {
-			 query += "," + strconv.Itoa(int(limit[1])); 
-		} 
-	}
-
-	e = r.db.Select(&collection, query, whereArgs...) 
+	e = r.db.Select(&collection, sql, args...)
 
 	if e != nil {
 		log.Printf("ERR {{.Table.Name}}Dal.GetMany > %s", e.Error())
@@ -309,7 +270,7 @@ func (r *{{.Table.Name}}Dal) GetMany(args map[string]interface{}, orderBy map[st
 		log.Println("INF {{.Table.Name}}Dal.GetMany")
 	}
 
-	return 
+	return
 }
 // #genEnd
 {{.FileFoot}}`
@@ -388,6 +349,7 @@ func (g *Gen) GenerateDALInterfaces(database *lib.Database, dir string) (e error
 		BasePackage: g.Config.BasePackage,
 		Imports: []string{
 			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
+			"github.com/macinnir/dvc/modules/query",
 		},
 		Tables: database.Tables,
 	}
@@ -425,8 +387,8 @@ type I{{.Name}}Dal interface {
 	Update(model *models.{{.Name}}) (e error) 
 	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
 	HardDelete(model *models.{{.Name}}) (e error) 
-	GetMany(args map[string]interface{}, orderBy map[string]string, limit []int64) (collection []*models.{{.Name}}, e error) 
 	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
+	Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) 
 }
 {{end}}
 `

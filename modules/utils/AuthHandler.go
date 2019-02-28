@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type contextKey int
@@ -57,11 +58,12 @@ func (a *AuthHandler) IsAnonymousRoute(r *http.Request) bool {
 	return ok
 }
 
-func (a *AuthHandler) LogRoute(r *http.Request, anonymous bool) {
+func (a *AuthHandler) LogRoute(r *http.Request, userID int64, anonymous bool) {
 
-	anonymousString := "AUTH"
+	userIDString := strconv.Itoa(int(userID))
+	anonymousString := "AUTH " + userIDString
 	if anonymous {
-		anonymousString = "ANON"
+		anonymousString = "ANON " + userIDString
 	}
 	log.Println("INF HTTP > " + r.Method + " " + r.RequestURI + " [" + anonymousString + "]")
 }
@@ -79,24 +81,24 @@ func (a *AuthHandler) CreateRouteAuthHandler(h http.Handler) http.HandlerFunc {
 		var user interface{}
 
 		if a.IsAnonymousRoute(r) {
-			a.LogRoute(r, true)
+			a.LogRoute(r, 0, false)
 			h.ServeHTTP(w, r)
 			return
 		}
 
 		if userID, e = GetUserIDFromAuthHeader(r); e != nil {
-			a.LogRoute(r, false)
+			a.LogRoute(r, 0, false)
 			Unauthorized(r, w)
 			return
 		}
 
 		if user, e = a.authCallback(userID); e != nil {
-			a.LogRoute(r, false)
+			a.LogRoute(r, -1, false)
 			Unauthorized(r, w)
 			return
 		}
 
-		a.LogRoute(r, false)
+		a.LogRoute(r, userID, false)
 
 		// add the user object to the global context for this request
 		h.ServeHTTP(
