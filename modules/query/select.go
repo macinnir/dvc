@@ -125,7 +125,6 @@ func (s *SelectQuery) ToSQL() (sql string, args []interface{}) {
 
 	escapedFields := []string{}
 	for _, field := range fields {
-		fmt.Println(field.Name)
 		escapedFields = append(escapedFields, escapeField(field.Name))
 	}
 
