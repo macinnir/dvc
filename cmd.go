@@ -3,12 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
 	"os"
 	"path"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	"github.com/macinnir/dvc/modules/compare"
 
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
@@ -565,6 +566,10 @@ func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
 		ManyToOne: map[string]string{},
 	}
 	_, e = toml.DecodeFile(configFilePath, config)
+
+	if e != nil {
+		return
+	}
 
 	if len(config.OneToMany) > 0 {
 
