@@ -119,8 +119,6 @@ func (s *SelectQuery) OrderBy(fieldName string, orderByDir OrderByDir) *SelectQu
 // ToSQL builds a sql select statement
 func (s *SelectQuery) ToSQL() (sql string, args []interface{}) {
 
-	args = []interface{}{}
-
 	fields := s.Object.GetFieldsOrdered()
 
 	escapedFields := []string{}
@@ -128,39 +126,22 @@ func (s *SelectQuery) ToSQL() (sql string, args []interface{}) {
 		escapedFields = append(escapedFields, escapeField(field.Name))
 	}
 
-	wheres := []string{}
-
-	if len(s.where) > 0 {
-		for _, where := range s.where {
-			whereSQL, whereArgs := where.ToSQL()
-			wheres = append(wheres, whereSQL)
-			if whereArgs != nil {
-				for _, whereArg := range whereArgs {
-					args = append(args, whereArg)
-				}
-			}
-		}
-	}
-
-	where := ""
-	if len(wheres) > 0 {
-		where = "WHERE " + strings.Join(wheres, " ") + " "
-	}
+	sql, args = buildWhereClauseString(s.where)
 
 	if s.orderBy != nil && len(s.orderBy) > 0 {
-		where += "ORDER BY "
+		sql += "ORDER BY "
 		orderBys := []string{}
 		for _, orderBy := range s.orderBy {
 			orderBySQL, _ := orderBy.ToSQL()
 			orderBys = append(orderBys, orderBySQL)
 		}
-		where += strings.Join(orderBys, ", ") + " "
+		sql += strings.Join(orderBys, ", ") + " "
 	}
 
 	if s.limit != nil {
-		where += "LIMIT "
+		sql += "LIMIT "
 		limitSQL, limitArgs := s.limit.ToSQL()
-		where += limitSQL
+		sql += limitSQL
 		for _, limitArg := range limitArgs {
 			args = append(args, limitArg)
 		}
@@ -171,7 +152,7 @@ func (s *SelectQuery) ToSQL() (sql string, args []interface{}) {
 		distinct = " DISTINCT "
 	}
 
-	sql = fmt.Sprintf("SELECT%s%s FROM %s %s", distinct, strings.Join(escapedFields, ","), escapeField(s.Object.GetName()), where)
+	sql = fmt.Sprintf("SELECT%s%s FROM %s %s", distinct, strings.Join(escapedFields, ","), escapeField(s.Object.GetName()), sql)
 
 	log.Printf("INF SQL: %s -- %v\n", sql, args)
 	return

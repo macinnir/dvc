@@ -351,6 +351,8 @@ func (c *Cmd) CommandGen(args []string) {
 
 	argLen := len(args)
 	n := 0
+
+	// dvc gen models -c
 	for n < argLen {
 		switch args[n] {
 		case "-c":

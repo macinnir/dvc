@@ -41,3 +41,18 @@ func TestEscapeField(t *testing.T) {
 	result := escapeField(field)
 	assert.Equal(t, "`a`", result)
 }
+
+func TestBuildWhereClauseString_ShouldReturnEmpty(t *testing.T) {
+	var parts []IQueryPart
+	sql, args := buildWhereClauseString(parts)
+	assert.Empty(t, sql)
+	assert.Empty(t, args)
+}
+
+func TestBuildWhereClauseString_ShouldReturnSimpleWhereClauseAndArgs(t *testing.T) {
+	var parts []IQueryPart
+	parts = append(parts, Equals{"a": 1})
+	sql, args := buildWhereClauseString(parts)
+	assert.Equal(t, "WHERE `a` = ? ", sql)
+	assert.Equal(t, args[0], 1)
+}

@@ -5,26 +5,27 @@ import (
 	"log"
 )
 
-// Count initiates a count statement
-// Count(DomainObject)
-func Count() *CountQuery {
-	s := &CountQuery{}
+// Max initiates a count statement
+// Count(fieldName string)
+func Max(fieldName string) *MaxQuery {
+	s := &MaxQuery{fieldName: fieldName}
 	return s
 }
 
-// CountQuery is the containing struct for functionality to build count statements on domain objects
-type CountQuery struct {
-	Object DomainObject
-	where  []IQueryPart
+// MaxQuery is the containing struct for functionality to build count statements on domain objects
+type MaxQuery struct {
+	fieldName string
+	Object    DomainObject
+	where     []IQueryPart
 }
 
 // Where is sugar for the And(queryParts...) method
-func (s *CountQuery) Where(queryParts ...IQueryPart) *CountQuery {
+func (s *MaxQuery) Where(queryParts ...IQueryPart) *MaxQuery {
 	return s.And(queryParts...)
 }
 
 // And adds an "and group" to the query
-func (s *CountQuery) And(queryParts ...IQueryPart) *CountQuery {
+func (s *MaxQuery) And(queryParts ...IQueryPart) *MaxQuery {
 
 	l := len(queryParts)
 
@@ -49,7 +50,7 @@ func (s *CountQuery) And(queryParts ...IQueryPart) *CountQuery {
 }
 
 // Or adds an "or group" to the select query
-func (s *CountQuery) Or(queryParts ...IQueryPart) *CountQuery {
+func (s *MaxQuery) Or(queryParts ...IQueryPart) *MaxQuery {
 
 	l := len(queryParts)
 
@@ -74,11 +75,11 @@ func (s *CountQuery) Or(queryParts ...IQueryPart) *CountQuery {
 }
 
 // ToSQL builds a sql select statement
-func (s *CountQuery) ToSQL() (sql string, args []interface{}) {
+func (s *MaxQuery) ToSQL() (sql string, args []interface{}) {
 
 	sql, args = buildWhereClauseString(s.where)
 
-	sql = fmt.Sprintf("SELECT COUNT(*) FROM %s %s", escapeField(s.Object.GetName()), sql)
+	sql = fmt.Sprintf("SELECT MAX(%s) FROM %s %s", escapeField(s.fieldName), escapeField(s.Object.GetName()), sql)
 
 	log.Printf("INF SQL: %s -- %v\n", sql, args)
 	return
