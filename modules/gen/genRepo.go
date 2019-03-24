@@ -99,6 +99,7 @@ type I{{.Name}}Repo interface {
 	HardDelete(model *models.{{.Name}}) (e error) 
 	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
 	Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) 
+	Count(q *query.CountQuery) (count int64, e error) 
 }
 {{end}}
 `
@@ -323,6 +324,12 @@ func (r {{.Name}}Repo) GetByID({{.PrimaryKey}} {{.PrimaryKeyType}})(model *model
 func (r *{{.Name}}Repo) Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) {
 	log.Println("INF {{.Name}}Repo.GetMany")
 	return r.dal.{{.Name}}.Run(q)
+}
+
+// Count runs the count query (from Count()) for {{.Name}} objects
+func (r *{{.Name}}Repo) Count(q *query.CountQuery) (int64, error) {
+	log.Println("INF {{.Name}}Repo.Count")
+	return r.dal.{{.Name}}.Count(q)
 }
 
 // #genEnd

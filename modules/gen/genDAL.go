@@ -272,6 +272,23 @@ func (r *{{.Table.Name}}Dal) Run(q *query.SelectQuery) (collection []*models.{{.
 
 	return
 }
+
+func (r *{{.Table.Name}}Dal) Count(q *query.CountQuery) (count int64, e error) {
+
+	count = 0
+	q.Object = models.New{{.Table.Name}}()
+	sql, args := q.ToSQL()
+
+	e = r.db.Get(&count, sql, args...)
+
+	if e != nil {
+		log.Printf("ERR {{.Table.Name}}Dal.Count > %s", e.Error())
+	} else {
+		log.Println("INF {{.Table.Name}}Dal.Count")
+	}
+
+	return
+}
 // #genEnd
 {{.FileFoot}}`
 
@@ -389,6 +406,7 @@ type I{{.Name}}Dal interface {
 	HardDelete(model *models.{{.Name}}) (e error) 
 	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
 	Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) 
+	Count(q *query.CountQuery) (count int64, e error) 
 }
 {{end}}
 `
