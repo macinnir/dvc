@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type contextKey int
@@ -52,7 +53,14 @@ func (a *AuthHandler) IsAnonymousRoute(r *http.Request) bool {
 		return true
 	}
 
-	fullRouteName := r.Method + "_" + r.RequestURI
+	if strings.Contains(requestPath, "?") {
+		requestPathParts := strings.Split(requestPath, "?")
+		requestPath = requestPathParts[0]
+	}
+
+	fullRouteName := r.Method + "_" + requestPath
+
+	// log.Printf("FullRouteName: %s\n", r.Method+"_"+requestPath)
 
 	_, ok := a.anonymousRoutes[fullRouteName]
 	return ok
