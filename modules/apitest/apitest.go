@@ -13,15 +13,6 @@ import (
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz_1234567890")
 
-// RandString returns a random string based on a set of runes
-func RandString(length int) string {
-	b := make([]rune, length)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
-
 // APITest tests your API
 type APITest struct {
 	url        string
@@ -42,6 +33,36 @@ func NewAPITest(t *testing.T, url string) *APITest {
 	}
 }
 
+// RandString returns a random string based on a set of runes
+func (a *APITest) RandString(length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
+// SetRandString generates a random string of length `length`,
+// sets it to the string cache and returns the string
+func (a *APITest) SetRandString(name string, length int) string {
+	randString := a.RandString(length)
+	a.SetString(name, randString)
+	return randString
+}
+
+// RandInt generates a random number where 0 <= n <= max
+func (a *APITest) RandInt(max int) int64 {
+	return int64(rand.Intn(max))
+}
+
+// SetRandInt generates a random number where 0 <= n <= max,
+// sets it to the number cache and returns the number
+func (a *APITest) SetRandInt(name string, max int) int64 {
+	randNum := a.RandInt(max)
+	a.SetInt(name, randNum)
+	return randNum
+}
+
 // SetAuthKey sets the auth key
 func (a *APITest) SetAuthKey(authKey string) {
 	log.Printf("Setting auth key to %s", authKey)
@@ -54,17 +75,12 @@ func (a *APITest) GetAuthKey() string {
 }
 
 // SetStringVal sets a string val identified by `name`
-func (a *APITest) SetStringVal(name string, v string) {
+func (a *APITest) SetString(name string, v string) {
 	a.stringVals[name] = v
 }
 
-// SetIntVal sets an int value identified by `name`
-func (a *APITest) SetIntVal(name string, v int64) {
-	a.intVals[name] = v
-}
-
-// GetStringVal gets the string value identified by `name`
-func (a *APITest) GetStringVal(name string) string {
+// GetString gets the string value identified by `name`
+func (a *APITest) GetString(name string) string {
 	val, ok := a.stringVals[name]
 	if !ok {
 		return ""
@@ -73,14 +89,47 @@ func (a *APITest) GetStringVal(name string) string {
 	return val
 }
 
-// GetIntVal gets the int value identified by `name`
-func (a *APITest) GetIntVal(name string) int64 {
+// SetInt sets an int value identified by `name`
+func (a *APITest) SetInt(name string, v int64) {
+	a.intVals[name] = v
+}
+
+// GetInt gets the int value identified by `name`
+func (a *APITest) GetInt(name string) int64 {
 	val, ok := a.intVals[name]
 	if !ok {
 		return -1
 	}
 
 	return val
+}
+
+// Increment sets an integer in the number cache if it doesn't exist
+// And then increments it by 1
+// The resulting value is returned
+func (a *APITest) Increment(name string) int64 {
+	val, ok := a.intVals[name]
+	if !ok {
+		a.intVals[name] = 1
+	} else {
+		a.intVals[name] = val + 1
+	}
+
+	return a.intVals[name]
+}
+
+// Decrement sets an integer in the number cache if it doesn't exist
+// And then decrements it by 1
+// The resulting value is returned
+func (a *APITest) Decrement(name string) int64 {
+	val, ok := a.intVals[name]
+	if !ok {
+		a.intVals[name] = 0
+	} else {
+		a.intVals[name] = val - 1
+	}
+
+	return a.intVals[name]
 }
 
 // Post does a post request
@@ -107,18 +156,22 @@ func (a *APITest) Post(path string, body interface{}, authenticated bool) (respo
 
 	request.Header.Set("Content-Type", "application/json")
 	if authenticated {
-		request.Header.Set("Authorization", "Bearer "+a.authKey)
+		request.Header.Set("Authorization", a.authKey)
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
-	statusCode = response.StatusCode
 
 	// assert.NotNil(t, e)
 	if e != nil {
-		log.Println(response.Status)
-		a.t.Fatal(e)
+		log.Println("#### Hello?")
+		log.Println(e.Error())
+		// log.Println(response.Status)
+		a.t.Fatal(e.Error())
 		return
 	}
+
+	statusCode = response.StatusCode
+
 	defer response.Body.Close()
 	responseBody, _ = ioutil.ReadAll(response.Body)
 	log.Printf("RESPONSE: %d %s", statusCode, responseBody)
@@ -150,7 +203,7 @@ func (a *APITest) Put(path string, body interface{}, authenticated bool) (respon
 
 	request.Header.Set("Content-Type", "application/json")
 	if authenticated {
-		request.Header.Set("Authorization", "Bearer "+a.authKey)
+		request.Header.Set("Authorization", a.authKey)
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
@@ -221,7 +274,7 @@ func (a *APITest) Delete(path string, withAuth bool) (responseBody []byte, statu
 
 	request.Header.Set("Content-Type", "application/json")
 	if withAuth {
-		request.Header.Set("Authorization", "Bearer "+a.authKey)
+		request.Header.Set("Authorization", a.authKey)
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
