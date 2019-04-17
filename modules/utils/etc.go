@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 // CheckErr checks if an error is nil, and panics if it isn't
 func CheckErr(err error) {
 	if err != nil {
@@ -57,14 +61,14 @@ func DateOnlyStringNow() string {
 // 	return self
 // }
 
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+var characterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 // Random generates a random string of n length
 func Random(n int) string {
 	rand.Seed(time.Now().UnixNano())
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		b[i] = characterRunes[rand.Intn(len(characterRunes))]
 	}
 	return string(b)
 }
