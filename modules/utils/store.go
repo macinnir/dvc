@@ -187,3 +187,58 @@ func (s *Store) Keys(search string) (keys []string) {
 
 	return
 }
+
+type MockStore struct {
+}
+
+func (s *MockStore) Connect(host string, password string, db int) {
+
+}
+
+func (s *MockStore) Subscribe(channelNames ...string) {
+
+}
+
+func (s *MockStore) Set(key string, content interface{}) {
+
+}
+
+func (s *MockStore) Keys(search string) (keys []string) {
+	return []string{}
+}
+
+func (s *MockStore) SetString(key string, content string) {
+
+}
+
+func (s *MockStore) Delete(key string) {
+
+}
+
+func (s *MockStore) Publish(channel string, content interface{}) {
+
+}
+
+func (s *MockStore) PublishEvent(eventType string, recipient int64, obj interface{}) {
+
+}
+
+func (s *MockStore) PublishString(channel string, content string) {
+
+}
+
+func (s *MockStore) ReceiveMessage() *redis.Message {
+	return &redis.Message{}
+}
+
+func (s *MockStore) Ping() string {
+	return "PONG"
+}
+
+func (s *MockStore) Close() {
+
+}
+
+func (s *MockStore) Get(key string, obj interface{}) (e error) {
+	return nil
+}
