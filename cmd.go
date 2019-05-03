@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -161,14 +163,43 @@ func connectorFactory(databaseType string, config *lib.Config) (connector lib.IC
 	return
 }
 
+// CommandInit creates a default dvc.toml file in the CWD
 func (c *Cmd) CommandInit(args []string) {
 
 	var e error
 
 	if _, e = os.Stat("./dvc.toml"); os.IsNotExist(e) {
 
-		content := "databaseType = \"mysql\"\nbasePackage = \"myPackage\"\n\nenums = []\n\n"
-		content += "[connection]\nhost = \"\"\ndatabaseName = \"\"\nusername = \"\"\npassword = \"\"\n\n"
+		reader := bufio.NewReader(os.Stdin)
+
+		// https://tutorialedge.net/golang/reading-console-input-golang/
+		// BasePackage
+		fmt.Print("> Base Package:")
+		basePackage, _ := reader.ReadString('\n')
+		basePackage = strings.Replace(basePackage, "\n", "", -1)
+
+		// Host
+		fmt.Print("> Database Host:")
+		host, _ := reader.ReadString('\n')
+		host = strings.Replace(host, "\n", "", -1)
+
+		// databaseName
+		fmt.Print("> Database Name:")
+		databaseName, _ := reader.ReadString('\n')
+		databaseName = strings.Replace(databaseName, "\n", "", -1)
+
+		// databaseUser
+		fmt.Print("> Database User:")
+		databaseUser, _ := reader.ReadString('\n')
+		databaseUser = strings.Replace(databaseUser, "\n", "", -1)
+
+		// databasePass
+		fmt.Print("> Database Password:")
+		databasePass, _ := reader.ReadString('\n')
+		databasePass = strings.Replace(databasePass, "\n", "", -1)
+
+		content := "databaseType = \"mysql\"\nbasePackage = \"" + basePackage + "\"\n\nenums = []\n\n"
+		content += "[connection]\nhost = \"" + host + "\"\ndatabaseName = \"" + databaseName + "\"\nusername = \"" + databaseUser + "\"\npassword = \"" + databasePass + "\"\n\n"
 		content += "[packages]\ncache = \"myPackage/cache\"\nmodels = \"myPackage/models\"\nschema = \"myPackage/schema\"\nrepos = \"myPackage/repos\"\n\n"
 		content += "[dirs]\nrepos = \"repos\"\ncache = \"cache\"\nmodels = \"models\"\nschema = \"schema\"\ntypescript = \"ts\""
 
@@ -180,7 +211,8 @@ func (c *Cmd) CommandInit(args []string) {
 
 }
 
-// CommandImport is the `import` command
+// CommandImport fetches the sql schema from the target database (specified in dvc.toml)
+// and from that generates the json representation at `[schema name].schema.json`
 func (c *Cmd) CommandImport(args []string) {
 
 	var e error
@@ -194,6 +226,7 @@ func (c *Cmd) CommandImport(args []string) {
 	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.Config.Connection.Host, c.Config.Connection.DatabaseName, c.Config.Connection.DatabaseName+".schema.json")
 }
 
+// CommandExport export SQL create statements to standard out
 func (c *Cmd) CommandExport(args []string) {
 	var e error
 	var sql string

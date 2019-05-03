@@ -3,47 +3,63 @@ package apitest
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"testing"
 )
 
+// Requests sends network requests using `profile` as context
+type Requests struct {
+	profile *UserProfile
+	logger  *Logger
+	t       *testing.T
+}
+
+// NewRequests returns a new Requests instance
+func NewRequests(profile *UserProfile, logger *Logger, t *testing.T) *Requests {
+	return &Requests{profile, logger, t}
+}
+
 // Post does a post request
-func (a *APITest) Post(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
+func (r *Requests) Post(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
 
 	var bodyBytes []byte
 	var e error
 
 	if bodyBytes, e = json.Marshal(body); e != nil {
-		a.t.Fatal(e)
+		r.logger.Error(e.Error())
 		return
 	}
 
 	var request *http.Request
 	var response *http.Response
 
-	profile := a.GetActiveProfile()
+	requestURL := r.profile.baseURL + "/" + path
 
-	requestURL := a.baseURL + "/" + path
-	log.Printf("REQUEST (Profile %d: %s): POST %s \n>> %s", profile.id, profile.name, requestURL, string(bodyBytes))
+	r.logger.Info(fmt.Sprintf("REQUEST (Profile %d: %s): POST %s", r.profile.ID, r.profile.Name, requestURL))
+	r.logger.Debug(fmt.Sprintf("%s", string(bodyBytes)))
+
 	request, e = http.NewRequest("POST", requestURL, bytes.NewBuffer(bodyBytes))
 	if e != nil {
-		a.t.Fatal(e)
+		r.logger.Error(e.Error())
+		r.t.Fatal(e.Error())
 		return
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 	if authenticated {
-		request.Header.Set("Authorization", profile.authKey)
+		r.logger.Debug(fmt.Sprintf("AuthKey: %s", r.profile.GetString(AuthKey)))
+		request.Header.Set("Authorization", r.profile.GetString(AuthKey))
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
 
 	// assert.NotNil(t, e)
 	if e != nil {
-		log.Println(e.Error())
-		// log.Println(response.Status)
-		a.t.Fatal(e.Error())
+		r.logger.Error(e.Error())
+		r.t.Fatal(e.Error())
 		return
 	}
 
@@ -51,38 +67,41 @@ func (a *APITest) Post(path string, body interface{}, authenticated bool) (respo
 
 	defer response.Body.Close()
 	responseBody, _ = ioutil.ReadAll(response.Body)
-	log.Printf("RESPONSE: %d %s", statusCode, responseBody)
+	r.logger.Info(fmt.Sprintf("RESPONSE: %d", statusCode))
+	r.logger.Debug(fmt.Sprintf("%s", responseBody))
 
 	return
 }
 
 // Put does a PUT request
-func (a *APITest) Put(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
+func (r *Requests) Put(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
 
 	var bodyBytes []byte
 	var e error
 
 	if bodyBytes, e = json.Marshal(body); e != nil {
-		a.t.Fatal(e)
+		r.t.Fatal(e)
 		return
 	}
 
 	var request *http.Request
 	var response *http.Response
 
-	requestURL := a.baseURL + "/" + path
+	requestURL := r.profile.baseURL + "/" + path
 
-	profile := a.GetActiveProfile()
-	log.Printf("REQUEST (Profile %d: %s): PUT %s \n>> %s", profile.id, profile.name, requestURL, string(bodyBytes))
+	r.logger.Info(fmt.Sprintf("REQUEST (Profile %d: %s): PUT %s", r.profile.ID, r.profile.Name, requestURL))
+	r.logger.Debug(fmt.Sprintf("%s", string(bodyBytes)))
+
 	request, e = http.NewRequest("PUT", requestURL, bytes.NewBuffer(bodyBytes))
 	if e != nil {
-		a.t.Fatal(e)
+		r.t.Fatal(e)
 		return
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 	if authenticated {
-		request.Header.Set("Authorization", profile.authKey)
+		r.logger.Debug(fmt.Sprintf("AuthKey: %s", r.profile.GetString(AuthKey)))
+		request.Header.Set("Authorization", r.profile.GetString(AuthKey))
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
@@ -90,37 +109,37 @@ func (a *APITest) Put(path string, body interface{}, authenticated bool) (respon
 
 	// assert.NotNil(t, e)
 	if e != nil {
-		log.Println(response.Status)
-		a.t.Fatal(e)
+		r.logger.Info(response.Status)
+		r.t.Fatal(e)
 		return
 	}
 	defer response.Body.Close()
 	responseBody, _ = ioutil.ReadAll(response.Body)
-	log.Printf("RESPONSE: %d %s", statusCode, responseBody)
+	r.logger.Info(fmt.Sprintf("RESPONSE: %d", statusCode))
+	r.logger.Debug(fmt.Sprintf("%s", responseBody))
 	return
 }
 
 // Get does a GET request
-func (a *APITest) Get(path string, withAuth bool) (responseBody []byte, statusCode int) {
+func (r *Requests) Get(path string, withAuth bool) (responseBody []byte, statusCode int) {
 
 	var request *http.Request
 	var response *http.Response
 	var e error
 
-	requestURL := a.baseURL + "/" + path
+	requestURL := r.profile.baseURL + "/" + path
 
-	profile := a.GetActiveProfile()
-	log.Printf("REQUEST (Profile %d: %s): GET %s", profile.id, profile.name, requestURL)
-
+	r.logger.Info(fmt.Sprintf("REQUEST (Profile %d: %s): GET %s", r.profile.ID, r.profile.Name, requestURL))
 	request, e = http.NewRequest("GET", requestURL, nil)
 	if e != nil {
-		a.t.Fatal(e)
+		r.t.Fatal(e)
 		return
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 	if withAuth {
-		request.Header.Set("Authorization", profile.authKey)
+		r.logger.Debug(fmt.Sprintf("AuthKey: %s", r.profile.GetString(AuthKey)))
+		request.Header.Set("Authorization", r.profile.GetString(AuthKey))
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
@@ -128,36 +147,37 @@ func (a *APITest) Get(path string, withAuth bool) (responseBody []byte, statusCo
 
 	// assert.NotNil(t, e)
 	if e != nil {
-		log.Println(response.Status)
-		a.t.Fatal(e)
+		r.logger.Error(response.Status)
+		r.t.Fatal(e)
 		return
 	}
 	defer response.Body.Close()
 	responseBody, _ = ioutil.ReadAll(response.Body)
-	log.Printf("RESPONSE: %d %s", statusCode, responseBody)
+	r.logger.Info(fmt.Sprintf("RESPONSE: %d", statusCode))
+	r.logger.Debug(fmt.Sprintf("%s", responseBody))
 
 	return
 }
 
 // Delete does a DELETE request
-func (a *APITest) Delete(path string, withAuth bool) (responseBody []byte, statusCode int) {
+func (r *Requests) Delete(path string, withAuth bool) (responseBody []byte, statusCode int) {
 
 	var request *http.Request
 	var response *http.Response
 	var e error
 
-	requestURL := a.baseURL + "/" + path
-	profile := a.GetActiveProfile()
-	log.Printf("REQUEST (Profile %d: %s): DELETE %s", profile.id, profile.name, requestURL)
+	requestURL := r.profile.baseURL + "/" + path
+	r.logger.Info(fmt.Sprintf("REQUEST (Profile %d: %s): DELETE %s", r.profile.ID, r.profile.Name, requestURL))
 	request, e = http.NewRequest("DELETE", requestURL, nil)
 	if e != nil {
-		a.t.Fatal(e)
+		r.t.Fatal(e)
 		return
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 	if withAuth {
-		request.Header.Set("Authorization", profile.authKey)
+		r.logger.Debug(fmt.Sprintf("AuthKey: %s", r.profile.GetString(AuthKey)))
+		request.Header.Set("Authorization", r.profile.GetString(AuthKey))
 	}
 	client := &http.Client{}
 	response, e = client.Do(request)
@@ -166,12 +186,13 @@ func (a *APITest) Delete(path string, withAuth bool) (responseBody []byte, statu
 	// assert.NotNil(t, e)
 	if e != nil {
 		log.Println(response.Status)
-		a.t.Fatal(e)
+		r.t.Fatal(e)
 		return
 	}
 	defer response.Body.Close()
 	responseBody, _ = ioutil.ReadAll(response.Body)
-	log.Printf("RESPONSE: %d %s", statusCode, responseBody)
+	r.logger.Info(fmt.Sprintf("RESPONSE: %d", statusCode))
+	r.logger.Debug(fmt.Sprintf("%s", responseBody))
 
 	return
 }
