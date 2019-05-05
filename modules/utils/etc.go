@@ -28,6 +28,16 @@ func RequireFile(fileName string) {
 	}
 }
 
+// DateTimeParse parses a date time string into a time object
+func DateTimeParse(dateString string) (time.Time, error) {
+	return time.Parse("2006-01-02 15:04:05", dateString)
+}
+
+// DateParse parses a date string into a time object
+func DateParse(dateString string) (time.Time, error) {
+	return time.Parse("2006-01-02", dateString)
+}
+
 // DateString returns an ISO 8601 string (for mysql datetime)
 func DateString(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")

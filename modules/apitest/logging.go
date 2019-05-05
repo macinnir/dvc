@@ -26,16 +26,21 @@ var white func(a ...interface{}) string
 var heading func(a ...interface{}) string
 
 type Logger struct {
-	logLevel     LogLevel
-	headingCount int
+	logLevel    LogLevel
+	indentCount int
 }
 
 func (l *Logger) Indent() {
-	l.headingCount++
+	l.indentCount++
 }
 
 func (l *Logger) UnIndent() {
-	l.headingCount--
+	if l.indentCount > 0 {
+		l.indentCount = l.indentCount - 1
+	}
+
+	// l.indentCount = 0
+	// fmt.Printf("Unindent!!!! %d", l.indentCount)
 }
 
 func InitLogger(logLevel LogLevel) *Logger {
@@ -53,17 +58,12 @@ func InitLogger(logLevel LogLevel) *Logger {
 
 func (l *Logger) Heading(message string) {
 	l.Log(heading(message))
-	l.headingCount++
+	l.Indent()
 }
 
-func (l *Logger) FinishHeading() {
-	if l.headingCount > 0 {
-		l.headingCount--
-	}
-}
-
+// Log writes a log message to stdout
 func (l *Logger) Log(message string) {
-	message = strings.Repeat("\t", l.headingCount) + message
+	message = strings.Repeat(" ", (l.indentCount*2)) + message
 	log.Println(message)
 }
 

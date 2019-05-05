@@ -29,19 +29,17 @@ const (
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
 	CommandGenApp        Command = "app"
-	CommandGenApi        Command = "api"
-	CommandGenSchema     Command = "schema"
+	CommandGenAPI        Command = "api"
 	CommandGenDal        Command = "dal"
 	CommandGenRepos      Command = "repos"
-	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
 	CommandGenModel      Command = "model"
 	CommandGenServices   Command = "services"
-	CommandGenAll        Command = "all"
 	CommandGenTypescript Command = "typescript"
 	CommandCompare       Command = "compare"
 	CommandHelp          Command = "help"
 	CommandRefresh       Command = "refresh"
+	CommandInstall       Command = "install"
 )
 
 // Cmd is a container for handling commands
@@ -119,6 +117,13 @@ func (c *Cmd) Main(args []string) (err error) {
 		c.CommandGen([]string{"dal"})
 		c.CommandGen([]string{"repos"})
 		c.CommandGen([]string{"services"})
+	case CommandInstall:
+		c.CommandImport(args)
+		c.CommandGen([]string{"app"})
+		c.CommandGen([]string{"models"})
+		c.CommandGen([]string{"dal"})
+		c.CommandGen([]string{"repos"})
+		c.CommandGen([]string{"services"})
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandExport:
@@ -178,6 +183,10 @@ func (c *Cmd) CommandInit(args []string) {
 		basePackage, _ := reader.ReadString('\n')
 		basePackage = strings.Replace(basePackage, "\n", "", -1)
 
+		fmt.Print("> Base directory (leave blank for current):")
+		baseDir, _ := reader.ReadString('\n')
+		baseDir = strings.Replace(baseDir, "\n", "", -1)
+
 		// Host
 		fmt.Print("> Database Host:")
 		host, _ := reader.ReadString('\n')
@@ -200,8 +209,39 @@ func (c *Cmd) CommandInit(args []string) {
 
 		content := "databaseType = \"mysql\"\nbasePackage = \"" + basePackage + "\"\n\nenums = []\n\n"
 		content += "[connection]\nhost = \"" + host + "\"\ndatabaseName = \"" + databaseName + "\"\nusername = \"" + databaseUser + "\"\npassword = \"" + databasePass + "\"\n\n"
-		content += "[packages]\ncache = \"myPackage/cache\"\nmodels = \"myPackage/models\"\nschema = \"myPackage/schema\"\nrepos = \"myPackage/repos\"\n\n"
-		content += "[dirs]\nrepos = \"repos\"\ncache = \"cache\"\nmodels = \"models\"\nschema = \"schema\"\ntypescript = \"ts\""
+
+		packages := []string{
+			"repos",
+			"models",
+			"typescript",
+			"services",
+			"dal",
+			"definitions",
+		}
+
+		content += "[packages]\n"
+		for _, p := range packages {
+			if p == "typescript" {
+				continue
+			}
+
+			content += fmt.Sprintf("%s = \"%s\"\n", p, path.Join(basePackage, p))
+		}
+
+		// content += "[packages]\ncache = \"myPackage/cache\"\nmodels = \"myPackage/models\"\nschema = \"myPackage/schema\"\nrepos = \"myPackage/repos\"\n\n"
+
+		content += "[dirs]\n"
+
+		for _, p := range packages {
+
+			if baseDir != "" {
+				content += fmt.Sprintf("%s = \"%s\"\n", p, path.Join(baseDir, p))
+			} else {
+				content += fmt.Sprintf("%s = \"%s\"\n", p, p)
+			}
+		}
+
+		// content += "[dirs]\nrepos = \"repos\"\ncache = \"cache\"\nmodels = \"models\"\nschema = \"schema\"\ntypescript = \"ts\""
 
 		ioutil.WriteFile("./dvc.toml", []byte(content), 0644)
 
@@ -363,8 +403,6 @@ func writeSQLToLog(sql string) {
 
 }
 
-// Write SQL to STDOUT
-
 // CommandGen handles the `gen` command
 func (c *Cmd) CommandGen(args []string) {
 
@@ -418,19 +456,19 @@ func (c *Cmd) CommandGen(args []string) {
 	}
 
 	switch subCmd {
-	case CommandGenSchema:
-		e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-	case CommandGenCaches:
-		fmt.Println("CommandGenCaches")
-		e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+	// case CommandGenSchema:
+	// 	e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
+	// 	if e != nil {
+	// 		lib.Error(e.Error(), c.Options)
+	// 		os.Exit(1)
+	// 	}
+	// case CommandGenCaches:
+	// 	fmt.Println("CommandGenCaches")
+	// 	e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
+	// 	if e != nil {
+	// 		lib.Error(e.Error(), c.Options)
+	// 		os.Exit(1)
+	// 	}
 	case CommandGenRepos:
 
 		if c.Options&lib.OptClean == lib.OptClean {
@@ -493,23 +531,28 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenModels:
 
+		modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
 		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoModels(c.Config.Dirs.Models, database)
+			g.CleanGoModels(modelsDir, database)
 		}
 
 		for _, table := range database.Tables {
-			e = g.GenerateGoModel(path.Join(c.Config.Dirs.Definitions, "models"), table)
+			e = g.GenerateGoModel(modelsDir, table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
 			}
 		}
 
-		if _, e = os.Stat(c.Config.Dirs.Models + "/Config.go"); os.IsNotExist(e) {
-			g.GenerateDefaultConfigModelFile(c.Config.Dirs.Models)
+		// Config.go
+		if _, e = os.Stat(path.Join(modelsDir, "Config.go")); os.IsNotExist(e) {
+			lib.Debugf("Generating default Config.go file at %s", c.Options, path.Join(modelsDir, "Config.go"))
+			g.GenerateDefaultConfigModelFile(modelsDir)
 		}
 
+		// config.json
 		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
+			lib.Debugf("Generating default config.json file at %s", c.Options, path.Join(cwd, "config.json"))
 			g.GenerateDefaultConfigJsonFile(cwd)
 		}
 
@@ -519,7 +562,8 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenApp:
 		g.GenerateGoApp(cwd)
-	case CommandGenApi:
+
+	case CommandGenAPI:
 		g.GenerateGoAPI(cwd)
 
 	case "ts":

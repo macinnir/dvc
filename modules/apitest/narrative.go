@@ -1,36 +1,77 @@
 package apitest
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 /**
  * Logging Stories
  */
 
-// Story starts and stops a story
-func (a *APITest) Story(title string, fn func()) {
-	a.StartStory(title)
-	fn()
-	a.FinishStory()
+func (a *APITest) incrementStory() {
+	a.storyCounters[a.storyLevel]++
 }
 
-// StartStory starts a new story
-func (a *APITest) StartStory(title string) {
-	a.storyCount++
-	a.logger.Heading(fmt.Sprintf("%d. %s", a.storyCount, title))
+func (a *APITest) levelUp() {
+	if a.storyLevel == 0 {
+		return
+	}
+	a.storyLevel--
+	a.logger.UnIndent()
+
+	// for k, c := range a.storyCounters {
+	// 	if k <= a.storyLevel {
+	// 		continue
+	// 	}
+
+	// 	a.storyCounters[]
+	// }
 }
 
-// FinishStory finishes a new story
-func (a *APITest) FinishStory() {
-	a.logger.FinishHeading()
-	a.subStoryCount = 0
-}
+func (a *APITest) levelDown() {
 
-func (a *APITest) StartSubStory(title string) {
-	a.subStoryCount++
-	a.logger.Log(fmt.Sprintf("%d.%d %s", a.storyCount, a.subStoryCount, title))
+	a.storyLevel++
+
+	if len(a.storyCounters) < (a.storyLevel + 1) {
+		a.storyCounters = append(a.storyCounters, 0)
+	}
+
+	a.storyCounters[a.storyLevel] = 0
 	a.logger.Indent()
 }
 
-func (a *APITest) FinishSubStory() {
-	a.logger.UnIndent()
+func (a *APITest) countTitle() string {
+	titleCounts := []string{}
+	for k, storyCount := range a.storyCounters {
+		if k > a.storyLevel {
+			break
+		}
+
+		titleCounts = append(titleCounts, fmt.Sprintf("%d", storyCount))
+	}
+
+	return strings.Join(titleCounts, ".")
+}
+
+// Start starts a new story
+func (a *APITest) Start(title string) {
+	a.incrementStory()
+	a.logger.Log(fmt.Sprintf("%s. %s", a.countTitle(), title))
+	a.levelDown()
+}
+
+func (a *APITest) Finish() {
+	a.levelUp()
+}
+
+// Note prints a string to log with an asterisk prefix
+func (a *APITest) Note(note string) {
+	a.logger.Log(fmt.Sprintf("* %s", note))
+}
+
+// Notef call Note() with formatting
+func (a *APITest) Notef(note string, args ...interface{}) {
+	note = fmt.Sprintf(note, args...)
+	a.logger.Log("* " + note)
 }

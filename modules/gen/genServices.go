@@ -17,6 +17,8 @@ import (
 //  2. A services definition file in the definitions directory
 func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir string) (e error) {
 
+	g.EnsureDir(servicesDir)
+
 	var data = struct {
 		BasePackage string
 		Imports     []string
@@ -25,16 +27,25 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 		BasePackage: g.Config.BasePackage,
 		Imports: []string{
 			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
-			fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage),
 			"github.com/macinnir/dvc/modules/utils",
 		},
 		Services: map[string][]string{},
 	}
 
+	definitionsPath := fmt.Sprintf("%s/viewmodels", definitionsDir)
+
+	if g.dirExists(definitionsPath) && !g.dirIsEmpty(definitionsPath) {
+		data.Imports = append(data.Imports, fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage))
+	}
+
+	// fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage),
+	// g.EnsureDir("definitions/viewmodels")
+
 	var serviceNames []string
 
 	serviceNames, e = g.getServiceNames(servicesDir)
 	if e != nil {
+		panic(e)
 		return
 	}
 
@@ -155,7 +166,6 @@ func Bootstrap(config *models.Config, repos *definitions.Repos, store utils.ISto
 // GetServiceNames gets a list of services in the services directory
 func (g *Gen) getServiceNames(dir string) (serviceNames []string, e error) {
 
-	fmt.Println("Gettings service names")
 	serviceNames = []string{}
 	dirFileNames := []string{}
 	var dirHandle *os.File

@@ -76,11 +76,6 @@ func (a *App) InitRepos() {
 	a.Repos = repos.Bootstrap(conn)
 }
 
-// // InitCache initializes the cache
-// func (a *App) InitCache() {
-// 	// a.Cache = cache.Bootstrap(a.Store, a.Schema.Schema)
-// }
-
 // InitStore initializes the redis store
 func (a *App) InitStore() {
 	a.Store = utils.NewStore(a.Config.RedisHost, a.Config.RedisPassword, int(a.Config.RedisDB))

@@ -2,6 +2,7 @@ package gen
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -19,8 +20,14 @@ type Gen struct {
 // EnsureDir creates a new dir if the dir is not found
 func (g *Gen) EnsureDir(dir string) (e error) {
 
+	lib.Debugf("Ensuring directory: %s", g.Options, dir)
+
 	if _, e = os.Stat(dir); os.IsNotExist(e) {
-		os.Mkdir(dir, 0777)
+		e = os.MkdirAll(dir, 0777)
+
+		if e != nil {
+			panic(e)
+		}
 	}
 	return
 }
@@ -48,6 +55,31 @@ func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
 	// e = cmd.Run()
 	// fmt.Printf("WriteCodeToFile: %s\n", e.Error())
 	return
+}
+
+func (g *Gen) dirExists(dirPath string) bool {
+	if _, e := os.Stat(dirPath); os.IsNotExist(e) {
+		return false
+	}
+
+	return true
+}
+
+func (g *Gen) dirIsEmpty(dirPath string) bool {
+
+	f, e := os.Open(dirPath)
+	if e != nil {
+		return false
+	}
+
+	defer f.Close()
+
+	_, e = f.Readdirnames(1)
+	if e == io.EOF {
+		return true
+	}
+
+	return false
 }
 
 func (g *Gen) fileExists(filePath string) bool {

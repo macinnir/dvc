@@ -27,22 +27,23 @@ type APITest struct {
 	// Unique key for the current testing session
 	sessionKey    string
 	logger        *Logger
-	storyCount    int
-	subStoryCount int
+	storyLevel    int
+	storyCounters []int
 }
 
 // NewAPITest returns a new APITest instance
 func NewAPITest(t *testing.T, baseURL string, logLevel LogLevel) *APITest {
 
 	apiTest := &APITest{
-		t:            t,
-		baseURL:      baseURL,
-		userProfiles: map[string]*UserProfile{},
-		stringVals:   map[string]string{},
-		intVals:      map[string]int64{},
-		objectVals:   map[string]interface{}{},
-		logger:       InitLogger(logLevel),
-		storyCount:   0,
+		t:             t,
+		baseURL:       baseURL,
+		userProfiles:  map[string]*UserProfile{},
+		stringVals:    map[string]string{},
+		intVals:       map[string]int64{},
+		objectVals:    map[string]interface{}{},
+		logger:        InitLogger(logLevel),
+		storyLevel:    0,
+		storyCounters: []int{0},
 	}
 
 	apiTest.init()
