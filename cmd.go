@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/macinnir/dvc/modules/compare"
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
+	"github.com/macinnir/dvc/modules/compare"
 
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
@@ -26,19 +29,17 @@ const (
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
 	CommandGenApp        Command = "app"
-	CommandGenApi        Command = "api"
-	CommandGenSchema     Command = "schema"
+	CommandGenAPI        Command = "api"
 	CommandGenDal        Command = "dal"
 	CommandGenRepos      Command = "repos"
-	CommandGenCaches     Command = "cache"
 	CommandGenModels     Command = "models"
 	CommandGenModel      Command = "model"
 	CommandGenServices   Command = "services"
-	CommandGenAll        Command = "all"
 	CommandGenTypescript Command = "typescript"
 	CommandCompare       Command = "compare"
 	CommandHelp          Command = "help"
 	CommandRefresh       Command = "refresh"
+	CommandInstall       Command = "install"
 )
 
 // Cmd is a container for handling commands
@@ -116,6 +117,13 @@ func (c *Cmd) Main(args []string) (err error) {
 		c.CommandGen([]string{"dal"})
 		c.CommandGen([]string{"repos"})
 		c.CommandGen([]string{"services"})
+	case CommandInstall:
+		c.CommandImport(args)
+		c.CommandGen([]string{"app"})
+		c.CommandGen([]string{"models"})
+		c.CommandGen([]string{"dal"})
+		c.CommandGen([]string{"repos"})
+		c.CommandGen([]string{"services"})
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandExport:
@@ -160,16 +168,80 @@ func connectorFactory(databaseType string, config *lib.Config) (connector lib.IC
 	return
 }
 
+// CommandInit creates a default dvc.toml file in the CWD
 func (c *Cmd) CommandInit(args []string) {
 
 	var e error
 
 	if _, e = os.Stat("./dvc.toml"); os.IsNotExist(e) {
 
-		content := "databaseType = \"mysql\"\nbasePackage = \"myPackage\"\n\nenums = []\n\n"
-		content += "[connection]\nhost = \"\"\ndatabaseName = \"\"\nusername = \"\"\npassword = \"\"\n\n"
-		content += "[packages]\ncache = \"myPackage/cache\"\nmodels = \"myPackage/models\"\nschema = \"myPackage/schema\"\nrepos = \"myPackage/repos\"\n\n"
-		content += "[dirs]\nrepos = \"repos\"\ncache = \"cache\"\nmodels = \"models\"\nschema = \"schema\"\ntypescript = \"ts\""
+		reader := bufio.NewReader(os.Stdin)
+
+		// https://tutorialedge.net/golang/reading-console-input-golang/
+		// BasePackage
+		fmt.Print("> Base Package:")
+		basePackage, _ := reader.ReadString('\n')
+		basePackage = strings.Replace(basePackage, "\n", "", -1)
+
+		fmt.Print("> Base directory (leave blank for current):")
+		baseDir, _ := reader.ReadString('\n')
+		baseDir = strings.Replace(baseDir, "\n", "", -1)
+
+		// Host
+		fmt.Print("> Database Host:")
+		host, _ := reader.ReadString('\n')
+		host = strings.Replace(host, "\n", "", -1)
+
+		// databaseName
+		fmt.Print("> Database Name:")
+		databaseName, _ := reader.ReadString('\n')
+		databaseName = strings.Replace(databaseName, "\n", "", -1)
+
+		// databaseUser
+		fmt.Print("> Database User:")
+		databaseUser, _ := reader.ReadString('\n')
+		databaseUser = strings.Replace(databaseUser, "\n", "", -1)
+
+		// databasePass
+		fmt.Print("> Database Password:")
+		databasePass, _ := reader.ReadString('\n')
+		databasePass = strings.Replace(databasePass, "\n", "", -1)
+
+		content := "databaseType = \"mysql\"\nbasePackage = \"" + basePackage + "\"\n\nenums = []\n\n"
+		content += "[connection]\nhost = \"" + host + "\"\ndatabaseName = \"" + databaseName + "\"\nusername = \"" + databaseUser + "\"\npassword = \"" + databasePass + "\"\n\n"
+
+		packages := []string{
+			"repos",
+			"models",
+			"typescript",
+			"services",
+			"dal",
+			"definitions",
+		}
+
+		content += "[packages]\n"
+		for _, p := range packages {
+			if p == "typescript" {
+				continue
+			}
+
+			content += fmt.Sprintf("%s = \"%s\"\n", p, path.Join(basePackage, p))
+		}
+
+		// content += "[packages]\ncache = \"myPackage/cache\"\nmodels = \"myPackage/models\"\nschema = \"myPackage/schema\"\nrepos = \"myPackage/repos\"\n\n"
+
+		content += "[dirs]\n"
+
+		for _, p := range packages {
+
+			if baseDir != "" {
+				content += fmt.Sprintf("%s = \"%s\"\n", p, path.Join(baseDir, p))
+			} else {
+				content += fmt.Sprintf("%s = \"%s\"\n", p, p)
+			}
+		}
+
+		// content += "[dirs]\nrepos = \"repos\"\ncache = \"cache\"\nmodels = \"models\"\nschema = \"schema\"\ntypescript = \"ts\""
 
 		ioutil.WriteFile("./dvc.toml", []byte(content), 0644)
 
@@ -179,7 +251,8 @@ func (c *Cmd) CommandInit(args []string) {
 
 }
 
-// CommandImport is the `import` command
+// CommandImport fetches the sql schema from the target database (specified in dvc.toml)
+// and from that generates the json representation at `[schema name].schema.json`
 func (c *Cmd) CommandImport(args []string) {
 
 	var e error
@@ -193,6 +266,7 @@ func (c *Cmd) CommandImport(args []string) {
 	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.Config.Connection.Host, c.Config.Connection.DatabaseName, c.Config.Connection.DatabaseName+".schema.json")
 }
 
+// CommandExport export SQL create statements to standard out
 func (c *Cmd) CommandExport(args []string) {
 	var e error
 	var sql string
@@ -329,8 +403,6 @@ func writeSQLToLog(sql string) {
 
 }
 
-// Write SQL to STDOUT
-
 // CommandGen handles the `gen` command
 func (c *Cmd) CommandGen(args []string) {
 
@@ -350,6 +422,8 @@ func (c *Cmd) CommandGen(args []string) {
 
 	argLen := len(args)
 	n := 0
+
+	// dvc gen models -c
 	for n < argLen {
 		switch args[n] {
 		case "-c":
@@ -382,19 +456,19 @@ func (c *Cmd) CommandGen(args []string) {
 	}
 
 	switch subCmd {
-	case CommandGenSchema:
-		e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-	case CommandGenCaches:
-		fmt.Println("CommandGenCaches")
-		e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+	// case CommandGenSchema:
+	// 	e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
+	// 	if e != nil {
+	// 		lib.Error(e.Error(), c.Options)
+	// 		os.Exit(1)
+	// 	}
+	// case CommandGenCaches:
+	// 	fmt.Println("CommandGenCaches")
+	// 	e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
+	// 	if e != nil {
+	// 		lib.Error(e.Error(), c.Options)
+	// 		os.Exit(1)
+	// 	}
 	case CommandGenRepos:
 
 		if c.Options&lib.OptClean == lib.OptClean {
@@ -457,23 +531,28 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenModels:
 
+		modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
 		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoModels(c.Config.Dirs.Models, database)
+			g.CleanGoModels(modelsDir, database)
 		}
 
 		for _, table := range database.Tables {
-			e = g.GenerateGoModel(path.Join(c.Config.Dirs.Definitions, "models"), table)
+			e = g.GenerateGoModel(modelsDir, table)
 			if e != nil {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
 			}
 		}
 
-		if _, e = os.Stat(c.Config.Dirs.Models + "/Config.go"); os.IsNotExist(e) {
-			g.GenerateDefaultConfigModelFile(c.Config.Dirs.Models)
+		// Config.go
+		if _, e = os.Stat(path.Join(modelsDir, "Config.go")); os.IsNotExist(e) {
+			lib.Debugf("Generating default Config.go file at %s", c.Options, path.Join(modelsDir, "Config.go"))
+			g.GenerateDefaultConfigModelFile(modelsDir)
 		}
 
+		// config.json
 		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
+			lib.Debugf("Generating default config.json file at %s", c.Options, path.Join(cwd, "config.json"))
 			g.GenerateDefaultConfigJsonFile(cwd)
 		}
 
@@ -483,7 +562,8 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenApp:
 		g.GenerateGoApp(cwd)
-	case CommandGenApi:
+
+	case CommandGenAPI:
 		g.GenerateGoAPI(cwd)
 
 	case "ts":
@@ -565,6 +645,10 @@ func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
 		ManyToOne: map[string]string{},
 	}
 	_, e = toml.DecodeFile(configFilePath, config)
+
+	if e != nil {
+		return
+	}
 
 	if len(config.OneToMany) > 0 {
 

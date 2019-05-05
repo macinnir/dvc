@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 // CheckErr checks if an error is nil, and panics if it isn't
 func CheckErr(err error) {
 	if err != nil {
@@ -22,6 +26,16 @@ func RequireFile(fileName string) {
 		fmt.Printf("Required file %s does not exist. Quitting...\n", fileName)
 		os.Exit(1)
 	}
+}
+
+// DateTimeParse parses a date time string into a time object
+func DateTimeParse(dateString string) (time.Time, error) {
+	return time.Parse("2006-01-02 15:04:05", dateString)
+}
+
+// DateParse parses a date string into a time object
+func DateParse(dateString string) (time.Time, error) {
+	return time.Parse("2006-01-02", dateString)
 }
 
 // DateString returns an ISO 8601 string (for mysql datetime)
@@ -57,14 +71,14 @@ func DateOnlyStringNow() string {
 // 	return self
 // }
 
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+var characterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 // Random generates a random string of n length
 func Random(n int) string {
 	rand.Seed(time.Now().UnixNano())
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		b[i] = characterRunes[rand.Intn(len(characterRunes))]
 	}
 	return string(b)
 }

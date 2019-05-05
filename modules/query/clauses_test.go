@@ -148,3 +148,21 @@ func TestOrderBy_Single(t *testing.T) {
 	sql, _ := b.ToSQL()
 	assert.Equal(t, "`Foo` ASC", sql)
 }
+
+func TestSet(t *testing.T) {
+	b := Set{"Foo": "bar", "Baz": 123}
+	sql, args := b.ToSQL()
+	assert.Equal(t, "`Baz` = ?, `Foo` = ?", sql)
+	assert.Equal(t, 2, len(args))
+	assert.Equal(t, 123, args[0])
+	assert.Equal(t, "bar", args[1])
+}
+
+func TestValues(t *testing.T) {
+	b := Values{"A": 1, "B": 2}
+	sql, args := b.ToSQL()
+	assert.Equal(t, "(`A`, `B`) VALUES (?, ?)", sql)
+	assert.Equal(t, 2, len(args))
+	assert.Equal(t, 1, args[0])
+	assert.Equal(t, 2, args[1])
+}

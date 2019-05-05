@@ -2,19 +2,22 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"html/template"
 	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateServiceInterfaces scans the services directory and outputs 2 files
 // 	1. A services bootstrap file in the services directory
 //  2. A services definition file in the definitions directory
 func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir string) (e error) {
+
+	g.EnsureDir(servicesDir)
 
 	var data = struct {
 		BasePackage string
@@ -24,16 +27,25 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 		BasePackage: g.Config.BasePackage,
 		Imports: []string{
 			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
-			fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage),
 			"github.com/macinnir/dvc/modules/utils",
 		},
 		Services: map[string][]string{},
 	}
 
+	definitionsPath := fmt.Sprintf("%s/viewmodels", definitionsDir)
+
+	if g.dirExists(definitionsPath) && !g.dirIsEmpty(definitionsPath) {
+		data.Imports = append(data.Imports, fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage))
+	}
+
+	// fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage),
+	// g.EnsureDir("definitions/viewmodels")
+
 	var serviceNames []string
 
 	serviceNames, e = g.getServiceNames(servicesDir)
 	if e != nil {
+		panic(e)
 		return
 	}
 
@@ -154,7 +166,6 @@ func Bootstrap(config *models.Config, repos *definitions.Repos, store utils.ISto
 // GetServiceNames gets a list of services in the services directory
 func (g *Gen) getServiceNames(dir string) (serviceNames []string, e error) {
 
-	fmt.Println("Gettings service names")
 	serviceNames = []string{}
 	dirFileNames := []string{}
 	var dirHandle *os.File
@@ -170,38 +181,64 @@ func (g *Gen) getServiceNames(dir string) (serviceNames []string, e error) {
 		return
 	}
 
-	var fileInfo os.FileInfo
-
 	for _, fileName := range dirFileNames {
 
+		var fileInfo os.FileInfo
+
 		p := path.Join(dir, fileName)
-		fmt.Printf("1. File %s\n", p)
+
 		// Skip directories
 		if fileInfo, e = os.Stat(p); e != nil {
-			fmt.Printf("Could not find file %s. Skipping...\n ", p)
+			fmt.Printf("CODEGEN.Services> SKIP: File Not Found: `%s`\n ", p)
 			continue
 		}
 
 		if fileInfo.IsDir() {
-			fmt.Printf("File %s is a directory. Skipping...\n", p)
-		}
-
-		r, _ := regexp.MatchString("[A-Z]{1}.+", fileName)
-
-		if !r {
-			fmt.Printf("Filename: %s does have an uppercase first letter. Skipping...\n", fileName)
+			fmt.Printf("CODEGEN.Services> SKIP: File is directory: `%s`\n", p)
 			continue
 		}
 
-		// Skip bootstrap file, test files and anything not a go file
-		if (len(fileName) > 8 && fileName[len(fileName)-8:len(fileName)] == "_test.go") ||
-			fileName == "bootstrap.go" ||
-			(len(fileName) > 3 && fileName[len(fileName)-3:len(fileName)] != ".go") {
-			fmt.Printf("Skipping %s\n", fileName)
+		if !isGeneratableFile(fileName) {
 			continue
 		}
 
+		fmt.Printf("CODEGEN.Services> GENERATE: %s\n", fileName[0:len(fileName)-3])
 		serviceNames = append(serviceNames, fileName[0:len(fileName)-3])
 	}
 	return
+}
+
+func isGeneratableFile(fileName string) bool {
+
+	fileLen := len(fileName)
+
+	if fileLen < 4 {
+		fmt.Printf("CODEGEN.Services> SKIP: FileName too short: `%s`\n", fileName)
+		return false
+	}
+
+	if fileName[fileLen-3:] != ".go" {
+		fmt.Printf("CODEGEN.Services> SKIP: Not a go file: `%s`\n", fileName)
+		return false
+	}
+
+	if fileLen > 8 && fileName[fileLen-8:] == "_test.go" {
+		fmt.Printf("CODEGEN.Services> SKIP: Test file: `%s`\n", fileName)
+		return false
+	}
+
+	// https://yourbasic.org/golang/regexp-cheat-sheet/
+	// https://regex-golang.appspot.com/assets/html/index.html
+	r, e := regexp.MatchString("^[A-Z]{1}.+", fileName)
+	if e != nil {
+		panic(e)
+	}
+
+	// Skip bootstrap file, test files and anything not a go file
+	if !r {
+		fmt.Printf("CODEGEN.Services> SKIP: Invalid file format: %s\n", fileName)
+		return false
+	}
+
+	return true
 }

@@ -235,6 +235,16 @@ func (limit Limit) ToSQL() (sql string, args []interface{}) {
 	return
 }
 
+// LimitSimple is a single integer limit
+type LimitSimple int
+
+// ToSQL returns the SQL representation of a LIMIT clause, along with its arguments
+func (dl LimitSimple) ToSQL() (sql string, args []interface{}) {
+	sql = Placeholder
+	args = []interface{}{dl}
+	return
+}
+
 // OrderBy represents an ORDER BY sql clause
 type OrderBy struct {
 	Field string
@@ -245,5 +255,42 @@ type OrderBy struct {
 func (orderBy OrderBy) ToSQL() (sql string, args []interface{}) {
 
 	sql = fmt.Sprintf("%s %s", escapeField(orderBy.Field), string(orderBy.Dir))
+	return
+}
+
+// Set represents a SQL set statement
+type Set map[string]interface{}
+
+// ToSQL returns the SQL representation of a set statement (for update)
+func (set Set) ToSQL() (sql string, args []interface{}) {
+	args = []interface{}{}
+	sqls := []string{}
+
+	keys := getSortedKeys(set)
+	for _, key := range keys {
+		sqls = append(sqls, fmt.Sprintf("%s = %s", escapeField(key), Placeholder))
+		args = append(args, set[key])
+	}
+
+	sql = strings.Join(sqls, ", ")
+	return
+}
+
+// Values represents the SQL values in an insert statement
+type Values map[string]interface{}
+
+// ToSQL returns the SQL representation of values in an insert statement
+func (values Values) ToSQL() (sql string, args []interface{}) {
+	args = []interface{}{}
+	fields := []string{}
+	placeholders := []string{}
+	keys := getSortedKeys(values)
+	for _, key := range keys {
+		fields = append(fields, fmt.Sprintf("%s", escapeField(key)))
+		placeholders = append(placeholders, Placeholder)
+		args = append(args, values[key])
+	}
+
+	sql = fmt.Sprintf("(%s) VALUES (%s)", strings.Join(fields, ", "), strings.Join(placeholders, ", "))
 	return
 }
