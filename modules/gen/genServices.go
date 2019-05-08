@@ -46,7 +46,6 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 	serviceNames, e = g.getServiceNames(servicesDir)
 	if e != nil {
 		panic(e)
-		return
 	}
 
 	var fileBytes []byte

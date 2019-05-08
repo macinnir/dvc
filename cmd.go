@@ -117,6 +117,7 @@ func (c *Cmd) Main(args []string) (err error) {
 		c.CommandGen([]string{"dal"})
 		c.CommandGen([]string{"repos"})
 		c.CommandGen([]string{"services"})
+		c.CommandGen([]string{"api"})
 	case CommandInstall:
 		c.CommandImport(args)
 		c.CommandGen([]string{"app"})
@@ -564,8 +565,8 @@ func (c *Cmd) CommandGen(args []string) {
 		g.GenerateGoApp(cwd)
 
 	case CommandGenAPI:
-		g.GenerateGoAPI(cwd)
-
+		// g.GenerateGoAPI(cwd)
+		g.GenerateAPIRoutes(c.Config.Dirs.API)
 	case "ts":
 		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
 	default:
