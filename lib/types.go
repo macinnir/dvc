@@ -62,6 +62,7 @@ type Config struct {
 		Schema   string `toml:"schema"`
 		Repos    string `toml:"repos"`
 		Services string `toml:"services"`
+		API      string `toml:"api"`
 	}
 
 	Dirs struct {
@@ -73,6 +74,7 @@ type Config struct {
 		Typescript  string `toml:"typescript"`
 		Services    string `toml:"services"`
 		Definitions string `toml:"definitions"`
+		API         string `toml:"api"`
 	}
 }
 
