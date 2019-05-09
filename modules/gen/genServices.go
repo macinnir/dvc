@@ -32,9 +32,9 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 		Services: map[string][]string{},
 	}
 
-	definitionsPath := fmt.Sprintf("%s/viewmodels", definitionsDir)
+	viewmodelsPath := fmt.Sprintf("%s/viewmodels", definitionsDir)
 
-	if g.dirExists(definitionsPath) && !g.dirIsEmpty(definitionsPath) {
+	if g.dirExists(viewmodelsPath) && !g.dirIsEmpty(viewmodelsPath) {
 		data.Imports = append(data.Imports, fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage))
 	}
 
@@ -80,6 +80,11 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 
 	t := template.New("service-interfaces")
 
+	// {{range $serviceName, $service := .Services}}	{{$serviceName}} I{{$serviceName}}Service
+	// // I{{$serviceName}}Service outlines the service methods for the {{$serviceName}} service
+	// type I{{$serviceName}}Service interface {
+	// {{end}}
+
 	tpl := `
 // Package definitions outlines objects and functionality used in the {{.BasePackage}} application
 package definitions
@@ -88,16 +93,13 @@ import ({{range .Imports}}
 )
 
 // Services defines the container for all service layer structs
-type Services struct {
-{{range $serviceName, $service := .Services}}	{{$serviceName}} I{{$serviceName}}Service
-{{end}}}
+type IServices interface {
 
-{{range $serviceName, $service := .Services}}
-// I{{$serviceName}}Service outlines the service methods for the {{$serviceName}} service 
-type I{{$serviceName}}Service interface {
-{{range $service}}	{{.}}
+	{{range $serviceName, $service := .Services}}
+	// {{$serviceName}}
+	{{range $service}}	{{.}}
+	{{end}}
 {{end}}}
-{{end}}
 // #genEnd
 `
 
@@ -124,6 +126,9 @@ func (g *Gen) GenerateServiceBootstrapFile(servicesDir string) (e error) {
 		return
 	}
 
+	// {{range .Services}}services.{{.}} = &{{.}}{config, repos, store}
+	// {{end}}
+
 	var data = struct {
 		BasePackage string
 		Services    []string
@@ -140,11 +145,15 @@ import (
 	"github.com/macinnir/dvc/modules/utils" 
 )
 
+type Services struct {
+	config *models.Config
+	repos *definitions.Repos 
+	store utils.IStore
+}
+
 // Bootstrap instantiates a new Services instance and all of its members 
-func Bootstrap(config *models.Config, repos *definitions.Repos, store utils.IStore) *definitions.Services {
-	services := &definitions.Services{} 
-	{{range .Services}}services.{{.}} = &{{.}}{config, repos, store}
-	{{end}}
+func Bootstrap(config *models.Config, repos *definitions.Repos, store utils.IStore) *Services {
+	services := &Services{config, repos, store} 
 	return services
 }
 // #genEnd 

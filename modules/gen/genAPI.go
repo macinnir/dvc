@@ -31,7 +31,7 @@ func (routes *Routes) init() {`
 	apiFiles, _ := g.getServiceNames(apiDir)
 	routes := []apiPart{}
 
-	currentRoute := ""
+	currentRoutes := []string{}
 	// for _, apiName := range apiFiles {
 	// 	objName := strings.ToLower(apiName[0:1]) + apiName[1:]
 	// 	file += fmt.Sprintf("\t%s := &%s{app}\n", objName, apiName)
@@ -51,52 +51,56 @@ func (routes *Routes) init() {`
 		validSig := regexp.MustCompile(`^// @route.*$`)
 
 		for _, line := range fileLines {
+
 			// This is a line that starts with `// @route`
 			if validSig.Match([]byte(line)) {
-				currentRoute = line
+				currentRoutes = append(currentRoutes, line)
 				continue
 			}
 
-			// This is the line below the @route line
-			if len(currentRoute) > 0 {
+			// Allow for other comments
+			if len(line) < 7 || line[0:5] != "func " {
+				continue
+			}
 
-				if len(line) < 7 || line[0:5] != "func " {
+			// This is the line below @route line(s)
+			if len(currentRoutes) > 0 {
+				for _, currentRoute := range currentRoutes {
+
+					args := map[string]string{}
+					lineParts := strings.Split(line, " ")
+					currentRoute = currentRoute[10:]
+					currentRouteParts := strings.Split(currentRoute, " ")
+					route := currentRouteParts[1]
+
+					if strings.Contains(route, "?") {
+						routeParts := strings.Split(route, "?")
+						route = routeParts[0]
+
+						keyValues := []string{routeParts[1]}
+						if strings.Contains(routeParts[1], "&") {
+							keyValues = strings.Split(routeParts[1], "&")
+						}
+
+						for _, keyValue := range keyValues {
+							if strings.Contains(keyValue, "=") {
+								kvParts := strings.Split(keyValue, "=")
+								args[kvParts[0]] = kvParts[1]
+							}
+						}
+
+					}
+
+					p := apiPart{
+						verb:   currentRouteParts[0],
+						route:  route,
+						method: fmt.Sprintf("routes.%s", lineParts[3][:len(lineParts[3])-2]),
+						args:   args,
+					}
+					routes = append(routes, p)
+					currentRoutes = []string{}
 					continue
 				}
-
-				args := map[string]string{}
-				lineParts := strings.Split(line, " ")
-				currentRoute = currentRoute[10:]
-				currentRouteParts := strings.Split(currentRoute, " ")
-				route := currentRouteParts[1]
-
-				if strings.Contains(route, "?") {
-					routeParts := strings.Split(route, "?")
-					route = routeParts[0]
-
-					keyValues := []string{routeParts[1]}
-					if strings.Contains(routeParts[1], "&") {
-						keyValues = strings.Split(routeParts[1], "&")
-					}
-
-					for _, keyValue := range keyValues {
-						if strings.Contains(keyValue, "=") {
-							kvParts := strings.Split(keyValue, "=")
-							args[kvParts[0]] = kvParts[1]
-						}
-					}
-
-				}
-
-				p := apiPart{
-					verb:   currentRouteParts[0],
-					route:  route,
-					method: fmt.Sprintf("routes.%s", lineParts[3][:len(lineParts[3])-2]),
-					args:   args,
-				}
-				routes = append(routes, p)
-				currentRoute = ""
-				continue
 			}
 		}
 	}
@@ -107,6 +111,7 @@ func (routes *Routes) init() {`
 
 		if len(route.args) > 0 {
 			argsParts := []string{}
+
 			// Reassemble into URL query string
 			// argsString += "?"
 			// for k, v := range route.args {
