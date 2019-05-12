@@ -73,6 +73,15 @@ func (r *Requests) Post(path string, body interface{}, authenticated bool) (resp
 	return
 }
 
+// PostDebug does a post request while temporarily setting the log level to debug
+func (r *Requests) PostDebug(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
+	oldLogLevel := r.logger.logLevel
+	r.logger.logLevel = LogLevelDebug
+	responseBody, statusCode = r.Post(path, body, authenticated)
+	r.logger.logLevel = oldLogLevel
+	return
+}
+
 // Put does a PUT request
 func (r *Requests) Put(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
 
@@ -120,6 +129,15 @@ func (r *Requests) Put(path string, body interface{}, authenticated bool) (respo
 	return
 }
 
+// PutDebug does a put request while temporarily setting the log level to debug
+func (r *Requests) PutDebug(path string, body interface{}, authenticated bool) (responseBody []byte, statusCode int) {
+	oldLogLevel := r.logger.logLevel
+	r.logger.logLevel = LogLevelDebug
+	responseBody, statusCode = r.Put(path, body, authenticated)
+	r.logger.logLevel = oldLogLevel
+	return
+}
+
 // Get does a GET request
 func (r *Requests) Get(path string, withAuth bool) (responseBody []byte, statusCode int) {
 
@@ -159,6 +177,15 @@ func (r *Requests) Get(path string, withAuth bool) (responseBody []byte, statusC
 	return
 }
 
+// GetDebug does a get request while temporarily setting the log level to debug
+func (r *Requests) GetDebug(path string, withAuth bool) (responseBody []byte, statusCode int) {
+	oldLogLevel := r.logger.logLevel
+	r.logger.logLevel = LogLevelDebug
+	responseBody, statusCode = r.Get(path, withAuth)
+	r.logger.logLevel = oldLogLevel
+	return
+}
+
 // Delete does a DELETE request
 func (r *Requests) Delete(path string, withAuth bool) (responseBody []byte, statusCode int) {
 
@@ -195,4 +222,15 @@ func (r *Requests) Delete(path string, withAuth bool) (responseBody []byte, stat
 	r.logger.Debug(fmt.Sprintf("%s", responseBody))
 
 	return
+}
+
+// DeleteDebug does a DELETE request while temporarily setting the log level to debug
+func (r *Requests) DeleteDebug(path string, withAuth bool) (responseBody []byte, statusCode int) {
+
+	oldLogLevel := r.logger.logLevel
+	r.logger.logLevel = LogLevelDebug
+	responseBody, statusCode = r.Delete(path, withAuth)
+	r.logger.logLevel = oldLogLevel
+	return
+
 }
