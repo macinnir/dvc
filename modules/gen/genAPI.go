@@ -4,40 +4,45 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 )
 
 type apiPart struct {
-	route  string
-	verb   string
-	args   map[string]string
-	method string
+	baseRoute string
+	route     string
+	verb      string
+	args      map[string]string
+	method    string
+}
+
+type apiPartGroup struct {
+	baseRoute string
+	routes    map[string]apiPart
+	routeKeys sort.StringSlice
 }
 
 func (g *Gen) GenerateAPIRoutes(apiDir string) {
 
-	file := `package main
-
-func (routes *Routes) init() {`
-	file += "\n\n"
 	// Find the directory where the api exists
 	if _, e := os.Stat(apiDir); os.IsNotExist(e) {
 		panic(fmt.Errorf("Can't generate API routes: No API directory exists at path %s", apiDir))
 	}
 
 	apiFiles, _ := g.getServiceNames(apiDir)
-	routes := []apiPart{}
-
+	routes := map[string]apiPartGroup{}
+	groupKeys := []string{}
 	currentRoutes := []string{}
 	// for _, apiName := range apiFiles {
 	// 	objName := strings.ToLower(apiName[0:1]) + apiName[1:]
 	// 	file += fmt.Sprintf("\t%s := &%s{app}\n", objName, apiName)
 	// }
 
-	file += "\n\troutes.routes = []Route{\n"
+	validRouteSig := regexp.MustCompile(`^// @route.*$`)
 
 	for _, apiName := range apiFiles {
 
@@ -48,12 +53,10 @@ func (routes *Routes) init() {`
 		fileString := string(fileBytes)
 		fileLines := strings.Split(fileString, "\n")
 
-		validSig := regexp.MustCompile(`^// @route.*$`)
-
 		for _, line := range fileLines {
 
 			// This is a line that starts with `// @route`
-			if validSig.Match([]byte(line)) {
+			if validRouteSig.Match([]byte(line)) {
 				currentRoutes = append(currentRoutes, line)
 				continue
 			}
@@ -71,11 +74,15 @@ func (routes *Routes) init() {`
 					lineParts := strings.Split(line, " ")
 					currentRoute = currentRoute[10:]
 					currentRouteParts := strings.Split(currentRoute, " ")
-					route := currentRouteParts[1]
+					baseRoute := currentRouteParts[1]
+					route := baseRoute
+
+					queryPart := ""
 
 					if strings.Contains(route, "?") {
 						routeParts := strings.Split(route, "?")
-						route = routeParts[0]
+						queryPart = routeParts[1]
+						baseRoute = routeParts[0]
 
 						keyValues := []string{routeParts[1]}
 						if strings.Contains(routeParts[1], "&") {
@@ -91,13 +98,37 @@ func (routes *Routes) init() {`
 
 					}
 
+					verb := currentRouteParts[0]
+
+					subRouteKey := fmt.Sprintf("%s_%d_%s", verb, len(queryPart), queryPart)
+					// if len(queryPart) > 0 {
+					// 	subRouteKey += "?" + queryPart + " "
+					// }
+					// subRouteKey += verb
+
 					p := apiPart{
-						verb:   currentRouteParts[0],
-						route:  route,
-						method: fmt.Sprintf("routes.%s", lineParts[3][:len(lineParts[3])-2]),
-						args:   args,
+						verb:      verb,
+						baseRoute: baseRoute,
+						route:     route,
+						method:    fmt.Sprintf("routes.%s", lineParts[3][:len(lineParts[3])-2]),
+						args:      args,
 					}
-					routes = append(routes, p)
+
+					// Keyed by the base route path
+					if _, ok := routes[baseRoute]; !ok {
+						routes[baseRoute] = apiPartGroup{
+							baseRoute: baseRoute,
+							routes:    map[string]apiPart{},
+							routeKeys: sort.StringSlice{},
+						}
+						groupKeys = append(groupKeys, baseRoute)
+					}
+
+					routes[baseRoute].routes[subRouteKey] = p
+					routeBaseRoute := routes[baseRoute]
+					routeBaseRoute.routeKeys = append(routeBaseRoute.routeKeys, subRouteKey)
+					routes[baseRoute] = routeBaseRoute
+
 					currentRoutes = []string{}
 					continue
 				}
@@ -105,28 +136,49 @@ func (routes *Routes) init() {`
 		}
 	}
 
-	for _, route := range routes {
+	file := `package main
 
-		argsString := ""
+	func (routes *Routes) init() {`
+	file += "\n\n"
+	file += "\n\troutes.routes = []Route{\n"
 
-		if len(route.args) > 0 {
-			argsParts := []string{}
+	sort.Strings(groupKeys)
 
-			// Reassemble into URL query string
-			// argsString += "?"
-			// for k, v := range route.args {
-			// 	argsParts = append(argsParts, fmt.Sprintf("%s=%s", k, v))
-			// }
-			// argsString += strings.Join(argsParts, "&")
+	for _, routeGroupKey := range groupKeys {
 
-			for k, v := range route.args {
-				argsParts = append(argsParts, fmt.Sprintf("\"%s\": \"%s\"", k, v))
+		log.Printf("RouteKey: %s\n", routeGroupKey)
+		routeGroup := routes[routeGroupKey]
+
+		sort.Sort(sort.Reverse(routeGroup.routeKeys))
+
+		file += fmt.Sprintf("\t\t// Group: %s\n", routeGroupKey)
+
+		for _, routeKey := range routeGroup.routeKeys {
+
+			argsString := ""
+
+			route := routeGroup.routes[routeKey]
+
+			if len(route.args) > 0 {
+
+				argsParts := []string{}
+
+				// Reassemble into URL query string
+				// argsString += "?"
+				// for k, v := range route.args {
+				// 	argsParts = append(argsParts, fmt.Sprintf("%s=%s", k, v))
+				// }
+				// argsString += strings.Join(argsParts, "&")
+
+				for k, v := range route.args {
+					argsParts = append(argsParts, fmt.Sprintf("\"%s\": \"%s\"", k, v))
+				}
+
+				argsString = strings.Join(argsParts, ", ")
 			}
 
-			argsString = strings.Join(argsParts, ", ")
+			file += fmt.Sprintf("\t\t{ \"%s\", \"%s\", map[string]string{%s}, %s }, \n", route.baseRoute, route.verb, argsString, route.method)
 		}
-
-		file += fmt.Sprintf("\t\t{ \"%s\", \"%s\", map[string]string{%s}, %s }, \n", route.route, route.verb, argsString, route.method)
 	}
 
 	file += "\t}\n\n\treturn \n}"

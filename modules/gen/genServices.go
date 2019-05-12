@@ -50,12 +50,16 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 
 	var fileBytes []byte
 
+	funcPrefix := "func (s *Services) "
+
 	for _, serviceName := range serviceNames {
 
 		data.Services[serviceName] = []string{}
 
 		// Get the service file
-		fileBytes, e = ioutil.ReadFile(path.Join(servicesDir, serviceName+".go"))
+		serviceFilePath := path.Join(servicesDir, serviceName+".go")
+		fmt.Printf("ServiceFilePath: %s\n", serviceFilePath)
+		fileBytes, e = ioutil.ReadFile(serviceFilePath)
 
 		if e != nil {
 			lib.Error(e.Error(), g.Options)
@@ -65,9 +69,7 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 		fileString := string(fileBytes)
 		fileLines := strings.Split(fileString, "\n")
 
-		funcSig := fmt.Sprintf(`^func \(s \*%s\) [A-Z].*$`, serviceName)
-		var validSignature = regexp.MustCompile(funcSig)
-		funcPrefix := fmt.Sprintf("func (s *%s) ", serviceName)
+		var validSignature = regexp.MustCompile(`^func \(s \*Services\) [A-Z].*$`)
 
 		for _, line := range fileLines {
 			if validSignature.Match([]byte(line)) {
@@ -75,6 +77,13 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 				funcLine := line[len(funcPrefix) : len(line)-2]
 				data.Services[serviceName] = append(data.Services[serviceName], funcLine)
 			}
+		}
+	}
+
+	for serviceName, services := range data.Services {
+		fmt.Printf("Service: %s\n", serviceName)
+		for _, method := range services {
+			fmt.Printf("Service: %s.%s\n", serviceName, method)
 		}
 	}
 
