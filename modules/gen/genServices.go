@@ -156,7 +156,7 @@ import (
 
 type Services struct {
 	config *models.Config
-	repos *definitions.Repos 
+	Repos *definitions.Repos 
 	store utils.IStore
 }
 
