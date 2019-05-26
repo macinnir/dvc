@@ -166,6 +166,50 @@ func (notIn NotIn) ToSQL() (sql string, args []interface{}) {
 	return
 }
 
+// Between represents a BETWEEN query part
+type Between map[string][]interface{}
+
+// ToSQL returns the sql representation of a BETWEEN query part along with its arguments (if any)
+func (between Between) ToSQL() (sql string, args []interface{}) {
+
+	keys := getSortedInKeys(between)
+	args = []interface{}{}
+	sqls := []string{}
+	for _, key := range keys {
+		vals := between[key]
+		sqls = append(sqls, fmt.Sprintf("%s BETWEEN %s AND %s", escapeField(key), Placeholder, Placeholder))
+		n := 0
+		for n < 2 {
+			args = append(args, vals[n])
+			n++
+		}
+	}
+	sql = buildWhereClause(sqls)
+	return
+}
+
+// NotBetween represents a NOT BETWEEN query part
+type NotBetween map[string][]interface{}
+
+// ToSQL returns the sql representation of a NOT BETWEEN query part along with its arguments (if any)
+func (notBetween NotBetween) ToSQL() (sql string, args []interface{}) {
+
+	keys := getSortedInKeys(notBetween)
+	args = []interface{}{}
+	sqls := []string{}
+	for _, key := range keys {
+		vals := notBetween[key]
+		sqls = append(sqls, fmt.Sprintf("%s NOT BETWEEN %s AND %s", escapeField(key), Placeholder, Placeholder))
+		n := 0
+		for n < 2 {
+			args = append(args, vals[n])
+			n++
+		}
+	}
+	sql = buildWhereClause(sqls)
+	return
+}
+
 // And represents an AND comparison query part
 type And struct{}
 

@@ -108,6 +108,24 @@ func TestNotIn(t *testing.T) {
 	assert.Equal(t, 1, args[0])
 }
 
+func TestBetween(t *testing.T) {
+	b := Between{"id": {1, 10}}
+	expectedSQL := "`id` BETWEEN ? AND ?"
+	sql, args := b.ToSQL()
+	assert.Equal(t, expectedSQL, sql)
+	assert.Equal(t, 2, len(args))
+	assert.Equal(t, 1, args[0])
+}
+
+func TestNotBetween(t *testing.T) {
+	b := NotBetween{"id": {1, 10}}
+	expectedSQL := "`id` NOT BETWEEN ? AND ?"
+	sql, args := b.ToSQL()
+	assert.Equal(t, expectedSQL, sql)
+	assert.Equal(t, 2, len(args))
+	assert.Equal(t, 1, args[0])
+}
+
 func TestOr(t *testing.T) {
 	b := Or{}
 	sql, args := b.ToSQL()
