@@ -66,6 +66,11 @@ func TestSelect_AllTheThings(t *testing.T) {
 			Or{},
 			Equals{"C": 2},
 		).
+		Where(
+			Between{"B": {1, 2}},
+			Or{},
+			NotBetween{"C": {3, 4}},
+		).
 		Or(
 			NotEquals{"B": 2},
 			And{},
@@ -77,6 +82,6 @@ func TestSelect_AllTheThings(t *testing.T) {
 		OrderBy("B", DESC).OrderBy("A", ASC)
 	s.Object = NewTestObject()
 	sql, args := s.ToSQL()
-	assert.Equal(t, "SELECT DISTINCT `ID`,`Name`,`DateCreated` FROM `TestObject` WHERE ( `A` = ? OR `C` = ? ) OR ( `B` != ? AND `C` < ? AND `D` > ? ) ORDER BY `B` DESC, `A` ASC LIMIT ?,?", sql)
-	assert.Equal(t, 7, len(args))
+	assert.Equal(t, "SELECT DISTINCT `ID`,`Name`,`DateCreated` FROM `TestObject` WHERE ( `A` = ? OR `C` = ? ) AND ( `B` BETWEEN ? AND ? OR `C` NOT BETWEEN ? AND ? ) OR ( `B` != ? AND `C` < ? AND `D` > ? ) ORDER BY `B` DESC, `A` ASC LIMIT ?,?", sql)
+	assert.Equal(t, 11, len(args))
 }
