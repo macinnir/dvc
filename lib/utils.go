@@ -90,6 +90,7 @@ func HashFileMd5(filePath string) (string, error) {
 
 }
 
+// RunCommand runs a system command
 func RunCommand(name string, args ...string) (stdout string, stderr string, exitCode int) {
 	// log.Println("run command:", name, args)
 	var outbuf, errbuf bytes.Buffer

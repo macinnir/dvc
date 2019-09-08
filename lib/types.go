@@ -5,10 +5,13 @@ import (
 	"errors"
 )
 
+// DatabaseType is the type of database to be used.
 type DatabaseType string
 
 const (
-	DatabaseTypeMysql  DatabaseType = "mysql"
+	// DatabaseTypeMysql is the MySQL flavor of database
+	DatabaseTypeMysql DatabaseType = "mysql"
+	// DatabaseTypeSqlite is the Sqlite flavor of database
 	DatabaseTypeSqlite DatabaseType = "sqlite"
 )
 
