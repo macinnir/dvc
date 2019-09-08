@@ -2,14 +2,26 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
+	"sort"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateTypescriptTypes returns a string for a typscript types file
 func (g *Gen) GenerateTypescriptTypes(database *lib.Database) (goCode string, e error) {
 	goCode = "// #genStart \n\ndeclare namespace Models {\n\n"
-	for _, table := range database.Tables {
+
+	tableKeys := []string{}
+	for key := range database.Tables {
+		tableKeys = append(tableKeys, key)
+	}
+
+	sort.Strings(tableKeys)
+
+	for _, key := range tableKeys {
+
+		table := database.Tables[key]
 
 		str := ""
 
@@ -31,7 +43,18 @@ func (g *Gen) GenerateTypescriptType(table *lib.Table) (goCode string, e error) 
 
 	goCode += fmt.Sprintf("\t/**\n\t * %s\n\t */\n", table.Name)
 	goCode += fmt.Sprintf("\texport interface %s {\n", table.Name)
-	for _, column := range table.Columns {
+
+	columnKeys := []string{}
+
+	for key := range table.Columns {
+		columnKeys = append(columnKeys, key)
+	}
+
+	sort.Strings(columnKeys)
+
+	for _, key := range columnKeys {
+
+		column := table.Columns[key]
 
 		fieldType := "number"
 		switch column.DataType {

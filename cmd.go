@@ -29,6 +29,7 @@ const (
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
 	CommandGenApp        Command = "app"
+	CommandGenCLI        Command = "cli"
 	CommandGenAPI        Command = "api"
 	CommandGenDal        Command = "dal"
 	CommandGenRepos      Command = "repos"
@@ -563,7 +564,8 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenApp:
 		g.GenerateGoApp(cwd)
-
+	case CommandGenCLI:
+		g.GenerateGoCLI(cwd)
 	case CommandGenAPI:
 		// g.GenerateGoAPI(cwd)
 		g.GenerateAPIRoutes(c.Config.Dirs.API)
