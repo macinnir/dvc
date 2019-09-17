@@ -17,6 +17,7 @@ func NotImplemented(w http.ResponseWriter) {
 	return
 }
 
+// NotImplementedHandler return a new NotImplemented object
 func NotImplementedHandler(w http.ResponseWriter, r *http.Request) {
 	NotImplemented(w)
 }

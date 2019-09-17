@@ -23,6 +23,7 @@ type NoAuthRequest struct {
 	Path   string
 }
 
+// NewAuthHandler returns a new AuthHandler object
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
 		anonymousRoutes: map[string]string{},
@@ -35,11 +36,13 @@ type AuthHandler struct {
 	authCallback    func(userID int64) (interface{}, error)
 }
 
+// AddAnonymousRoute adds an anonymous route to the allowed anonymous routes map
 func (a *AuthHandler) AddAnonymousRoute(method string, path string) {
 
 	a.anonymousRoutes[method+"_"+path] = method + "_" + path
 }
 
+// IsAnonymousRoute verifies whether or not the route being used is in fact anonymous
 func (a *AuthHandler) IsAnonymousRoute(r *http.Request) bool {
 
 	if r.RequestURI == "*" {
@@ -66,6 +69,7 @@ func (a *AuthHandler) IsAnonymousRoute(r *http.Request) bool {
 	return ok
 }
 
+// LogRoute logs a route event to the logger
 func (a *AuthHandler) LogRoute(r *http.Request, userID int64, anonymous bool) {
 
 	userIDString := strconv.Itoa(int(userID))
@@ -76,10 +80,12 @@ func (a *AuthHandler) LogRoute(r *http.Request, userID int64, anonymous bool) {
 	log.Println("INF HTTP > " + r.Method + " " + r.RequestURI + " [" + anonymousString + "]")
 }
 
+// SetAuthCallback sets a callback method to be used for authentication
 func (a *AuthHandler) SetAuthCallback(cb func(userID int64) (interface{}, error)) {
 	a.authCallback = cb
 }
 
+// CreateRouteAuthHandler creates an authentication handler for all routes
 func (a *AuthHandler) CreateRouteAuthHandler(h http.Handler) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
