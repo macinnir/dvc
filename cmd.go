@@ -16,7 +16,6 @@ import (
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
 	"github.com/macinnir/dvc/lib"
-	"github.com/macinnir/dvc/modules/gen"
 )
 
 // Command is a type that represents the possible commands passed in at run time
@@ -112,28 +111,28 @@ func (c *Cmd) Main(args []string) (err error) {
 	}
 
 	switch cmd {
-	case CommandRefresh:
-		c.CommandImport(args)
-		c.CommandGen([]string{"models"})
-		c.CommandGen([]string{"dal"})
-		c.CommandGen([]string{"repos"})
-		c.CommandGen([]string{"services"})
-		c.CommandGen([]string{"api"})
-	case CommandInstall:
-		c.CommandImport(args)
-		c.CommandGen([]string{"app"})
-		c.CommandGen([]string{"models"})
-		c.CommandGen([]string{"dal"})
-		c.CommandGen([]string{"repos"})
-		c.CommandGen([]string{"services"})
+	// case CommandRefresh:
+	// 	c.CommandImport(args)
+	// 	c.CommandGen([]string{"models"})
+	// 	c.CommandGen([]string{"dal"})
+	// 	c.CommandGen([]string{"repos"})
+	// 	c.CommandGen([]string{"services"})
+	// 	c.CommandGen([]string{"api"})
+	// case CommandInstall:
+	// 	c.CommandImport(args)
+	// 	c.CommandGen([]string{"app"})
+	// 	c.CommandGen([]string{"models"})
+	// 	c.CommandGen([]string{"dal"})
+	// 	c.CommandGen([]string{"repos"})
+	// 	c.CommandGen([]string{"services"})
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandExport:
 		c.CommandExport(args)
 	case CommandCompare:
 		c.CommandCompare(args)
-	case CommandGen:
-		c.CommandGen(args)
+	// case CommandGen:
+	// c.CommandGen(args)
 	case CommandHelp:
 		c.PrintHelp(args)
 	case CommandInit:
@@ -405,177 +404,177 @@ func writeSQLToLog(sql string) {
 
 }
 
-// CommandGen handles the `gen` command
-func (c *Cmd) CommandGen(args []string) {
+// // CommandGen handles the `gen` command
+// func (c *Cmd) CommandGen(args []string) {
 
-	var e error
-	var database *lib.Database
-	// fmt.Printf("Args: %v", args)
-	if len(args) < 1 {
-		lib.Error("Missing gen type [schema | models | repos | caches | ts]", c.Options)
-		os.Exit(1)
-	}
-	subCmd := Command(args[0])
-	cwd, _ := os.Getwd()
+// 	var e error
+// 	var database *lib.Database
+// 	// fmt.Printf("Args: %v", args)
+// 	if len(args) < 1 {
+// 		lib.Error("Missing gen type [schema | models | repos | caches | ts]", c.Options)
+// 		os.Exit(1)
+// 	}
+// 	subCmd := Command(args[0])
+// 	cwd, _ := os.Getwd()
 
-	if len(args) > 1 {
-		args = args[1:]
-	}
+// 	if len(args) > 1 {
+// 		args = args[1:]
+// 	}
 
-	argLen := len(args)
-	n := 0
+// 	argLen := len(args)
+// 	n := 0
 
-	// dvc gen models -c
-	for n < argLen {
-		switch args[n] {
-		case "-c":
-			c.Options |= lib.OptClean
-		}
-		n++
-	}
+// 	// dvc gen models -c
+// 	for n < argLen {
+// 		switch args[n] {
+// 		case "-c":
+// 			c.Options |= lib.OptClean
+// 		}
+// 		n++
+// 	}
 
-	// for len(args) > 0 {
-	// 	switch args[0] {
-	// 	case "-c", "--clean":
-	// 		c.Options |= lib.OptClean
-	// 	}
-	// 	args = args[1:]
-	// }
+// 	// for len(args) > 0 {
+// 	// 	switch args[0] {
+// 	// 	case "-c", "--clean":
+// 	// 		c.Options |= lib.OptClean
+// 	// 	}
+// 	// 	args = args[1:]
+// 	// }
 
-	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
+// 	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
-	// Load the schema
-	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
-	database, e = lib.ReadSchemaFromFile(schemaFile)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
-		os.Exit(1)
-	}
+// 	// Load the schema
+// 	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
+// 	database, e = lib.ReadSchemaFromFile(schemaFile)
+// 	if e != nil {
+// 		lib.Error(e.Error(), c.Options)
+// 		os.Exit(1)
+// 	}
 
-	g := &gen.Gen{
-		Options: c.Options,
-		Config:  c.Config,
-	}
+// 	g := &gen.Gen{
+// 		Options: c.Options,
+// 		Config:  c.Config,
+// 	}
 
-	switch subCmd {
-	// case CommandGenSchema:
-	// 	e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
-	// 	if e != nil {
-	// 		lib.Error(e.Error(), c.Options)
-	// 		os.Exit(1)
-	// 	}
-	// case CommandGenCaches:
-	// 	fmt.Println("CommandGenCaches")
-	// 	e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
-	// 	if e != nil {
-	// 		lib.Error(e.Error(), c.Options)
-	// 		os.Exit(1)
-	// 	}
-	case CommandGenRepos:
+// 	switch subCmd {
+// 	// case CommandGenSchema:
+// 	// 	e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
+// 	// 	if e != nil {
+// 	// 		lib.Error(e.Error(), c.Options)
+// 	// 		os.Exit(1)
+// 	// 	}
+// 	// case CommandGenCaches:
+// 	// 	fmt.Println("CommandGenCaches")
+// 	// 	e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
+// 	// 	if e != nil {
+// 	// 		lib.Error(e.Error(), c.Options)
+// 	// 		os.Exit(1)
+// 	// 	}
+// 	case CommandGenRepos:
 
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoRepos(c.Config.Dirs.Repos, database)
-		}
+// 		if c.Options&lib.OptClean == lib.OptClean {
+// 			g.CleanGoRepos(c.Config.Dirs.Repos, database)
+// 		}
 
-		e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+// 		e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
+// 		if e != nil {
+// 			lib.Error(e.Error(), c.Options)
+// 			os.Exit(1)
+// 		}
 
-		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+// 		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+// 		if e != nil {
+// 			lib.Error(e.Error(), c.Options)
+// 			os.Exit(1)
+// 		}
 
-		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
-		g.EnsureDir(c.Config.Dirs.Definitions)
-		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-	case CommandGenDal:
+// 		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
+// 		g.EnsureDir(c.Config.Dirs.Definitions)
+// 		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
+// 		if e != nil {
+// 			lib.Error(e.Error(), c.Options)
+// 			os.Exit(1)
+// 		}
+// 	case CommandGenDal:
 
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoDALs(c.Config.Dirs.Dal, database)
-		}
+// 		if c.Options&lib.OptClean == lib.OptClean {
+// 			g.CleanGoDALs(c.Config.Dirs.Dal, database)
+// 		}
 
-		for _, table := range database.Tables {
+// 		for _, table := range database.Tables {
 
-			lib.Debugf("Generating dal %s", g.Options, table.Name)
-			e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
-			if e != nil {
-				return
-			}
-		}
+// 			lib.Debugf("Generating dal %s", g.Options, table.Name)
+// 			e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
+// 			if e != nil {
+// 				return
+// 			}
+// 		}
 
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+// 		if e != nil {
+// 			lib.Error(e.Error(), c.Options)
+// 			os.Exit(1)
+// 		}
 
-		// Create the dal bootstrap file in the dal repo
-		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+// 		// Create the dal bootstrap file in the dal repo
+// 		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
+// 		if e != nil {
+// 			lib.Error(e.Error(), c.Options)
+// 			os.Exit(1)
+// 		}
 
-		lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
-		g.EnsureDir(c.Config.Dirs.Definitions)
-		e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+// 		lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
+// 		g.EnsureDir(c.Config.Dirs.Definitions)
+// 		e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
+// 		if e != nil {
+// 			lib.Error(e.Error(), c.Options)
+// 			os.Exit(1)
+// 		}
 
-	case CommandGenModels:
+// 	case CommandGenModels:
 
-		modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoModels(modelsDir, database)
-		}
+// 		modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
+// 		if c.Options&lib.OptClean == lib.OptClean {
+// 			g.CleanGoModels(modelsDir, database)
+// 		}
 
-		for _, table := range database.Tables {
-			e = g.GenerateGoModel(modelsDir, table)
-			if e != nil {
-				lib.Error(e.Error(), c.Options)
-				os.Exit(1)
-			}
-		}
+// 		for _, table := range database.Tables {
+// 			e = g.GenerateGoModel(modelsDir, table)
+// 			if e != nil {
+// 				lib.Error(e.Error(), c.Options)
+// 				os.Exit(1)
+// 			}
+// 		}
 
-		// Config.go
-		if _, e = os.Stat(path.Join(modelsDir, "Config.go")); os.IsNotExist(e) {
-			lib.Debugf("Generating default Config.go file at %s", c.Options, path.Join(modelsDir, "Config.go"))
-			g.GenerateDefaultConfigModelFile(modelsDir)
-		}
+// 		// Config.go
+// 		if _, e = os.Stat(path.Join(modelsDir, "Config.go")); os.IsNotExist(e) {
+// 			lib.Debugf("Generating default Config.go file at %s", c.Options, path.Join(modelsDir, "Config.go"))
+// 			g.GenerateDefaultConfigModelFile(modelsDir)
+// 		}
 
-		// config.json
-		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
-			lib.Debugf("Generating default config.json file at %s", c.Options, path.Join(cwd, "config.json"))
-			g.GenerateDefaultConfigJsonFile(cwd)
-		}
+// 		// config.json
+// 		if _, e = os.Stat(path.Join(cwd, "config.json")); os.IsNotExist(e) {
+// 			lib.Debugf("Generating default config.json file at %s", c.Options, path.Join(cwd, "config.json"))
+// 			g.GenerateDefaultConfigJsonFile(cwd)
+// 		}
 
-	case CommandGenServices:
-		g.GenerateServiceInterfaces(c.Config.Dirs.Definitions, c.Config.Dirs.Services)
-		g.GenerateServiceBootstrapFile(c.Config.Dirs.Services)
+// 	case CommandGenServices:
+// 		g.GenerateServiceInterfaces(c.Config.Dirs.Definitions, c.Config.Dirs.Services)
+// 		g.GenerateServiceBootstrapFile(c.Config.Dirs.Services)
 
-	case CommandGenApp:
-		g.GenerateGoApp(cwd)
-	case CommandGenCLI:
-		g.GenerateGoCLI(cwd)
-	case CommandGenAPI:
-		// g.GenerateGoAPI(cwd)
-		g.GenerateAPIRoutes(c.Config.Dirs.API)
-	case "ts":
-		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
-	default:
-		lib.Errorf("Unknown output type: `%s`", c.Options, subCmd)
-		os.Exit(1)
-	}
-}
+// 	case CommandGenApp:
+// 		g.GenerateGoApp(cwd)
+// 	case CommandGenCLI:
+// 		g.GenerateGoCLI(cwd)
+// 	case CommandGenAPI:
+// 		// g.GenerateGoAPI(cwd)
+// 		g.GenerateAPIRoutes(c.Config.Dirs.API)
+// 	case "ts":
+// 		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
+// 	default:
+// 		lib.Errorf("Unknown output type: `%s`", c.Options, subCmd)
+// 		os.Exit(1)
+// 	}
+// }
 
 // PrintHelp prints help information
 func (c *Cmd) PrintHelp(args []string) {
