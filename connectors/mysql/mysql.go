@@ -171,6 +171,11 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 			return
 		}
 		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
+
+		if column.Default == "''" {
+			column.Default = ""
+		}
+
 		columns[column.Name] = &column
 	}
 
