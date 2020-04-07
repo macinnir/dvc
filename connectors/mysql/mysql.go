@@ -690,13 +690,20 @@ func createColumnSegment(column *lib.Column) (sql string, e error) {
 	// Add single quotes to string default
 	if hasDefaultString(column.DataType) {
 
+		defaultString := ""
 		// Just use the NULL default (instead of a null string) if the field is nullable and the default is NULL
 		// Sometimes default strings include their own single quotes
-		if !(column.IsNullable && column.Default == "NULL") || !(len(column.Default) > 0 && column.Default[0:1] == "'") {
-			column.Default = "'" + column.Default + "'"
+		if column.IsNullable && column.Default == "NULL" {
+			// Don't add quotes
+			defaultString = column.Default
+		} else if len(column.Default) > 0 && column.Default[0:1] == "'" {
+			// Don't add quotes
+			defaultString = column.Default
+		} else {
+			defaultString = "'" + column.Default + "'"
 		}
-		fmt.Println("string datatype: ", column.DataType, column.Default)
-		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
+		fmt.Println("string datatype: ", column.DataType, defaultString)
+		sql += fmt.Sprintf(" DEFAULT %s", defaultString)
 	} else if len(column.Default) > 0 {
 		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
 	}
