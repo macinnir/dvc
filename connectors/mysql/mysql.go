@@ -8,6 +8,7 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
+
 	// "gopkg.in/guregu/null.v3"
 	"log"
 	"reflect"
@@ -687,7 +688,8 @@ func createColumnSegment(column *lib.Column) (sql string, e error) {
 	sql += " NULL"
 
 	// Add single quotes to string default
-	if hasDefaultString(column.DataType) {
+	if hasDefaultString(column.DataType) && column.Default[0:1] != "'" {
+		fmt.Println("string datatype: ", column.DataType, column.Default)
 		sql += fmt.Sprintf(" DEFAULT '%s'", column.Default)
 	} else if len(column.Default) > 0 {
 		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
