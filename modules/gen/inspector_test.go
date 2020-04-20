@@ -189,6 +189,7 @@ func TestBuildModelNodeFromTable(t *testing.T) {
 }
 
 func TestDataTypeToGoTypeString(t *testing.T) {
+	assert.Equal(t, "int", dataTypeToGoTypeString(&lib.Column{DataType: "tinyint"}))
 	assert.Equal(t, "int64", dataTypeToGoTypeString(&lib.Column{DataType: "int"}))
 	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "varchar"}))
 	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "enum"}))

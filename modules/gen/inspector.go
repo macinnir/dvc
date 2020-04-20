@@ -247,6 +247,8 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 func dataTypeToGoTypeString(column *lib.Column) (fieldType string) {
 	fieldType = "int64"
 	switch column.DataType {
+	case "tinyint":
+		fieldType = "int"
 	case "varchar":
 		fieldType = "string"
 	case "enum":
