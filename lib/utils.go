@@ -87,7 +87,6 @@ func HashFileMd5(filePath string) (string, error) {
 	returnMD5String = hex.EncodeToString(hashInBytes)
 
 	return returnMD5String, nil
-
 }
 
 // RunCommand runs a system command

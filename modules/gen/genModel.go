@@ -35,7 +35,7 @@ func (g *Gen) updateGoModel(p string, table *lib.Table) (e error) {
 	var outFile []byte
 
 	fileBytes, e := ioutil.ReadFile(p)
-	modelNode, e = buildModelNodeFromFile(fileBytes)
+	modelNode, e = buildGoStructFromFile(fileBytes)
 	resolveTableToModel(modelNode, table)
 
 	if e != nil {

@@ -16,8 +16,31 @@ import (
 // NullPackage is the package name used for handling nulls
 const NullPackage = "\"gopkg.in/guregu/null.v3\""
 
+func getReceiverTypeName(src []byte, fl interface{}) (string, *ast.FuncDecl) {
+	fd, ok := fl.(*ast.FuncDecl)
+	if !ok {
+		return "", nil
+	}
+	t, err := getReceiverType(fd)
+	if err != nil {
+		return "", nil
+	}
+	st := string(src[t.Pos()-1 : t.End()-1])
+	if len(st) > 0 && st[0] == '*' {
+		st = st[1:]
+	}
+	return st, fd
+}
+
+func getReceiverType(fd *ast.FuncDecl) (ast.Expr, error) {
+	if fd.Recv == nil {
+		return nil, fmt.Errorf("fd is not a method, it is a function")
+	}
+	return fd.Recv.List[0].Type, nil
+}
+
 // buildModelNodeFromFile builds a node representation of a struct from a file
-func buildModelNodeFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) {
+func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) {
 
 	src := string(fileBytes)
 	modelNode = lib.NewGoStruct()
@@ -46,6 +69,10 @@ func buildModelNodeFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error)
 					modelNode.Imports.Append(i.Path.Value)
 				}
 			}
+
+			// for _, d := range s.Decls {
+			// 	GetReceiverTypeName
+			// }
 
 		}
 
@@ -186,27 +213,32 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 	fieldMap := map[string]int{}
 	modelFields := &lib.GoStructFields{}
 
-	hasNullImport := false
-	for _, i := range *modelNode.Imports {
+	nullImportIndex := -1
+	hasNullField := false
+
+	for k, i := range *modelNode.Imports {
 		if i == NullPackage {
-			hasNullImport = true
+			nullImportIndex = k
 			break
 		}
 	}
 
-	for n, m := range *modelNode.Fields {
-		fieldMap[m.Name] = n
+	i := 0
+	for _, m := range *modelNode.Fields {
+
 		// Skip any fields not in the database
 		if _, ok := table.Columns[m.Name]; !ok {
 			continue
 		}
 
+		fieldMap[m.Name] = i
 		modelFields.Append(m)
+		i++
 	}
 
 	for name, col := range table.Columns {
 
-		_, ok := fieldMap[name]
+		fieldIndex, ok := fieldMap[name]
 
 		// Add any fields not in the model
 		if !ok {
@@ -226,17 +258,35 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 					},
 				},
 			})
+		} else {
+
+			// Check that the datatype hasn't changed
+			colDataType := dataTypeToGoTypeString(col)
+
+			log.Println(colDataType, fieldIndex, name)
+
+			if colDataType != (*modelFields)[fieldIndex].DataType {
+				(*modelFields)[fieldIndex].DataType = colDataType
+			}
 		}
 	}
 
 	// Finally check for nullables
 	for _, f := range *modelFields {
 
-		// If the package needs null, and it hasn't been added, add it
-		if fieldDataTypeIsNull(f.DataType) && !hasNullImport {
-			modelNode.Imports.Append(NullPackage)
-			hasNullImport = true
+		if fieldDataTypeIsNull(f.DataType) {
+			hasNullField = true
 		}
+	}
+
+	// If the package needs null, and it hasn't been added, add it
+	if hasNullField && nullImportIndex == -1 {
+		modelNode.Imports.Append(NullPackage)
+	}
+
+	// If no null import is needed, but one exists, remove it
+	if !hasNullField && nullImportIndex > -1 {
+		*modelNode.Imports = append((*modelNode.Imports)[:nullImportIndex], (*modelNode.Imports)[nullImportIndex+1:]...)
 	}
 
 	modelNode.Fields = modelFields

@@ -1,8 +1,11 @@
 package gen
 
 import (
+	"bytes"
 	"fmt"
+	"go/format"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -145,8 +148,8 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		"database/sql",
 		"github.com/jmoiron/sqlx",
 		"log",
-		"github.com/macinnir/dvc/modules/utils",
-		"github.com/macinnir/dvc/modules/query",
+		// "github.com/macinnir/dvc/modules/utils",
+		// "github.com/macinnir/dvc/modules/query",
 	}
 
 	if len(imports) > 0 {
@@ -182,115 +185,86 @@ import ({{range .Imports}}
 	"{{.}}"{{end}}
 )
 
-// {{.Table.Name}}Dal is a data repository for {{.Table.Name}} objects 
-type {{.Table.Name}}Dal struct {
+// {{.Table.Name}}DAL is a data repository for {{.Table.Name}} objects 
+type {{.Table.Name}}DAL struct {
 	db *sqlx.DB
 }
 
-// New{{.Table.Name}}Dal returns a new instance of {{.Table.Name}}Repo
-func New{{.Table.Name}}Dal(db *sqlx.DB) *{{.Table.Name}}Dal {
-	return &{{.Table.Name}}Dal{db}
+// New{{.Table.Name}}DAL returns a new instance of {{.Table.Name}}Repo
+func New{{.Table.Name}}DAL(db *sqlx.DB) *{{.Table.Name}}DAL {
+	return &{{.Table.Name}}DAL{db}
 }
 
 // Create creates a new {{.Table.Name}} entry in the database 
-func (r {{.Table.Name}}Dal) Create(model *models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
 	
 	var result sql.Result 
 	result, e = r.db.NamedExec("INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})", model)
 
 	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.Insert > %s", e.Error())
+		log.Printf("ERR {{.Table.Name}}DAL.Insert > %s", e.Error())
 		return 
 	}
 
 	model.{{.PrimaryKey}}, e = result.LastInsertId()
 
-	log.Printf("INF {{.Table.Name}}Dal.Insert > #%d", model.{{.PrimaryKey}})
+	log.Printf("INF {{.Table.Name}}DAL.Insert > #%d", model.{{.PrimaryKey}})
 	return 
 }
 
 // Update updates an existing {{.Table.Name}} entry in the database 
-func (r *{{.Table.Name}}Dal) Update(model *models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}`" + ` SET {{.Columns | updateFields}} WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
 	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.Update > %s", e.Error())
+		log.Printf("ERR {{.Table.Name}}DAL.Update > %s", e.Error())
 	} else {
-		log.Printf("INF {{.Table.Name}}Dal.Update > #%d", model.{{.PrimaryKey}})
+		log.Printf("INF {{.Table.Name}}DAL.Update > #%d", model.{{.PrimaryKey}})
 	}
 	return 
 }{{if .IsDeleted}}
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
-func (r *{{.Table.Name}}Dal) Delete(model *models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) Delete(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
 	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.Delete > %s", e.Error())
+		log.Printf("ERR {{.Table.Name}}DAL.Delete > %s", e.Error())
 	} else {
-		log.Printf("INF {{.Table.Name}}Dal.Delete > #%d", model.{{.PrimaryKey}})
+		log.Printf("INF {{.Table.Name}}DAL.Delete > #%d", model.{{.PrimaryKey}})
 	}
 	return 
 }{{end}} 
 
 // HardDelete performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}Dal) HardDelete(model *models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) HardDelete(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model) 
 	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.HardDelete > %s", e.Error())
+		log.Printf("ERR {{.Table.Name}}DAL.HardDelete > %s", e.Error())
 	} else {
-		log.Printf("INF {{.Table.Name}}Dal.HardDelete > #%d", model.{{.PrimaryKey}})
+		log.Printf("INF {{.Table.Name}}DAL.HardDelete > #%d", model.{{.PrimaryKey}})
 	}
 	return 
 }
 
-// GetByID gets a single {{.Table.Name}} object by a Primary Key
-func (r *{{.Table.Name}}Dal) GetByID({{.PrimaryKey}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
+// FromID gets a single {{.Table.Name}} object by its Primary Key
+func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
+	
 	model = &models.{{.Table.Name}}{}
-	if e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey}}); e == sql.ErrNoRows {
-		e = utils.NewRecordNotFoundError()
-	}
-
-	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.GetByID > %s", e.Error())
+	
+	e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey}})
+	
+	if e == nil {
+		log.Printf("INF {{.Table.Name}}DAL.GetByID > #%d", model.{{.PrimaryKey}})
+	} else if e == sql.ErrNoRows {
+		e = nil 
+		model = nil 
+		log.Printf("INF {{.Table.Name}}DAL.GetByID > #%d NOT FOUND", model.{{.PrimaryKey}})
 	} else {
-		log.Printf("INF {{.Table.Name}}Dal.GetByID > #%d", model.{{.PrimaryKey}})
+		log.Printf("ERR {{.Table.Name}}DAL.GetByID > %s", e.Error())
 	}
-
+	
 	return 
 }
 
-func (r *{{.Table.Name}}Dal) Run(q *query.SelectQuery) (collection []*models.{{.Table.Name}}, e error) {
-
-	collection = []*models.{{.Table.Name}}{}
-	q.Object = models.New{{.Table.Name}}()
-	sql, args := q.ToSQL()
-
-	e = r.db.Select(&collection, sql, args...)
-
-	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.GetMany > %s", e.Error())
-	} else {
-		log.Println("INF {{.Table.Name}}Dal.GetMany")
-	}
-
-	return
-}
-
-func (r *{{.Table.Name}}Dal) Count(q *query.CountQuery) (count int64, e error) {
-
-	count = 0
-	q.Object = models.New{{.Table.Name}}()
-	sql, args := q.ToSQL()
-
-	e = r.db.Get(&count, sql, args...)
-
-	if e != nil {
-		log.Printf("ERR {{.Table.Name}}Dal.Count > %s", e.Error())
-	} else {
-		log.Println("INF {{.Table.Name}}Dal.Count")
-	}
-
-	return
-}
 // #genEnd
 {{.FileFoot}}`
 
@@ -393,15 +367,15 @@ import ({{range .Imports}}
 	"{{.}}"{{end}}
 )	
 
-// Dal defines the container for all data access layer structs
-type Dal struct {
+// DAL defines the container for all data access layer structs
+type DAL struct {
 	{{range .Tables}}
-	{{.Name}} I{{.Name}}Dal{{end}}
+	{{.Name}} I{{.Name}}DAL{{end}}
 }
 
 {{range .Tables}}
-// I{{.Name}}Dal outlines the repository methods on a {{.Name}} object 
-type I{{.Name}}Dal interface {
+// I{{.Name}}DAL outlines the repository methods on a {{.Name}} object 
+type I{{.Name}}DAL interface {
 	Create(model *models.{{.Name}}) (e error) 
 	Update(model *models.{{.Name}}) (e error) 
 	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
@@ -443,38 +417,41 @@ func (g *Gen) GenerateDALsBootstrapFile(dir string, database *lib.Database) (e e
 // Package dal is the Data Access Layer
 package dal
 import (
-	"log" 
 	"github.com/jmoiron/sqlx"
-	"{{.BasePackage}}/definitions"
 )
 
-// Bootstrap instantiates a collection of repositories
-func Bootstrap(db *sqlx.DB) *definitions.Dal {
-	log.Println("INF Bootstrapping DAL") 
-	r := new(definitions.Dal) 
+// DAL is a container for all dal structs
+type DAL struct {
 	{{range .Tables}}
-	// {{.Name}}
-	r.{{.Name}} = New{{.Name}}Dal(db)
-	{{end}}
-	return r
+	{{.Name}} *{{.Name}}DAL{{end}}
+}
+
+// BootstrapDAL bootstraps all of the DAL methods
+func BootstrapDAL(db *sqlx.DB) *DAL {
+
+	d := &DAL{} 
+	{{range .Tables}}
+	d.{{.Name}} = New{{.Name}}DAL(db){{end}}
+
+	return d
 }`
 
 	p := path.Join(dir, "bootstrap.go")
 	t := template.Must(template.New("repos-bootstrap").Parse(tpl))
-	f, err := os.Create(p)
-	if err != nil {
-		fmt.Println("ERROR: ", err.Error())
+	buffer := bytes.Buffer{}
+
+	e = t.Execute(&buffer, data)
+	if e != nil {
+		fmt.Println("Template Error: ", e.Error())
 		return
 	}
 
-	err = t.Execute(f, data)
-	if err != nil {
-		fmt.Println("Execute Error: ", err.Error())
-		return
-	}
+	var formatted []byte
+	formatted, e = format.Source(buffer.Bytes())
 
-	f.Close()
-	g.FmtGoCode(p)
+	if e = ioutil.WriteFile(p, formatted, 0644); e != nil {
+		fmt.Println("Write file error: ", e.Error())
+	}
 
 	return
 }

@@ -52,7 +52,7 @@ import (
 type School struct {
 	SchoolID    int64       ` + "`db:\"SchoolID\" json:\"SchoolID\"`" + `
 	Name        string      ` + "`db:\"Name\" json:\"Name\"`" + `
-	IsDeleted   int64       ` + "`db:\"IsDeleted\" json:\"IsDeleted\"`" + `
+	IsDeleted   int         ` + "`db:\"IsDeleted\" json:\"IsDeleted\"`" + `
 	Address     string      ` + "`db:\"Address\" json:\"Address\"`" + `
 	Address2    string      ` + "`db:\"Address2\" json:\"Address2\"`" + `
 	City        string      ` + "`db:\"City\" json:\"City\"`" + `
@@ -73,7 +73,7 @@ import (
 type School struct {
 	SchoolID    int64       ` + "`db:\"SchoolID\" json:\"SchoolID\"`" + `
 	Name        string      ` + "`db:\"Name\" json:\"Name\"`" + `
-	IsDeleted   int64       ` + "`db:\"IsDeleted\" json:\"IsDeleted\"`" + `
+	IsDeleted   int         ` + "`db:\"IsDeleted\" json:\"IsDeleted\"`" + `
 	Address     string      ` + "`db:\"Address\" json:\"Address\"`" + `
 	Address2    string      ` + "`db:\"Address2\" json:\"Address2\"`" + `
 	City        string      ` + "`db:\"City\" json:\"City\"`" + `
@@ -87,7 +87,7 @@ type School struct {
 
 func TestBuildModelNodeFromFile(t *testing.T) {
 
-	modelNode, e := buildModelNodeFromFile(structBytes)
+	modelNode, e := buildGoStructFromFile(structBytes)
 
 	require.Nil(t, e)
 	assert.Equal(t, "Foo", modelNode.Name)
@@ -123,7 +123,7 @@ func TestBuildModelNodeFromFile(t *testing.T) {
 }
 
 func TestBuildFileFromModelNode(t *testing.T) {
-	modelNode, e := buildModelNodeFromFile(structBytes)
+	modelNode, e := buildGoStructFromFile(structBytes)
 	require.Nil(t, e)
 	var modelBytes []byte
 	modelBytes, e = buildFileFromModelNode(modelNode)
@@ -133,7 +133,7 @@ func TestBuildFileFromModelNode(t *testing.T) {
 }
 
 func TestResolveTableToModel(t *testing.T) {
-	model, e := buildModelNodeFromFile(structB)
+	model, e := buildGoStructFromFile(structB)
 	if e != nil {
 		t.Log(e)
 	}
@@ -165,6 +165,50 @@ func TestResolveTableToModel_WithNulls(t *testing.T) {
 	assert.Equal(t, 2, model.Fields.Len())
 	assert.Equal(t, "NullableCol", model.Fields.Get(1).Name)
 	assert.Equal(t, "null.String", model.Fields.Get(1).DataType)
+}
+
+func TestResolveTableToModel_UpdatedType(t *testing.T) {
+	table := &lib.Table{
+		Columns: map[string]*lib.Column{
+			"One":         {Name: "One", DataType: "varchar", Position: 0},
+			"NullableCol": {Name: "NullableCol", DataType: "int", IsNullable: true, Position: 1},
+		},
+	}
+
+	// Model has no null import
+	model := lib.NewGoStruct()
+	model.Fields = &lib.GoStructFields{}
+	model.Fields.Append(&lib.GoStructField{Name: "One", DataType: "string"})
+	model.Fields.Append(&lib.GoStructField{Name: "NullableCol", DataType: "string"})
+
+	resolveTableToModel(model, table)
+
+	require.Equal(t, 1, model.Imports.Len())
+	assert.Equal(t, NullPackage, model.Imports.Get(0))
+	assert.Equal(t, 2, model.Fields.Len())
+	assert.Equal(t, "NullableCol", model.Fields.Get(1).Name)
+	assert.Equal(t, "null.Int", model.Fields.Get(1).DataType)
+}
+
+func TestResolveTableToModel_RemoveColumn(t *testing.T) {
+	table := &lib.Table{
+		Columns: map[string]*lib.Column{
+			"One": {Name: "One", DataType: "varchar", Position: 0},
+		},
+	}
+
+	// Model has no null import
+	model := lib.NewGoStruct()
+	model.Imports = &lib.GoFileImports{NullPackage}
+	model.Fields = &lib.GoStructFields{}
+	model.Fields.Append(&lib.GoStructField{Name: "One", DataType: "string"})
+	model.Fields.Append(&lib.GoStructField{Name: "Two", DataType: "null.String"})
+
+	resolveTableToModel(model, table)
+
+	require.Equal(t, 0, model.Imports.Len())
+	assert.Equal(t, 1, model.Fields.Len())
+	assert.Equal(t, "One", model.Fields.Get(0).Name)
 }
 
 func TestBuildModelNodeFromTable(t *testing.T) {

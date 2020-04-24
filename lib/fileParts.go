@@ -41,6 +41,7 @@ type GoStruct struct {
 	Package  string
 	Name     string
 	Fields   *GoStructFields
+	Methods  *GoStructMethods
 	Comments string
 	Imports  *GoFileImports
 }
@@ -104,6 +105,30 @@ func (m *GoStructField) ToString() string {
 
 	return str
 
+}
+
+// GoStructMethods is a collection of go methods on a struct
+type GoStructMethods []*GoStructMethod
+
+// Len returns the number of methods
+func (g *GoStructMethods) Len() int {
+	return len(*g)
+}
+
+// Append adds a new struct to the struct collection
+func (g *GoStructMethods) Append(m *GoStructMethod) {
+	*g = append(*g, m)
+}
+
+// Get gets a struct at index
+func (g *GoStructMethods) Get(index int) (m *GoStructMethod) {
+	return (*g)[index]
+}
+
+// GoStructMethod is a method on a struct
+type GoStructMethod struct {
+	Code string
+	Docs []string
 }
 
 // GoStructFieldTag is a tag on a field on a model struct

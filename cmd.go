@@ -418,7 +418,7 @@ func (c *Cmd) CommandGen(args []string) {
 	subCmd := Command(args[0])
 	cwd, _ := os.Getwd()
 
-	if len(args) > 1 {
+	if len(args) > 0 {
 		args = args[1:]
 	}
 
@@ -498,23 +498,40 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 	case CommandGenDal:
 
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoDALs(c.Config.Dirs.Dal, database)
+		if argLen == 0 {
+			lib.Error("Missing dal name", c.Options)
+			os.Exit(1)
 		}
 
-		for _, table := range database.Tables {
-
-			lib.Debugf("Generating dal %s", g.Options, table.Name)
-			e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
-			if e != nil {
-				return
-			}
-		}
-
+		// lib.Error(fmt.Sprintf("Args: %s", args[0]), c.Options)
+		table, e := database.FindTableByName(args[0])
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
+
+		e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+		// if c.Options&lib.OptClean == lib.OptClean {
+		// 	g.CleanGoDALs(c.Config.Dirs.Dal, database)
+		// }
+
+		// for _, table := range database.Tables {
+
+		// 	lib.Debugf("Generating dal %s", g.Options, table.Name)
+		// 	e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
+		// 	if e != nil {
+		// 		return
+		// 	}
+		// }
+
+		// if e != nil {
+		// 	lib.Error(e.Error(), c.Options)
+		// 	os.Exit(1)
+		// }
 
 		// Create the dal bootstrap file in the dal repo
 		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
@@ -523,13 +540,13 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
-		g.EnsureDir(c.Config.Dirs.Definitions)
-		e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+		// lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
+		// g.EnsureDir(c.Config.Dirs.Definitions)
+		// e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
+		// if e != nil {
+		// 	lib.Error(e.Error(), c.Options)
+		// 	os.Exit(1)
+		// }
 
 	case CommandGenModels:
 
