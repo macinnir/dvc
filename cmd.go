@@ -515,6 +515,7 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
+
 		// if c.Options&lib.OptClean == lib.OptClean {
 		// 	g.CleanGoDALs(c.Config.Dirs.Dal, database)
 		// }
@@ -535,6 +536,12 @@ func (c *Cmd) CommandGen(args []string) {
 
 		// Create the dal bootstrap file in the dal repo
 		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
+		e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
@@ -561,6 +568,12 @@ func (c *Cmd) CommandGen(args []string) {
 				lib.Error(e.Error(), c.Options)
 				os.Exit(1)
 			}
+		}
+
+		e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
 		}
 
 		// // Config.go

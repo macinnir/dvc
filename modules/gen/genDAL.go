@@ -270,42 +270,9 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey}} {{.IDType}}) (model *models.
 
 	t := template.New("dal-" + table.Name)
 	t.Funcs(template.FuncMap{
-		"insertFields": func(columns lib.SortedColumns) string {
-			fields := []string{}
-
-			for _, field := range columns {
-				if field.ColumnKey == "PRI" {
-					continue
-				}
-
-				fields = append(fields, "`"+field.Name+"`")
-			}
-
-			return strings.Join(fields, ",")
-		},
-		"insertValues": func(columns lib.SortedColumns) string {
-			fields := []string{}
-			for _, field := range columns {
-				if field.ColumnKey == "PRI" {
-					continue
-				}
-
-				fields = append(fields, ":"+field.Name)
-			}
-
-			return strings.Join(fields, ",")
-		},
-		"updateFields": func(columns lib.SortedColumns) string {
-			fields := []string{}
-			for _, field := range columns {
-				if field.ColumnKey == "PRI" {
-					continue
-				}
-				fields = append(fields, "`"+field.Name+"` = :"+field.Name)
-			}
-
-			return strings.Join(fields, ",")
-		},
+		"insertFields": fetchTableInsertFieldsString,
+		"insertValues": fetchTableInsertValuesString,
+		"updateFields": fetchTableUpdateFieldsString,
 	})
 
 	t, e = t.Parse(tpl)
@@ -332,6 +299,191 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey}} {{.IDType}}) (model *models.
 	return
 }
 
+// GenerateDALSQL generates a constants file filled with sql statements
+func (g *Gen) GenerateDALSQL(dir string, database *lib.Database) (e error) {
+
+	var contents string
+	var formatted []byte
+
+	g.EnsureDir(dir)
+
+	contents, e = generateDALSQL("dal", database)
+
+	if e != nil {
+		return
+	}
+
+	formatted, e = format.Source([]byte(contents))
+
+	if e != nil {
+		fmt.Println(contents)
+		return
+	}
+
+	p := path.Join(dir, "sql.go")
+	e = ioutil.WriteFile(p, formatted, 0644)
+	return
+}
+
+func generateDALSQL(basePackage string, database *lib.Database) (out string, e error) {
+
+	var sb strings.Builder
+
+	sb.WriteString("package " + basePackage + "\n")
+
+	for _, table := range database.Tables {
+		var outTable string
+		outTable, e = generateTableInsertAndUpdateFields(table)
+		if e != nil {
+			return
+		}
+
+		sb.WriteString("\n" + outTable + "\n")
+	}
+
+	out = sb.String()
+	return
+}
+
+// generateTableInsertAndUpdateFields generates insert and update fields as a string for use in their
+// respective SQL queries
+func generateTableInsertAndUpdateFields(table *lib.Table) (fields string, e error) {
+	data := struct {
+		Table          *lib.Table
+		PrimaryKey     string
+		PrimaryKeyType string
+		IDType         string
+		Columns        lib.SortedColumns
+		IsDeleted      bool
+	}{
+		Table: table,
+	}
+	sortedColumns := make(lib.SortedColumns, 0, len(table.Columns))
+
+	// Find the primary key
+	for _, column := range table.Columns {
+		if column.ColumnKey == "PRI" {
+			data.PrimaryKey = column.Name
+			data.PrimaryKeyType = column.DataType
+		}
+		sortedColumns = append(sortedColumns, column)
+	}
+
+	sort.Sort(sortedColumns)
+
+	data.Columns = sortedColumns
+
+	_, data.IsDeleted = table.Columns["IsDeleted"]
+
+	switch data.PrimaryKeyType {
+	case "varchar":
+		data.IDType = "string"
+	}
+	t := template.New("dal-fields")
+	t.Funcs(
+		template.FuncMap{
+			"primaryKey":   fetchTablePrimaryKey,
+			"insertFields": fetchTableInsertFieldsString,
+			"insertValues": fetchTableInsertValuesString,
+			"updateFields": fetchTableUpdateFieldsString,
+		},
+	)
+
+	tpl := `// {{.Table.Name}}DAL SQL
+const (
+	{{.Table.Name}}DALInsertSQL = "INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})" 
+	{{.Table.Name}}DALUpdateSQL = "UPDATE ` + "`{{.Table.Name}}`" + ` SET {{.Columns | updateFields}} WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}"
+)`
+
+	t, e = t.Parse(tpl)
+	if e != nil {
+		panic(e)
+	}
+
+	outBytes := []byte{}
+	out := bytes.NewBuffer(outBytes)
+
+	e = t.Execute(out, data)
+
+	if e != nil {
+		return
+	}
+
+	fields = out.String()
+	return
+}
+
+func fetchTablePrimaryKey(table *lib.Table) string {
+	primaryKey := ""
+	idType := "int64"
+	for _, column := range table.Columns {
+		if column.ColumnKey == "PRI" {
+			primaryKey = column.Name
+		}
+	}
+
+	return primaryKey + " " + idType
+}
+
+func fetchTableInsertFieldsString(columns lib.SortedColumns) string {
+
+	fields := []string{}
+
+	for _, field := range columns {
+		if field.ColumnKey == "PRI" {
+			continue
+		}
+
+		if field.Name == "IsDeleted" {
+			continue
+		}
+
+		fields = append(fields, "`"+field.Name+"`")
+	}
+
+	return strings.Join(fields, ",")
+}
+
+func fetchTableInsertValuesString(columns lib.SortedColumns) string {
+	fields := []string{}
+	for _, field := range columns {
+
+		if field.ColumnKey == "PRI" {
+			continue
+		}
+
+		if field.Name == "IsDeleted" {
+			continue
+		}
+
+		fields = append(fields, ":"+field.Name)
+	}
+
+	return strings.Join(fields, ",")
+}
+
+func fetchTableUpdateFieldsString(columns lib.SortedColumns) string {
+	fields := []string{}
+	for _, field := range columns {
+
+		if field.ColumnKey == "PRI" {
+			continue
+		}
+
+		if field.Name == "IsDeleted" {
+			continue
+		}
+
+		if field.Name == "DateCreated" {
+			continue
+		}
+
+		fields = append(fields, "`"+field.Name+"` = :"+field.Name)
+	}
+
+	return strings.Join(fields, ",")
+}
+
 func (g *Gen) GenerateDALInterfaces(database *lib.Database, dir string) (e error) {
 
 	var data = struct {
@@ -348,17 +500,7 @@ func (g *Gen) GenerateDALInterfaces(database *lib.Database, dir string) (e error
 	}
 
 	t := template.New("dal-interface")
-	t.Funcs(template.FuncMap{"primaryKey": func(table *lib.Table) string {
-		primaryKey := ""
-		idType := "int64"
-		for _, column := range table.Columns {
-			if column.ColumnKey == "PRI" {
-				primaryKey = column.Name
-			}
-		}
-
-		return primaryKey + " " + idType
-	}})
+	t.Funcs(template.FuncMap{"primaryKey": fetchTablePrimaryKey})
 
 	tpl := `
 // Package definitions outlines objects and functionality used in the {{.BasePackage}} application
