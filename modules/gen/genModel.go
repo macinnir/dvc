@@ -25,6 +25,7 @@ func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 		return
 	}
 
+	lib.Infof("Creating `%s`", g.Options, table.Name)
 	e = g.buildGoModel(p, table)
 	return
 }

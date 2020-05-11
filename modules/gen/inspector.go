@@ -263,7 +263,7 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 			// Check that the datatype hasn't changed
 			colDataType := dataTypeToGoTypeString(col)
 
-			log.Println(colDataType, fieldIndex, name)
+			// log.Println(colDataType, fieldIndex, name)
 
 			if colDataType != (*modelFields)[fieldIndex].DataType {
 				(*modelFields)[fieldIndex].DataType = colDataType
