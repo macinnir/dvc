@@ -164,6 +164,24 @@ type Table struct {
 	Columns       map[string]*Column `json:"columns"`
 }
 
+// SortedTables is a slice of Table objects
+type SortedTables []*Table
+
+// Len is part of sort.Interface.
+func (c SortedTables) Len() int {
+	return len(c)
+}
+
+// Swap is part of sort.Interface.
+func (c SortedTables) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less is part of sort.Interface. We use count as the value to sort by
+func (c SortedTables) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
+}
+
 // Column represents a column in a table
 type Column struct {
 	Name         string `json:"column"`

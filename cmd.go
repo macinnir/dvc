@@ -9,10 +9,12 @@ import (
 	"path"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/BurntSushi/toml"
 	"github.com/macinnir/dvc/modules/compare"
 	"github.com/macinnir/dvc/modules/gen"
+	"github.com/macinnir/dvc/modules/gen/interfaces"
 
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
@@ -34,6 +36,7 @@ const (
 	CommandGenDal        Command = "dal"
 	CommandGenRepos      Command = "repos"
 	CommandGenModels     Command = "models"
+	CommandGenInterfaces Command = "interfaces"
 	CommandGenModel      Command = "model"
 	CommandGenServices   Command = "services"
 	CommandGenTypescript Command = "typescript"
@@ -554,6 +557,73 @@ func (c *Cmd) CommandGen(args []string) {
 		// 	lib.Error(e.Error(), c.Options)
 		// 	os.Exit(1)
 		// }
+
+	case CommandGenInterfaces:
+
+		genInterfaces := func(srcDir, srcType string) (e error) {
+
+			var files []os.FileInfo
+			// DAL
+			if files, e = ioutil.ReadDir(srcDir); e != nil {
+				return
+			}
+			for _, f := range files {
+
+				if !unicode.IsUpper([]rune(f.Name())[0]) {
+					continue
+				}
+
+				srcFile := path.Join(srcDir, f.Name())
+				baseName := f.Name()[0 : len(f.Name())-3]
+
+				// srcFile := path.Join(c.Config.Dirs.Dal, baseName + ".go")
+				destFile := path.Join(c.Config.Dirs.Definitions, srcType, "I"+baseName+".go")
+				interfaceName := "I" + baseName
+				packageName := srcType
+
+				var i []byte
+				i, e = interfaces.Run(
+					[]string{srcFile},
+					baseName,
+					"Generated Code; DO NOT EDIT.",
+					packageName,
+					interfaceName,
+					fmt.Sprintf("%s describes the %s", interfaceName, baseName),
+					true,
+					true,
+				)
+				if e != nil {
+					fmt.Println("ERROR", e.Error())
+					return
+				}
+
+				// fmt.Println("Generating ", destFile)
+				// fmt.Println("Writing to: ", destFile)
+
+				ioutil.WriteFile(destFile, i, 0644)
+
+				// fmt.Println("Name: ", baseName, "Path: ", srcFile)
+
+			}
+
+			return
+		}
+
+		e = genInterfaces(c.Config.Dirs.Dal, "dal")
+		if e != nil {
+			fmt.Println("ERROR", e.Error())
+			os.Exit(1)
+		}
+
+		e = genInterfaces(c.Config.Dirs.Services, "services")
+		if e != nil {
+			fmt.Println("ERROR", e.Error())
+			os.Exit(1)
+		}
+
+		os.Exit(0)
+
+		// result, err := interfaces.Make(files, args.StructType, args.Comment, args.PkgName, args.IfaceName, args.IfaceComment, args.copyDocs, args.CopyTypeDoc)
 
 	case CommandGenModels:
 
