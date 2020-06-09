@@ -176,7 +176,6 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	data.Imports = imports
 
 	tpl := `{{.FileHead}}
-// #genStart
 // Package dal is the Data Access Layer
 package dal
 
@@ -200,27 +199,24 @@ func (r {{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
 	
 	var result sql.Result 
 	result, e = r.db.NamedExec({{.Table.Name}}DALInsertSQL, model)
-	// "INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})", model)
-
 	if e != nil {
-		r.log.Printf("ERR {{.Table.Name}}DAL.Insert > %s", e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.Insert > %s", e.Error())
 		return 
 	}
 
 	model.{{.PrimaryKey}}, e = result.LastInsertId()
 
-	r.log.Printf("INF {{.Table.Name}}DAL.Insert > #%d", model.{{.PrimaryKey}})
+	r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
 	return 
 }
 
 // Update updates an existing {{.Table.Name}} entry in the database 
 func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec({{.Table.Name}}DALUpdateSQL, model)
-	// "UPDATE ` + "`{{.Table.Name}}`" + ` SET {{.Columns | updateFields}} WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
 	if e != nil {
-		r.log.Printf("ERR {{.Table.Name}}DAL.Update > %s", e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.Update(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 	} else {
-		r.log.Printf("INF {{.Table.Name}}DAL.Update > #%d", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.Update(%d)", model.{{.PrimaryKey}})
 	}
 	return 
 }{{if .IsDeleted}}
@@ -229,9 +225,9 @@ func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
 func (r *{{.Table.Name}}DAL) Delete(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
 	if e != nil {
-		r.log.Printf("ERR {{.Table.Name}}DAL.Delete > %s", e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 	} else {
-		r.log.Printf("INF {{.Table.Name}}DAL.Delete > #%d", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", model.{{.PrimaryKey}})
 	}
 	return 
 }{{end}} 
@@ -240,9 +236,9 @@ func (r *{{.Table.Name}}DAL) Delete(model *models.{{.Table.Name}}) (e error) {
 func (r *{{.Table.Name}}DAL) HardDelete(model *models.{{.Table.Name}}) (e error) {
 	_, e = r.db.NamedExec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model) 
 	if e != nil {
-		r.log.Printf("ERR {{.Table.Name}}DAL.HardDelete > %s", e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 	} else {
-		r.log.Printf("INF {{.Table.Name}}DAL.HardDelete > #%d", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", model.{{.PrimaryKey}})
 	}
 	return 
 }
@@ -255,19 +251,17 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey}} {{.IDType}}) (model *models.
 	e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey}})
 	
 	if e == nil {
-		r.log.Printf("INF {{.Table.Name}}DAL.GetByID > #%d", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
 	} else if e == sql.ErrNoRows {
 		e = nil 
 		model = nil 
-		r.log.Printf("INF {{.Table.Name}}DAL.GetByID > #%d NOT FOUND", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", model.{{.PrimaryKey}})
 	} else {
-		r.log.Printf("ERR {{.Table.Name}}DAL.GetByID > %s", e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.FromID(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 	}
 	
 	return 
 }
-
-// #genEnd
 {{.FileFoot}}`
 
 	t := template.New("dal-" + table.Name)
