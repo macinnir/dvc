@@ -107,6 +107,8 @@ func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string
 	fileFoot = ""
 	imports = []string{}
 
+	return
+
 	if !g.fileExists(filePath) {
 		return
 	}

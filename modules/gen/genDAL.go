@@ -81,6 +81,10 @@ func (g *Gen) CleanGoDALs(dir string, database *lib.Database) (e error) {
 	return
 }
 
+func toArgName(field string) string {
+	return strings.ToLower(field[:1]) + field[1:]
+}
+
 // GenerateGoDAL returns a string for a repo in golang
 func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 
@@ -93,24 +97,27 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	lib.Debugf("Generating go dal file for table %s at path %s", g.Options, table.Name, p)
 
 	data := struct {
-		Table          *lib.Table
-		Columns        lib.SortedColumns
-		PrimaryKey     string
-		PrimaryKeyType string
-		IDType         string
-		IsDeleted      bool
-		Imports        []string
-		FileHead       string
-		FileFoot       string
+		Table             *lib.Table
+		Columns           lib.SortedColumns
+		UpdateColumns     []*lib.Column
+		PrimaryKey        string
+		PrimaryKeyType    string
+		PrimaryKeyArgName string
+		IDType            string
+		IsDeleted         bool
+		Imports           []string
+		FileHead          string
+		FileFoot          string
 	}{
-		Table:          table,
-		PrimaryKey:     "",
-		PrimaryKeyType: "",
-		IDType:         "int64",
-		IsDeleted:      false,
-		Imports:        []string{},
-		FileHead:       "",
-		FileFoot:       "",
+		Table:             table,
+		PrimaryKey:        "",
+		PrimaryKeyType:    "",
+		PrimaryKeyArgName: "",
+		IDType:            "int64",
+		IsDeleted:         false,
+		Imports:           []string{},
+		FileHead:          "",
+		FileFoot:          "",
 	}
 
 	if data.FileHead, data.FileFoot, imports, e = g.scanFileParts(p, true); e != nil {
@@ -128,6 +135,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		if column.ColumnKey == "PRI" {
 			data.PrimaryKey = column.Name
 			data.PrimaryKeyType = column.DataType
+			data.PrimaryKeyArgName = toArgName(data.PrimaryKey)
 		}
 		sortedColumns = append(sortedColumns, column)
 	}
@@ -135,6 +143,8 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	sort.Sort(sortedColumns)
 
 	data.Columns = sortedColumns
+
+	data.UpdateColumns = fetchUpdateColumns(data.Columns)
 
 	_, data.IsDeleted = table.Columns["IsDeleted"]
 
@@ -147,10 +157,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		fmt.Sprintf("%s/%s/models", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		"database/sql",
-		// "github.com/macinnir/dvc/modules/utils",
-		// "github.com/macinnir/dvc/modules/query",
 	}
-
 	if len(imports) > 0 {
 
 		for _, di := range defaultImports {
@@ -174,6 +181,11 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	}
 
 	data.Imports = imports
+
+	// var {{.Table.Name}}DALFields = []string{
+	// 	{{range $col := .Columns}}"{{$col.Name}}",
+	// 	{{end}}
+	// }
 
 	tpl := `{{.FileHead}}
 // Package dal is the Data Access Layer
@@ -244,31 +256,47 @@ func (r *{{.Table.Name}}DAL) HardDelete(model *models.{{.Table.Name}}) (e error)
 }
 
 // FromID gets a single {{.Table.Name}} object by its Primary Key
-func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
+func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
 	
 	model = &models.{{.Table.Name}}{}
 	
-	e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey}})
+	e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
 	
 	if e == nil {
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
 	} else if e == sql.ErrNoRows {
 		e = nil 
 		model = nil 
-		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
 	} else {
-		r.log.Errorf("{{.Table.Name}}DAL.FromID(%d) > %s", model.{{.PrimaryKey}}, e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.FromID(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	}
 	
 	return 
 }
+
+{{range $col := .UpdateColumns}}
+// Set{{$col.Name}} sets the {{$col.Name}} column on a {{$.Table.Name}} object
+func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (e error) {
+	e = r.db.Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
+	if e != nil {
+		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error()) 
+	} else {
+		r.log.Debugf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v)", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}) 
+	}
+	return 
+}
+{{end}}
+
 {{.FileFoot}}`
 
 	t := template.New("dal-" + table.Name)
 	t.Funcs(template.FuncMap{
-		"insertFields": fetchTableInsertFieldsString,
-		"insertValues": fetchTableInsertValuesString,
-		"updateFields": fetchTableUpdateFieldsString,
+		"insertFields":           fetchTableInsertFieldsString,
+		"insertValues":           fetchTableInsertValuesString,
+		"updateFields":           fetchTableUpdateFieldsString,
+		"dataTypeToGoTypeString": dataTypeToGoTypeString,
+		"toArgName":              toArgName,
 	})
 
 	t, e = t.Parse(tpl)
@@ -467,19 +495,42 @@ func fetchTableInsertValuesString(columns lib.SortedColumns) string {
 	return strings.Join(fields, ",")
 }
 
+func isUpdateColumn(column *lib.Column) bool {
+	if column.ColumnKey == "PRI" {
+		return false
+	}
+
+	if column.Name == "IsDeleted" {
+		return false
+	}
+
+	if column.Name == "DateCreated" {
+		return false
+	}
+
+	return true
+}
+
+func fetchUpdateColumns(columns lib.SortedColumns) []*lib.Column {
+
+	updateColumns := []*lib.Column{}
+
+	for _, column := range columns {
+		if !isUpdateColumn(column) {
+			continue
+		}
+
+		updateColumns = append(updateColumns, column)
+	}
+
+	return updateColumns
+}
+
 func fetchTableUpdateFieldsString(columns lib.SortedColumns) string {
 	fields := []string{}
 	for _, field := range columns {
 
-		if field.ColumnKey == "PRI" {
-			continue
-		}
-
-		if field.Name == "IsDeleted" {
-			continue
-		}
-
-		if field.Name == "DateCreated" {
+		if !isUpdateColumn(field) {
 			continue
 		}
 
@@ -487,63 +538,6 @@ func fetchTableUpdateFieldsString(columns lib.SortedColumns) string {
 	}
 
 	return strings.Join(fields, ",")
-}
-
-func (g *Gen) GenerateDALInterfaces(database *lib.Database, dir string) (e error) {
-
-	var data = struct {
-		BasePackage string
-		Imports     []string
-		Tables      map[string]*lib.Table
-	}{
-		BasePackage: g.Config.BasePackage,
-		Imports: []string{
-			fmt.Sprintf("%s/definitions/models", g.Config.BasePackage),
-			"github.com/macinnir/dvc/modules/query",
-		},
-		Tables: database.Tables,
-	}
-
-	t := template.New("dal-interface")
-	t.Funcs(template.FuncMap{"primaryKey": fetchTablePrimaryKey})
-
-	tpl := `
-// Package definitions outlines objects and functionality used in the {{.BasePackage}} application
-package definitions
-import ({{range .Imports}}
-	"{{.}}"{{end}}
-)	
-
-// DAL defines the container for all data access layer structs
-type DAL struct {
-	{{range .Tables}}
-	{{.Name}} I{{.Name}}DAL{{end}}
-}
-
-{{range .Tables}}
-// I{{.Name}}DAL outlines the repository methods on a {{.Name}} object 
-type I{{.Name}}DAL interface {
-	Create(model *models.{{.Name}}) (e error) 
-	Update(model *models.{{.Name}}) (e error) 
-	{{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
-	HardDelete(model *models.{{.Name}}) (e error) 
-	GetByID({{. | primaryKey}}) (model *models.{{.Name}}, e error) 
-	Run(q *query.SelectQuery) (collection []*models.{{.Name}}, e error) 
-	Count(q *query.CountQuery) (count int64, e error) 
-}
-{{end}}
-`
-	// {{if .Columns.IsDeleted}}Delete(model *models.{{.Name}}) (e error){{end}}
-	p := path.Join(dir, "dal.go")
-	f, _ := os.Create(p)
-	t, _ = t.Parse(tpl)
-	e = t.Execute(f, data)
-	if e != nil {
-		fmt.Println("Execute Error: ", e.Error())
-	}
-	f.Close()
-	g.FmtGoCode(p)
-	return
 }
 
 // GenerateDALsBootstrapFile generates a dal bootstrap file in golang

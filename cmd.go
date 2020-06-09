@@ -550,14 +550,6 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		// lib.Debug("Generating dal interfaces at "+c.Config.Dirs.Definitions, c.Options)
-		// g.EnsureDir(c.Config.Dirs.Definitions)
-		// e = g.GenerateDALInterfaces(database, c.Config.Dirs.Definitions)
-		// if e != nil {
-		// 	lib.Error(e.Error(), c.Options)
-		// 	os.Exit(1)
-		// }
-
 	case CommandGenInterfaces:
 
 		genInterfaces := func(srcDir, srcType string) (e error) {
@@ -569,21 +561,52 @@ func (c *Cmd) CommandGen(args []string) {
 			}
 			for _, f := range files {
 
+				// Filter out files that don't have upper case first letter names
 				if !unicode.IsUpper([]rune(f.Name())[0]) {
 					continue
 				}
 
 				srcFile := path.Join(srcDir, f.Name())
+
+				// Remove the go extension
 				baseName := f.Name()[0 : len(f.Name())-3]
+
+				// Skip over EXT files
+				if baseName[len(baseName)-3:] == "Ext" {
+					continue
+				}
+
+				// Skip over test files
+				if baseName[len(baseName)-5:] == "_test" {
+					continue
+				}
 
 				// srcFile := path.Join(c.Config.Dirs.Dal, baseName + ".go")
 				destFile := path.Join(c.Config.Dirs.Definitions, srcType, "I"+baseName+".go")
 				interfaceName := "I" + baseName
 				packageName := srcType
 
+				srcFiles := []string{srcFile}
+				// var src []byte
+				// if src, e = ioutil.ReadFile(srcFile); e != nil {
+				// 	return
+				// }
+
+				// Check if EXT file exists
+				extFile := srcFile[0:len(srcFile)-3] + "Ext.go"
+				if _, e = os.Stat(extFile); e == nil {
+					srcFiles = append(srcFiles, extFile)
+					// concatenate the contents of the ext file with the contents of the regular file
+					// var extSrc []byte
+					// if extSrc, e = ioutil.ReadFile(extFile); e != nil {
+					// 	return
+					// }
+					// src = append(src, extSrc...)
+				}
+
 				var i []byte
 				i, e = interfaces.Run(
-					[]string{srcFile},
+					srcFiles,
 					baseName,
 					"Generated Code; DO NOT EDIT.",
 					packageName,
