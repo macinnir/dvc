@@ -105,6 +105,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		PrimaryKeyArgName string
 		IDType            string
 		IsDeleted         bool
+		IsDateCreated     bool
 		Imports           []string
 		FileHead          string
 		FileFoot          string
@@ -115,6 +116,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		PrimaryKeyArgName: "",
 		IDType:            "int64",
 		IsDeleted:         false,
+		IsDateCreated:     false,
 		Imports:           []string{},
 		FileHead:          "",
 		FileFoot:          "",
@@ -130,13 +132,20 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 
 	sortedColumns := make(lib.SortedColumns, 0, len(table.Columns))
 
+	hasNull := false
+
 	// Find the primary key
 	for _, column := range table.Columns {
 		if column.ColumnKey == "PRI" {
 			data.PrimaryKey = column.Name
 			data.PrimaryKeyType = column.DataType
-			data.PrimaryKeyArgName = toArgName(data.PrimaryKey)
 		}
+
+		goDataType := dataTypeToGoTypeString(column)
+		if len(goDataType) > 5 && goDataType[0:5] == "null." {
+			hasNull = true
+		}
+
 		sortedColumns = append(sortedColumns, column)
 	}
 
@@ -147,6 +156,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	data.UpdateColumns = fetchUpdateColumns(data.Columns)
 
 	_, data.IsDeleted = table.Columns["IsDeleted"]
+	_, data.IsDateCreated = table.Columns["DateCreated"]
 
 	switch data.PrimaryKeyType {
 	case "varchar":
@@ -158,6 +168,15 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		"database/sql",
 	}
+
+	if hasNull {
+		imports = append(imports, "gopkg.in/guregu/null.v3")
+	}
+
+	if data.IsDateCreated {
+		imports = append(imports, "time")
+	}
+
 	if len(imports) > 0 {
 
 		for _, di := range defaultImports {
@@ -208,7 +227,9 @@ func New{{.Table.Name}}DAL(db integrations.IDB, log integrations.ILog) *{{.Table
 
 // Create creates a new {{.Table.Name}} entry in the database 
 func (r {{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
-	
+{{if .IsDateCreated}}
+	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
+
 	var result sql.Result 
 	result, e = r.db.NamedExec({{.Table.Name}}DALInsertSQL, model)
 	if e != nil {
@@ -234,23 +255,23 @@ func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
 }{{if .IsDeleted}}
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
-func (r *{{.Table.Name}}DAL) Delete(model *models.{{.Table.Name}}) (e error) {
-	_, e = r.db.NamedExec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model)
+func (r *{{.Table.Name}}DAL) Delete({{.PrimaryKey | toArgName}} {{.IDType}}) (e error) {
+	_, e = r.db.Exec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
 	if e != nil {
-		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", model.{{.PrimaryKey}}, e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", {{.PrimaryKey | toArgName}})
 	}
 	return 
 }{{end}} 
 
-// HardDelete performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) HardDelete(model *models.{{.Table.Name}}) (e error) {
-	_, e = r.db.NamedExec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}", model) 
+// DeleteHard performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
+func (r *{{.Table.Name}}DAL) DeleteHard({{.PrimaryKey | toArgName}} {{.IDType}}) (e error) {
+	_, e = r.db.Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}}) 
 	if e != nil {
-		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", model.{{.PrimaryKey}}, e.Error())
+		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", model.{{.PrimaryKey}})
+		r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", {{.PrimaryKey | toArgName}})
 	}
 	return 
 }
@@ -278,7 +299,7 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}) (mo
 {{range $col := .UpdateColumns}}
 // Set{{$col.Name}} sets the {{$col.Name}} column on a {{$.Table.Name}} object
 func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (e error) {
-	e = r.db.Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
+	_, e = r.db.Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error()) 
 	} else {

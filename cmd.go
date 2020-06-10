@@ -34,6 +34,7 @@ const (
 	CommandGenCLI        Command = "cli"
 	CommandGenAPI        Command = "api"
 	CommandGenDal        Command = "dal"
+	CommandGenDals       Command = "dals"
 	CommandGenRepos      Command = "repos"
 	CommandGenModels     Command = "models"
 	CommandGenInterfaces Command = "interfaces"
@@ -499,6 +500,30 @@ func (c *Cmd) CommandGen(args []string) {
 			lib.Error(e.Error(), c.Options)
 			os.Exit(1)
 		}
+	case CommandGenDals:
+
+		for _, table := range database.Tables {
+
+			// fmt.Printf("Generating %sDAL...\n", table.Name)
+			e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
+			if e != nil {
+				lib.Error(e.Error(), c.Options)
+				os.Exit(1)
+			}
+		}
+		// Create the dal bootstrap file in the dal repo
+		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
+		e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+
 	case CommandGenDal:
 
 		if argLen == 0 {
