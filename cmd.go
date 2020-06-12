@@ -14,7 +14,6 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/macinnir/dvc/modules/compare"
 	"github.com/macinnir/dvc/modules/gen"
-	"github.com/macinnir/dvc/modules/gen/interfaces"
 
 	"github.com/macinnir/dvc/connectors/mysql"
 	"github.com/macinnir/dvc/connectors/sqlite"
@@ -38,8 +37,10 @@ const (
 	CommandGenRepos      Command = "repos"
 	CommandGenModels     Command = "models"
 	CommandGenInterfaces Command = "interfaces"
+	CommandGenTests      Command = "tests"
 	CommandGenModel      Command = "model"
 	CommandGenServices   Command = "services"
+	CommandGenRoutes     Command = "routes"
 	CommandGenTypescript Command = "typescript"
 	CommandCompare       Command = "compare"
 	CommandHelp          Command = "help"
@@ -630,7 +631,7 @@ func (c *Cmd) CommandGen(args []string) {
 				}
 
 				var i []byte
-				i, e = interfaces.Run(
+				i, e = gen.GenInterfaces(
 					srcFiles,
 					baseName,
 					"Generated Code; DO NOT EDIT.",
@@ -672,6 +673,55 @@ func (c *Cmd) CommandGen(args []string) {
 		os.Exit(0)
 
 		// result, err := interfaces.Make(files, args.StructType, args.Comment, args.PkgName, args.IfaceName, args.IfaceComment, args.copyDocs, args.CopyTypeDoc)
+	case CommandGenRoutes:
+		e = g.GenRoutes("core/controllers")
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	case CommandGenTests:
+
+		serviceSuffix := "Service"
+		srcDir := c.Config.Dirs.Services
+		fmt.Println(srcDir)
+		var files []os.FileInfo
+		// DAL
+		if files, e = ioutil.ReadDir(srcDir); e != nil {
+			fmt.Println("ERROR", e.Error())
+			return
+		}
+		for _, f := range files {
+
+			// Filter out files that don't have upper case first letter names
+			if !unicode.IsUpper([]rune(f.Name())[0]) {
+				continue
+			}
+
+			srcFile := path.Join(srcDir, f.Name())
+
+			// Remove the go extension
+			baseName := f.Name()[0 : len(f.Name())-3]
+
+			// Skip over EXT files
+			if baseName[len(baseName)-3:] == "Ext" {
+				continue
+			}
+
+			// Skip over test files
+			if baseName[len(baseName)-5:] == "_test" {
+				continue
+			}
+
+			// fmt.Println(baseName)
+
+			if baseName == "DesignationService" {
+				e = g.GenServiceTest(baseName[0:len(baseName)-len(serviceSuffix)], srcFile)
+
+				if e != nil {
+					panic(e)
+				}
+			}
+		}
 
 	case CommandGenModels:
 

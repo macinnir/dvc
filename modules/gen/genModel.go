@@ -136,7 +136,7 @@ type {{.Name}} struct {
 
 	for _, column := range sortedColumns {
 
-		fieldType := dataTypeToGoTypeString(column)
+		fieldType := lib.DataTypeToGoTypeString(column)
 
 		if column.IsNullable {
 			includeNullPackage = true

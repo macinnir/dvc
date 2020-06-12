@@ -141,7 +141,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 			data.PrimaryKeyType = column.DataType
 		}
 
-		goDataType := dataTypeToGoTypeString(column)
+		goDataType := lib.DataTypeToGoTypeString(column)
 		if len(goDataType) > 5 && goDataType[0:5] == "null." {
 			hasNull = true
 		}
@@ -316,7 +316,7 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.
 		"insertFields":           fetchTableInsertFieldsString,
 		"insertValues":           fetchTableInsertValuesString,
 		"updateFields":           fetchTableUpdateFieldsString,
-		"dataTypeToGoTypeString": dataTypeToGoTypeString,
+		"dataTypeToGoTypeString": lib.DataTypeToGoTypeString,
 		"toArgName":              toArgName,
 	})
 

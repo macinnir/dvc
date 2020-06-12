@@ -231,18 +231,3 @@ func TestBuildModelNodeFromTable(t *testing.T) {
 	assert.Equal(t, "null.String", m.Fields.Get(1).DataType)
 	assert.Contains(t, *m.Imports, NullPackage)
 }
-
-func TestDataTypeToGoTypeString(t *testing.T) {
-	assert.Equal(t, "int", dataTypeToGoTypeString(&lib.Column{DataType: "tinyint"}))
-	assert.Equal(t, "int64", dataTypeToGoTypeString(&lib.Column{DataType: "int"}))
-	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "varchar"}))
-	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "enum"}))
-	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "text"}))
-	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "date"}))
-	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "datetime"}))
-	assert.Equal(t, "string", dataTypeToGoTypeString(&lib.Column{DataType: "char"}))
-	assert.Equal(t, "float64", dataTypeToGoTypeString(&lib.Column{DataType: "decimal"}))
-	assert.Equal(t, "null.String", dataTypeToGoTypeString(&lib.Column{DataType: "varchar", IsNullable: true}))
-	assert.Equal(t, "null.Int", dataTypeToGoTypeString(&lib.Column{DataType: "int", IsNullable: true}))
-	assert.Equal(t, "null.Float", dataTypeToGoTypeString(&lib.Column{DataType: "decimal", IsNullable: true}))
-}

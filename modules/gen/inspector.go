@@ -16,29 +16,6 @@ import (
 // NullPackage is the package name used for handling nulls
 const NullPackage = "\"gopkg.in/guregu/null.v3\""
 
-func getReceiverTypeName(src []byte, fl interface{}) (string, *ast.FuncDecl) {
-	fd, ok := fl.(*ast.FuncDecl)
-	if !ok {
-		return "", nil
-	}
-	t, err := getReceiverType(fd)
-	if err != nil {
-		return "", nil
-	}
-	st := string(src[t.Pos()-1 : t.End()-1])
-	if len(st) > 0 && st[0] == '*' {
-		st = st[1:]
-	}
-	return st, fd
-}
-
-func getReceiverType(fd *ast.FuncDecl) (ast.Expr, error) {
-	if fd.Recv == nil {
-		return nil, fmt.Errorf("fd is not a method, it is a function")
-	}
-	return fd.Recv.List[0].Type, nil
-}
-
 // buildModelNodeFromFile builds a node representation of a struct from a file
 func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) {
 
@@ -140,7 +117,7 @@ func buildModelNodeFromTable(table *lib.Table) (modelNode *lib.GoStruct, e error
 	sort.Sort(sortedColumns)
 
 	for _, col := range sortedColumns {
-		fieldType := dataTypeToGoTypeString(col)
+		fieldType := lib.DataTypeToGoTypeString(col)
 		if fieldDataTypeIsNull(fieldType) {
 			hasNull = true
 		}
@@ -244,7 +221,7 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 		if !ok {
 			modelFields.Append(&lib.GoStructField{
 				Name:     col.Name,
-				DataType: dataTypeToGoTypeString(col),
+				DataType: lib.DataTypeToGoTypeString(col),
 				Tags: []*lib.GoStructFieldTag{
 					{
 						Name:    "db",
@@ -261,7 +238,7 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 		} else {
 
 			// Check that the datatype hasn't changed
-			colDataType := dataTypeToGoTypeString(col)
+			colDataType := lib.DataTypeToGoTypeString(col)
 
 			// log.Println(colDataType, fieldIndex, name)
 
@@ -290,43 +267,5 @@ func resolveTableToModel(modelNode *lib.GoStruct, table *lib.Table) {
 	}
 
 	modelNode.Fields = modelFields
-	return
-}
-
-// dataTypeToGoTypeString converts a database type to its equivalent golang datatype
-func dataTypeToGoTypeString(column *lib.Column) (fieldType string) {
-	fieldType = "int64"
-	switch column.DataType {
-	case "tinyint":
-		fieldType = "int"
-	case "varchar":
-		fieldType = "string"
-	case "enum":
-		fieldType = "string"
-	case "text":
-		fieldType = "string"
-	case "date":
-		fieldType = "string"
-	case "datetime":
-		fieldType = "string"
-	case "char":
-		fieldType = "string"
-	case "decimal":
-		fieldType = "float64"
-	}
-
-	if column.IsNullable == true {
-		switch fieldType {
-		case "string":
-			// fieldType = "sql.NullString"
-			fieldType = "null.String"
-		case "int64":
-			// fieldType = "sql.NullInt64"
-			fieldType = "null.Int"
-		case "float64":
-			// fieldType = "sql.NullFloat64"
-			fieldType = "null.Float"
-		}
-	}
 	return
 }
