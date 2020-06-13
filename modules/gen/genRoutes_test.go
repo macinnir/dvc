@@ -34,7 +34,8 @@ func NewAssignmentsController(assignmentService iservices.IAssignmentService) *A
 
 // CreateAssignment creates an assignment
 // @route POST /assignments
-func (a *AssignmentsController) CreateAssignment(w http.ResponseWriter, r *http.Request) {
+// @body dtos.CreateAssignmentRequestDTO
+func (a *AssignmentsController) CreateAssignment(w http.ResponseWriter, r *http.Request, body *dtos.CreateAssignmentRequestDTO) {
 
 	currentUser := utils.GetCurrentUser(r)
 	var e error
@@ -95,7 +96,8 @@ func (a *AssignmentsController) UpdateAssignment(w http.ResponseWriter, r *http.
 }
 
 // GetAssignmentsByCurrentUser returns a slice of assignments by the current user
-// @route GET /assignments?classID={fooID:[0-9a-zA-Z-]+}&barID={barID:[0-9]+}
+// @route GET /assignments?classID={fooID:[0-9a-zA-Z-]+}&barID={barID:[0-9]+}&any={any}
+// @auth
 func (a *AssignmentsController) GetAssignmentsByCurrentUser(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := utils.GetCurrentUser(r)
@@ -111,6 +113,26 @@ func (a *AssignmentsController) GetAssignmentsByCurrentUser(w http.ResponseWrite
 	}
 
 	response.JSON(r, w, assignments)
+}
+
+// GetFooByAssignment returns a slice of foo by an assignment
+// @route GET /assignments/{assignmentID:[0-9]+}/foo
+// @auth
+func (a *AssignmentsController) GetFooByAssignment(w http.ResponseWriter, r *http.Request, assignmentID int64) {
+
+	currentUser := utils.GetCurrentUser(r)
+
+	var e error
+	var foo []models.Foo
+
+	foo, e = a.assignmentService.GetFooByAssignment(currentUser, assignmentID)
+
+	if e != nil {
+		response.HandleError(r, w, e)
+		return
+	}
+
+	response.JSON(r, w, foo)
 }
 
 // GetAssignmentByID returns a assignment by its unique ID
@@ -166,34 +188,151 @@ var routesCode = `// mapAssignmentsControllerRoutes maps all of the routes for A
 func mapAssignmentsControllerRoutes(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {
 
 	// CreateAssignment
-	r.HandleFunc("/assignments", c.AssignmentsController.CreateAssignment).
+	// POST /assignments
+	r.HandleFunc("/assignments", func(w http.ResponseWriter, r *http.Request) {
+
+		body := &dtos.CreateAssignmentRequestDTO{}
+		e := request.GetBodyJSON(r, body)
+
+		if e != nil {
+			response.BadRequest(r, w, e)
+			return
+		}
+
+		c.AssignmentsController.CreateAssignment(w, r, body)
+
+	}).
 		Methods("POST").
 		Name("CreateAssignment")
 
 	// UpdateAssignment
-	r.HandleFunc("/assignments/{assignmentID:[0-9]+}", c.AssignmentsController.UpdateAssignment).
+	// PUT /assignments/{assignmentID:[0-9]+}
+	r.HandleFunc("/assignments/{assignmentID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+
+		// URL Param assignmentID
+		assignmentID := request.URLParamInt64(r, "assignmentID", 0)
+
+		c.AssignmentsController.UpdateAssignment(w, r, assignmentID)
+
+	}).
 		Methods("PUT").
 		Name("UpdateAssignment")
 
 	// GetAssignmentsByCurrentUser
-	r.HandleFunc("/assignments", c.AssignmentsController.GetAssignmentsByCurrentUser).
+	// GET /assignments?classID={fooID:[0-9a-zA-Z-]+}&barID={barID:[0-9]+}&any={any}
+	r.Handle("/assignments", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+
+		currentUser := utils.GetCurrentUser(r)
+
+		// Query Arg fooID
+		fooID := request.QueryArgString(r, "fooID", "")
+
+		// Query Arg barID
+		barID := request.QueryArgInt64(r, "barID", 0)
+
+		// Query Arg any
+		any := request.QueryArgString(r, "any", "")
+
+		c.AssignmentsController.GetAssignmentsByCurrentUser(w, r, currentUser, fooID, barID, any)
+
+	})).
 		Methods("GET").
 		Queries(
 			"classID", "{fooID:[0-9a-zA-Z-]+}",
 			"barID", "{barID:[0-9]+}",
+			"any", "{any}",
 		).
 		Name("GetAssignmentsByCurrentUser")
 
+	// GetFooByAssignment
+	// GET /assignments/{assignmentID:[0-9]+}/foo
+	r.Handle("/assignments/{assignmentID:[0-9]+}/foo", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+
+		currentUser := utils.GetCurrentUser(r)
+
+		// URL Param assignmentID
+		assignmentID := request.URLParamInt64(r, "assignmentID", 0)
+
+		c.AssignmentsController.GetFooByAssignment(w, r, currentUser, assignmentID)
+
+	})).
+		Methods("GET").
+		Name("GetFooByAssignment")
+
 	// GetAssignmentByID
-	r.HandleFunc("/assignments/{assignmentID:[0-9]+}", c.AssignmentsController.GetAssignmentByID).
+	// GET /assignments/{assignmentID:[0-9]+}
+	r.HandleFunc("/assignments/{assignmentID:[0-9]+}", func(w http.ResponseWriter, r *http.Request) {
+
+		// URL Param assignmentID
+		assignmentID := request.URLParamInt64(r, "assignmentID", 0)
+
+		c.AssignmentsController.GetAssignmentByID(w, r, assignmentID)
+
+	}).
 		Methods("GET").
 		Name("GetAssignmentByID")
 
 	// DeleteAssignment
-	r.Handle("/assignments/{assignmentID:[0-9]+}", auth.AuthMiddleware(c.AssignmentsController.DeleteAssignment)).
+	// DELETE /assignments/{assignmentID:[0-9]+}
+	r.Handle("/assignments/{assignmentID:[0-9]+}", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
+
+		currentUser := utils.GetCurrentUser(r)
+
+		// URL Param assignmentID
+		assignmentID := request.URLParamInt64(r, "assignmentID", 0)
+
+		c.AssignmentsController.DeleteAssignment(w, r, currentUser, assignmentID)
+
+	})).
 		Methods("DELETE").
 		Name("DeleteAssignment")
+
 }`
+
+func TestExtractParamFromString(t *testing.T) {
+
+	tests := []struct {
+		p            string
+		paramName    string
+		paramType    string
+		paramPattern string
+	}{
+		{"fooID:[0-9]+}", "fooID", "int64", "[0-9]+"},
+		{"barID:[a-zA-Z]+}", "barID", "string", "[a-zA-Z]+"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.p, func(t *testing.T) {
+			param := extractParamFromString(test.p)
+			assert.Equal(t, test.paramName, param.Name)
+			assert.Equal(t, test.paramType, param.Type)
+			assert.Equal(t, test.paramPattern, param.Pattern)
+		})
+	}
+}
+
+func TestExtractParamsFromRoutePath(t *testing.T) {
+
+	route := "/get/{getID:[0-9]+}/something/{somethingID:[a-zA-Z-]+}/cool/{coolID:[0-9]+}"
+
+	params, e := extractParamsFromRoutePath(route)
+
+	require.Nil(t, e)
+	require.Len(t, params, 3)
+
+	assert.Equal(t, "getID", params[0].Name)
+	assert.Equal(t, "[0-9]+", params[0].Pattern)
+	assert.Equal(t, "int64", params[0].Type)
+
+	assert.Equal(t, "somethingID", params[1].Name)
+	assert.Equal(t, "[a-zA-Z-]+", params[1].Pattern)
+	assert.Equal(t, "string", params[1].Type)
+
+	assert.Equal(t, "coolID", params[2].Name)
+	assert.Equal(t, "[0-9]+", params[2].Pattern)
+	assert.Equal(t, "int64", params[2].Type)
+
+}
 
 func TestExtractRoutesFromController(t *testing.T) {
 
@@ -207,29 +346,32 @@ func TestExtractRoutesFromController(t *testing.T) {
 	require.Nil(t, e)
 	require.Less(t, 0, len(result))
 
+	// CreateAssignment
 	assert.Equal(t, "POST", result[0].Method)
 	assert.Equal(t, "/assignments", result[0].Path)
 	assert.Equal(t, "CreateAssignment", result[0].Name)
 	assert.Equal(t, "creates an assignment", result[0].Description)
+	assert.Equal(t, "dtos.CreateAssignmentRequestDTO", result[0].BodyType)
 
+	// UpdateAssignment
 	assert.Equal(t, "PUT", result[1].Method)
 	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}", result[1].Path)
 	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}", result[1].Raw)
 	assert.Equal(t, "UpdateAssignment", result[1].Name)
 	assert.Equal(t, "updates an assignment", result[1].Description)
 
-	// Params
 	require.Equal(t, 1, len(result[1].Params))
 	assert.Equal(t, "assignmentID", result[1].Params[0].Name)
 	assert.Equal(t, "[0-9]+", result[1].Params[0].Pattern)
 	assert.Equal(t, "int64", result[1].Params[0].Type)
 
+	// GetAssignmentsByCurrentUser
 	assert.Equal(t, "GET", result[2].Method)
 	assert.Equal(t, "/assignments", result[2].Path)
 	assert.Equal(t, "GetAssignmentsByCurrentUser", result[2].Name)
 	assert.Equal(t, "returns a slice of assignments by the current user", result[2].Description)
 
-	require.Equal(t, 2, len(result[2].Queries))
+	require.Equal(t, 3, len(result[2].Queries))
 
 	assert.Equal(t, "classID", result[2].Queries[0].Name)
 	assert.Equal(t, "fooID", result[2].Queries[0].VariableName)
@@ -243,15 +385,35 @@ func TestExtractRoutesFromController(t *testing.T) {
 	assert.Equal(t, "{barID:[0-9]+}", result[2].Queries[1].ValueRaw)
 	assert.Equal(t, "int64", result[2].Queries[1].Type)
 
-	assert.Equal(t, "GET", result[3].Method)
-	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}", result[3].Path)
-	assert.Equal(t, "GetAssignmentByID", result[3].Name)
-	assert.Equal(t, "returns a assignment by its unique ID", result[3].Description)
+	assert.Equal(t, "any", result[2].Queries[2].Name)
+	assert.Equal(t, "any", result[2].Queries[2].VariableName)
+	assert.Equal(t, "", result[2].Queries[2].Pattern)
+	assert.Equal(t, "{any}", result[2].Queries[2].ValueRaw)
+	assert.Equal(t, "string", result[2].Queries[2].Type)
 
-	assert.Equal(t, "DELETE", result[4].Method)
+	// GetAssignmentFoo
+	assert.Equal(t, "GET", result[3].Method)
+	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}/foo", result[3].Path)
+	assert.Equal(t, "GetFooByAssignment", result[3].Name)
+	assert.Equal(t, "returns a slice of foo by an assignment", result[3].Description)
+	require.Equal(t, 1, len(result[3].Params))
+	assert.Equal(t, "assignmentID", result[3].Params[0].Name)
+	assert.Equal(t, "int64", result[3].Params[0].Type)
+
+	// GetAssignmentByID
+	assert.Equal(t, "GET", result[4].Method)
 	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}", result[4].Path)
-	assert.Equal(t, "DeleteAssignment", result[4].Name)
-	assert.Equal(t, "deletes an assignment", result[4].Description)
+	assert.Equal(t, "GetAssignmentByID", result[4].Name)
+	assert.Equal(t, "returns a assignment by its unique ID", result[4].Description)
+	require.Equal(t, 1, len(result[4].Params))
+	assert.Equal(t, "assignmentID", result[4].Params[0].Name)
+	assert.Equal(t, "int64", result[4].Params[0].Type)
+
+	// DeleteAssignment
+	assert.Equal(t, "DELETE", result[5].Method)
+	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}", result[5].Path)
+	assert.Equal(t, "DeleteAssignment", result[5].Name)
+	assert.Equal(t, "deletes an assignment", result[5].Description)
 }
 
 func TestGetControllerName(t *testing.T) {

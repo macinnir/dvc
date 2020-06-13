@@ -24,20 +24,20 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 		return
 	}
 
-	code := `package main 
-import (
-	"` + g.Config.BasePackage + `/core/controllers"
-	"` + g.Config.BasePackage + `/core/utils"
+	imports := []string{
+		g.Config.BasePackage + "/core/controllers",
+		g.Config.BasePackage + "/core/utils",
+		g.Config.BasePackage + "/core/utils/request",
+		"net/http",
+		"github.com/gorilla/mux",
+	}
 
-	"github.com/gorilla/mux"
-)
+	code := ""
 
-// mapRoutesToControllers maps the routes to the controllers
-func mapRoutesToControllers(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {
-
-	`
 	rest := ""
 	controllerCalls := []string{}
+
+	hasBodyImports := false
 
 	for _, filePath := range files {
 
@@ -68,6 +68,12 @@ func mapRoutesToControllers(r *mux.Router, auth *utils.Auth, c *controllers.Cont
 		}
 
 		controller, _ := g.BuildControllerObjFromController(path.Join(dir, filePath.Name()), src)
+
+		// Include imports for dtos and response if necessary for JSON http body
+		if controller.HasDTOsImport == true {
+			hasBodyImports = true
+		}
+
 		rest += "\n" + g.BuildRoutesCodeFromController(controller) + "\n"
 
 		controllerCalls = append(
@@ -78,19 +84,42 @@ func mapRoutesToControllers(r *mux.Router, auth *utils.Auth, c *controllers.Cont
 
 	code += strings.Join(controllerCalls, "\n\t")
 	code += "\n\n}\n"
-
 	code += rest
 
-	ioutil.WriteFile("services/api/routes.go", []byte(code), 0777)
+	if hasBodyImports {
+		imports = append(imports, g.Config.BasePackage+"/core/utils/response")
+		imports = append(imports, g.Config.BasePackage+"/core/definitions/dtos")
+	}
+
+	final := `package main
+
+import (
+`
+
+	for _, i := range imports {
+		final += fmt.Sprintf("\t\"%s\"\n", i)
+	}
+
+	final += `)
+
+// mapRoutesToControllers maps the routes to the controllers
+func mapRoutesToControllers(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {
+
+	`
+	final += code
+
+	ioutil.WriteFile("services/api/routes.go", []byte(final), 0777)
 
 	return
 }
 
 // Controller represents a REST controller
 type Controller struct {
-	Name   string
-	Path   string
-	Routes []ControllerRoute
+	Name              string
+	Path              string
+	Routes            []ControllerRoute
+	HasDTOsImport     bool
+	HasResponseImport bool
 }
 
 // ControllerRoute represents a route inside a REST controller
@@ -103,6 +132,8 @@ type ControllerRoute struct {
 	Params      []ControllerRouteParam
 	Queries     []ControllerRouteQuery
 	IsAuth      bool
+	BodyType    string
+	HasBody     bool
 }
 
 // ControllerRouteParam represents a param inside a controller route
@@ -152,6 +183,12 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 				continue
 			}
 
+			if len(doc) > 8 && doc[0:9] == "// @body " {
+				route.BodyType = strings.Trim(doc[9:], " ")
+				route.HasBody = true
+				continue
+			}
+
 			if len(doc) > 9 && doc[0:9] == "// @route" {
 
 				lineParts := strings.Split(doc, " ")
@@ -184,14 +221,19 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 							queryValueParts := strings.Split(o.ValueRaw, ":")
 							// Remove the starting "{"
 							o.VariableName = queryValueParts[0][1:]
+
 							// Remove the ending "}"
-							o.Pattern = queryValueParts[1][0 : len(queryValueParts[1])-1]
+							o.Pattern = strings.Join(queryValueParts[1:], ":")
+							o.Pattern = o.Pattern[0 : len(o.Pattern)-1]
 
 							if o.Pattern == "[0-9]" || o.Pattern == "[0-9]+" {
 								o.Type = "int64"
 							} else {
 								o.Type = "string"
 							}
+						} else {
+							o.VariableName = o.Name
+							o.Type = "string"
 						}
 
 						route.Queries = append(route.Queries, o)
@@ -201,33 +243,9 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 					route.Path = route.Raw
 				}
 
-				// Params
-				if strings.Contains(route.Path, "{") {
+				params, _ := extractParamsFromRoutePath(route.Path)
 
-					routeParts := strings.Split(route.Path, "{")
-
-					for _, p := range routeParts[1:] {
-
-						if !strings.HasSuffix(p, "}") || !strings.Contains(p, ":") {
-							continue
-						}
-
-						paramParts := strings.Split(p, ":")
-
-						param := ControllerRouteParam{
-							Name:    paramParts[0],
-							Pattern: paramParts[1][0 : len(paramParts[1])-1],
-						}
-
-						if param.Pattern == "[0-9]" || param.Pattern == "[0-9]+" {
-							param.Type = "int64"
-						} else {
-							param.Type = "string"
-						}
-
-						route.Params = append(route.Params, param)
-					}
-				}
+				route.Params = append(route.Params, params...)
 
 			} else {
 				route.Description += " " + doc[3:]
@@ -241,6 +259,55 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 	return
 }
 
+func extractParamsFromRoutePath(routePath string) (params []ControllerRouteParam, e error) {
+
+	params = []ControllerRouteParam{}
+
+	// Params
+	if strings.Contains(routePath, "{") {
+
+		routeParts := strings.Split(routePath, "{")
+
+		for _, p := range routeParts[1:] {
+
+			if !strings.Contains(p, "}") || !strings.Contains(p, ":") {
+				continue
+			}
+
+			param := extractParamFromString(p)
+
+			params = append(params, param)
+		}
+	}
+
+	return
+}
+
+func extractParamFromString(paramString string) (param ControllerRouteParam) {
+
+	// Incase there are parts after the param, split on the closing bracket
+	pParts := strings.Split(paramString, "}")
+	paramString = pParts[0]
+
+	paramParts := strings.Split(paramString, ":")
+
+	param = ControllerRouteParam{
+		Name:    paramParts[0],
+		Pattern: paramParts[1],
+	}
+
+	param.Type = matchPatternToDataType(param.Pattern)
+	return
+}
+
+func matchPatternToDataType(pattern string) string {
+	if pattern == "[0-9]" || pattern == "[0-9]+" {
+		return "int64"
+	}
+
+	return "string"
+}
+
 // BuildControllerObjFromController builds a controller object from a controller file
 func (g *Gen) BuildControllerObjFromController(filePath string, src []byte) (controller *Controller, e error) {
 
@@ -251,6 +318,14 @@ func (g *Gen) BuildControllerObjFromController(filePath string, src []byte) (con
 
 	controller.Routes, e = g.ExtractRoutesFromController(filePath, src)
 
+	for _, r := range controller.Routes {
+		if r.HasBody {
+			controller.HasDTOsImport = true
+			controller.HasResponseImport = true
+			break
+		}
+	}
+
 	return
 }
 
@@ -259,36 +334,86 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string)
 
 	s := []string{
 		fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
-		fmt.Sprintf("func map%sRoutes(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {", controller.Name),
+		fmt.Sprintf("func map%sRoutes(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {\n", controller.Name),
 	}
 
 	for _, route := range controller.Routes {
 
-		handleFunc := ""
-		if route.IsAuth {
-			handleFunc = fmt.Sprintf("r.Handle(\"%s\", auth.AuthMiddleware(c.%s.%s)).", route.Path, controller.Name, route.Name)
-		} else {
-			handleFunc = fmt.Sprintf("r.HandleFunc(\"%s\", c.%s.%s).", route.Path, controller.Name, route.Name)
+		s = append(s, fmt.Sprintf("\t// %s", route.Name))
+		s = append(s, fmt.Sprintf("\t// %s %s", route.Method, route.Raw))
+
+		args := []string{
+			"w",
+			"r",
 		}
 
-		r := []string{
-			fmt.Sprintf("// %s", route.Name),
-			handleFunc,
-			fmt.Sprintf("\tMethods(\"%s\").", route.Method),
+		if route.IsAuth {
+			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
+			s = append(s, fmt.Sprintf("\t\tcurrentUser := utils.GetCurrentUser(r)\n"))
+			args = append(args, "currentUser")
+		} else {
+			s = append(s, fmt.Sprintf("\tr.HandleFunc(\"%s\", func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
+		}
+
+		if len(route.BodyType) > 0 {
+			s = append(s, fmt.Sprintf("\t\tbody := &%s{}", route.BodyType))
+			s = append(s, "\t\te := request.GetBodyJSON(r, body)\n")
+			s = append(s, "\t\tif e != nil {")
+			s = append(s, "\t\t\tresponse.BadRequest(r, w, e)")
+			s = append(s, "\t\t\treturn")
+			s = append(s, "\t\t}\n")
+		}
+
+		if len(route.Params) > 0 {
+			for _, param := range route.Params {
+				s = append(s, fmt.Sprintf("\t\t// URL Param %s", param.Name))
+				if param.Type == "int64" {
+					s = append(s, fmt.Sprintf("\t\t%s := request.URLParamInt64(r, \"%s\", 0)\n", param.Name, param.Name))
+				} else {
+					s = append(s, fmt.Sprintf("\t\t%s := request.URLParamString(r, \"%s\", \"\")\n", param.Name, param.Name))
+				}
+
+				args = append(args, param.Name)
+			}
 		}
 
 		if len(route.Queries) > 0 {
-			r = append(r, "\tQueries(")
 			for _, query := range route.Queries {
-				r = append(r, fmt.Sprintf("\t\t\"%s\", \"%s\",", query.Name, query.ValueRaw))
-			}
-			r = append(r, "\t).")
+				s = append(s, fmt.Sprintf("\t\t// Query Arg %s", query.VariableName))
+				if query.Type == "int64" {
+					s = append(s, fmt.Sprintf("\t\t%s := request.QueryArgInt64(r, \"%s\", 0)\n", query.VariableName, query.VariableName))
+				} else {
+					s = append(s, fmt.Sprintf("\t\t%s := request.QueryArgString(r, \"%s\", \"\")\n", query.VariableName, query.VariableName))
+				}
 
+				args = append(args, query.VariableName)
+			}
 		}
 
-		r = append(r, fmt.Sprintf("\tName(\"%s\")", route.Name))
+		// Add the body as the last argument
+		if len(route.BodyType) > 0 {
+			args = append(args, "body")
+		}
 
-		s = append(s, "\n\t"+strings.Join(r, "\n\t"))
+		s = append(s, fmt.Sprintf("\t\tc.%s.%s(", controller.Name, route.Name)+strings.Join(args, ", ")+")\n")
+
+		if route.IsAuth {
+			s = append(s, "\t})).")
+		} else {
+			s = append(s, "\t}).")
+		}
+
+		s = append(s, fmt.Sprintf("\t\tMethods(\"%s\").", route.Method))
+
+		if len(route.Queries) > 0 {
+			s = append(s, "\t\tQueries(")
+			for _, query := range route.Queries {
+				s = append(s, fmt.Sprintf("\t\t\t\"%s\", \"%s\",", query.Name, query.ValueRaw))
+			}
+			s = append(s, "\t\t).")
+		}
+
+		s = append(s, fmt.Sprintf("\t\tName(\"%s\")\n", route.Name))
 	}
 
 	out = strings.Join(s, "\n") + "\n}"
