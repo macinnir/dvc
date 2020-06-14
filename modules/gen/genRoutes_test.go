@@ -34,7 +34,8 @@ func NewAssignmentsController(assignmentService iservices.IAssignmentService) *A
 
 // CreateAssignment creates an assignment
 // @route POST /assignments
-// @body dtos.CreateAssignmentRequestDTO
+// @body JSON dtos.CreateAssignmentRequestDTO
+// @response 200 JSON *aggregates.AssignmentAggregate
 func (a *AssignmentsController) CreateAssignment(w http.ResponseWriter, r *http.Request, body *dtos.CreateAssignmentRequestDTO) {
 
 	currentUser := utils.GetCurrentUser(r)
@@ -63,6 +64,7 @@ func (a *AssignmentsController) CreateAssignment(w http.ResponseWriter, r *http.
 
 // UpdateAssignment updates an assignment
 // @route PUT /assignments/{assignmentID:[0-9]+}
+// @response 200 JSON *models.Assignment
 func (a *AssignmentsController) UpdateAssignment(w http.ResponseWriter, r *http.Request) {
 
 	var e error
@@ -97,6 +99,7 @@ func (a *AssignmentsController) UpdateAssignment(w http.ResponseWriter, r *http.
 
 // GetAssignmentsByCurrentUser returns a slice of assignments by the current user
 // @route GET /assignments?classID={fooID:[0-9a-zA-Z-]+}&barID={barID:[0-9]+}&any={any}
+// @response 200 JSON []models.Assignment
 // @auth
 func (a *AssignmentsController) GetAssignmentsByCurrentUser(w http.ResponseWriter, r *http.Request) {
 
@@ -117,6 +120,7 @@ func (a *AssignmentsController) GetAssignmentsByCurrentUser(w http.ResponseWrite
 
 // GetFooByAssignment returns a slice of foo by an assignment
 // @route GET /assignments/{assignmentID:[0-9]+}/foo
+// @response 200 JSON []models.Foo
 // @auth
 func (a *AssignmentsController) GetFooByAssignment(w http.ResponseWriter, r *http.Request, assignmentID int64) {
 
@@ -137,6 +141,7 @@ func (a *AssignmentsController) GetFooByAssignment(w http.ResponseWriter, r *htt
 
 // GetAssignmentByID returns a assignment by its unique ID
 // @route GET /assignments/{assignmentID:[0-9]+}
+// @response 200 JSON *aggregates.AssignmentAggregate
 func (a *AssignmentsController) GetAssignmentByID(w http.ResponseWriter, r *http.Request) {
 
 	var e error
@@ -161,6 +166,7 @@ func (a *AssignmentsController) GetAssignmentByID(w http.ResponseWriter, r *http
 
 // DeleteAssignment deletes an assignment
 // @route DELETE /assignments/{assignmentID:[0-9]+}
+// @response 200
 // @auth
 func (a *AssignmentsController) DeleteAssignment(w http.ResponseWriter, r *http.Request) {
 
@@ -351,7 +357,11 @@ func TestExtractRoutesFromController(t *testing.T) {
 	assert.Equal(t, "/assignments", result[0].Path)
 	assert.Equal(t, "CreateAssignment", result[0].Name)
 	assert.Equal(t, "creates an assignment", result[0].Description)
+	assert.Equal(t, "JSON", result[0].BodyFormat)
 	assert.Equal(t, "dtos.CreateAssignmentRequestDTO", result[0].BodyType)
+	assert.Equal(t, int(200), result[0].ResponseCode)
+	assert.Equal(t, "JSON", result[0].ResponseFormat)
+	assert.Equal(t, "*aggregates.AssignmentAggregate", result[0].ResponseType)
 
 	// UpdateAssignment
 	assert.Equal(t, "PUT", result[1].Method)
@@ -359,6 +369,9 @@ func TestExtractRoutesFromController(t *testing.T) {
 	assert.Equal(t, "/assignments/{assignmentID:[0-9]+}", result[1].Raw)
 	assert.Equal(t, "UpdateAssignment", result[1].Name)
 	assert.Equal(t, "updates an assignment", result[1].Description)
+	assert.Equal(t, int(200), result[1].ResponseCode)
+	assert.Equal(t, "JSON", result[1].ResponseFormat)
+	assert.Equal(t, "*models.Assignment", result[1].ResponseType)
 
 	require.Equal(t, 1, len(result[1].Params))
 	assert.Equal(t, "assignmentID", result[1].Params[0].Name)
@@ -370,6 +383,9 @@ func TestExtractRoutesFromController(t *testing.T) {
 	assert.Equal(t, "/assignments", result[2].Path)
 	assert.Equal(t, "GetAssignmentsByCurrentUser", result[2].Name)
 	assert.Equal(t, "returns a slice of assignments by the current user", result[2].Description)
+	assert.Equal(t, int(200), result[2].ResponseCode)
+	assert.Equal(t, "JSON", result[2].ResponseFormat)
+	assert.Equal(t, "[]models.Assignment", result[2].ResponseType)
 
 	require.Equal(t, 3, len(result[2].Queries))
 
@@ -408,6 +424,9 @@ func TestExtractRoutesFromController(t *testing.T) {
 	require.Equal(t, 1, len(result[4].Params))
 	assert.Equal(t, "assignmentID", result[4].Params[0].Name)
 	assert.Equal(t, "int64", result[4].Params[0].Type)
+	assert.Equal(t, int(200), result[4].ResponseCode)
+	assert.Equal(t, "JSON", result[4].ResponseFormat)
+	assert.Equal(t, "*aggregates.AssignmentAggregate", result[4].ResponseType)
 
 	// DeleteAssignment
 	assert.Equal(t, "DELETE", result[5].Method)

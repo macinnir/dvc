@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -124,16 +125,20 @@ type Controller struct {
 
 // ControllerRoute represents a route inside a REST controller
 type ControllerRoute struct {
-	Name        string
-	Description string
-	Raw         string
-	Path        string
-	Method      string
-	Params      []ControllerRouteParam
-	Queries     []ControllerRouteQuery
-	IsAuth      bool
-	BodyType    string
-	HasBody     bool
+	Name           string
+	Description    string
+	Raw            string
+	Path           string
+	Method         string
+	Params         []ControllerRouteParam
+	Queries        []ControllerRouteQuery
+	IsAuth         bool
+	BodyType       string
+	BodyFormat     string
+	HasBody        bool
+	ResponseType   string
+	ResponseFormat string
+	ResponseCode   int
 }
 
 // ControllerRouteParam represents a param inside a controller route
@@ -184,8 +189,33 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 			}
 
 			if len(doc) > 8 && doc[0:9] == "// @body " {
-				route.BodyType = strings.Trim(doc[9:], " ")
+				bodyComment := strings.Split(strings.Trim(doc[9:], " "), " ")
+				route.BodyFormat = bodyComment[0]
+
+				if len(bodyComment) > 1 {
+					route.BodyType = bodyComment[1]
+				}
+
 				route.HasBody = true
+				continue
+			}
+
+			if len(doc) > 13 && doc[0:13] == "// @response " {
+
+				responseComment := strings.Split(strings.Trim(doc[13:], " "), " ")
+
+				if route.ResponseCode, e = strconv.Atoi(responseComment[0]); e != nil {
+					log.Fatalf("Invalid @response comment: %s at %s.%s", doc, controllerName, route.Name)
+				}
+
+				if len(responseComment) > 1 {
+					route.ResponseFormat = responseComment[1]
+				}
+
+				if len(responseComment) > 2 {
+					route.ResponseType = responseComment[2]
+				}
+
 				continue
 			}
 
