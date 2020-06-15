@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"html/template"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/macinnir/dvc/lib"
 )
@@ -100,6 +100,10 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		Table             *lib.Table
 		Columns           lib.SortedColumns
 		UpdateColumns     []*lib.Column
+		InsertSQL         string
+		InsertArgs        string
+		UpdateSQL         string
+		UpdateArgs        string
 		PrimaryKey        string
 		PrimaryKeyType    string
 		PrimaryKeyArgName string
@@ -150,10 +154,32 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	}
 
 	sort.Sort(sortedColumns)
-
 	data.Columns = sortedColumns
 
-	data.UpdateColumns = fetchUpdateColumns(data.Columns)
+	insertColumnNames := []string{}
+	insertColumnVals := []string{}
+	insertColumnArgs := []string{}
+	for _, col := range sortedColumns {
+		insertColumnNames = append(insertColumnNames, fmt.Sprintf("`%s`", col.Name))
+		insertColumnVals = append(insertColumnVals, "?")
+		insertColumnArgs = append(insertColumnArgs, fmt.Sprintf("model.%s", col.Name))
+	}
+
+	data.InsertArgs = strings.Join(insertColumnArgs, ",")
+	data.InsertSQL = fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s)", data.Table.Name, strings.Join(insertColumnNames, ","), strings.Join(insertColumnVals, ","))
+
+	data.UpdateColumns = fetchUpdateColumns(sortedColumns)
+	updateColumnNames := []string{}
+	updateColumnArgs := []string{}
+	for _, col := range data.UpdateColumns {
+		updateColumnNames = append(updateColumnNames, fmt.Sprintf("`%s` = ?", col.Name))
+		updateColumnArgs = append(updateColumnArgs, fmt.Sprintf("model.%s", col.Name))
+	}
+
+	updateColumnArgs = append(updateColumnArgs, fmt.Sprintf("model.%s", data.PrimaryKey))
+
+	data.UpdateSQL = fmt.Sprintf("UPDATE `%s` SET %s WHERE %s = ?", data.Table.Name, strings.Join(updateColumnNames, ","), data.PrimaryKey)
+	data.UpdateArgs = strings.Join(updateColumnArgs, ",")
 
 	_, data.IsDeleted = table.Columns["IsDeleted"]
 	_, data.IsDateCreated = table.Columns["DateCreated"]
@@ -167,6 +193,9 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		fmt.Sprintf("%s/%s/models", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		"database/sql",
+		"context",
+		"fmt",
+		"strings",
 	}
 
 	if hasNull {
@@ -214,7 +243,7 @@ import ({{range .Imports}}
 	"{{.}}"{{end}}
 )
 
-// {{.Table.Name}}DAL is a data repository for {{.Table.Name}} objects 
+// {{.Table.Name}}DAL is a data repository for {{.Table.Name}} objects
 type {{.Table.Name}}DAL struct {
 	db  integrations.IDB
 	log integrations.ILog
@@ -225,33 +254,138 @@ func New{{.Table.Name}}DAL(db integrations.IDB, log integrations.ILog) *{{.Table
 	return &{{.Table.Name}}DAL{db, log}
 }
 
-// Create creates a new {{.Table.Name}} entry in the database 
+// Create creates a new {{.Table.Name}} entry in the database
 func (r {{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
 {{if .IsDateCreated}}
 	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
 
-	var result sql.Result 
-	result, e = r.db.NamedExec({{.Table.Name}}DALInsertSQL, model)
+	var result sql.Result
+	result, e = r.db.Exec("{{.InsertSQL}}", {{.InsertArgs}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Insert > %s", e.Error())
-		return 
+		return
 	}
 
 	model.{{.PrimaryKey}}, e = result.LastInsertId()
 
 	r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
-	return 
+	return
 }
 
-// Update updates an existing {{.Table.Name}} entry in the database 
+// CreateMany creates {{.Table.Name}} objects in chunks
+func (r {{.Table.Name}}DAL) CreateMany(modelSlice []models.{{.Table.Name}}) (e error) {
+
+	// Don't use a transaction if only a single value
+	if len(modelSlice) == 1 {
+		e = r.Create(&modelSlice[0])
+		return
+	}
+
+	chunkSize := 25
+	chunks := [][]models.{{.Table.Name}}{}
+
+	for i := 0; i < len(modelSlice); i += chunkSize {
+		end := i + chunkSize
+		if end > len(modelSlice) {
+			end = len(modelSlice)
+		}
+		chunks = append(chunks, modelSlice[i:end])
+	}
+
+	for chunkID, chunk := range chunks {
+
+		var tx *sql.Tx
+		ctx := context.Background()
+		tx, e = r.db.BeginTx(ctx, nil)
+		if e != nil {
+			return
+		}
+
+		for insertID, model := range chunk {
+
+			{{if .IsDateCreated}}
+			model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
+
+			_, e = tx.ExecContext(ctx, "{{.InsertSQL}}", {{.InsertArgs}})
+			if e != nil {
+				r.log.Errorf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, insertID, e.Error())
+				break
+			} else {
+				r.log.Debugf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, insertID)
+			}
+		}
+
+		if e != nil {
+			return
+		}
+
+		e = tx.Commit()
+	}
+
+	return
+
+}
+
+// Update updates an existing {{.Table.Name}} entry in the database
 func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
-	_, e = r.db.NamedExec({{.Table.Name}}DALUpdateSQL, model)
+	_, e = r.db.Exec("{{.UpdateSQL}}", {{.UpdateArgs}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Update(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.Update(%d)", model.{{.PrimaryKey}})
 	}
-	return 
+	return
+}
+
+// UpdateMany updates a slice of {{.Table.Name}} objects in chunks
+func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []models.{{.Table.Name}}) (e error) {
+
+	// Don't use a transaction if only a single value
+	if len(modelSlice) == 1 {
+		e = r.Update(&modelSlice[0])
+		return
+	}
+
+	chunkSize := 25
+	chunks := [][]models.{{.Table.Name}}{}
+
+	for i := 0; i < len(modelSlice); i += chunkSize {
+		end := i + chunkSize
+		if end > len(modelSlice) {
+			end = len(modelSlice)
+		}
+		chunks = append(chunks, modelSlice[i:end])
+	}
+
+	for chunkID, chunk := range chunks {
+
+		var tx *sql.Tx
+		ctx := context.Background()
+		tx, e = r.db.BeginTx(ctx, nil)
+		if e != nil {
+			return
+		}
+
+		for updateID, model := range chunk {
+
+			_, e = tx.ExecContext(ctx, "{{.UpdateSQL}}", {{.UpdateArgs}})
+			if e != nil {
+				r.log.Errorf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, updateID, e.Error())
+				break
+			} else {
+				r.log.Debugf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, updateID)
+			}
+		}
+
+		if e != nil {
+			return
+		}
+
+		e = tx.Commit()
+	}
+
+	return
+
 }{{if .IsDeleted}}
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
@@ -262,38 +396,162 @@ func (r *{{.Table.Name}}DAL) Delete({{.PrimaryKey | toArgName}} {{.IDType}}) (e 
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", {{.PrimaryKey | toArgName}})
 	}
-	return 
-}{{end}} 
+	return
+}
+
+// DeleteMany marks {{.Table.Name}} objects in chunks as deleted
+func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []models.{{.Table.Name}}) (e error) {
+
+	// Don't use a transaction if only a single value
+	if len(modelSlice) == 1 {
+		e = r.Delete(modelSlice[0].{{.PrimaryKey}})
+		return
+	}
+
+	chunkSize := 25
+	chunks := [][]models.{{.Table.Name}}{}
+
+	for i := 0; i < len(modelSlice); i += chunkSize {
+		end := i + chunkSize
+		if end > len(modelSlice) {
+			end = len(modelSlice)
+		}
+		chunks = append(chunks, modelSlice[i:end])
+	}
+
+	for chunkID, chunk := range chunks {
+
+		var tx *sql.Tx
+		ctx := context.Background()
+		tx, e = r.db.BeginTx(ctx, nil)
+		if e != nil {
+			return
+		}
+
+		for deleteID, model := range chunk {
+
+			_, e = tx.ExecContext(ctx, "UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`= 1 WHERE `{{.PrimaryKey}}` = ?" + `", model.{{.PrimaryKey}})
+			if e != nil {
+				r.log.Errorf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, deleteID, e.Error())
+				break
+			} else {
+				r.log.Debugf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
+			}
+		}
+
+		if e != nil {
+			return
+		}
+
+		e = tx.Commit()
+	}
+
+	return
+
+}{{end}}
 
 // DeleteHard performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
 func (r *{{.Table.Name}}DAL) DeleteHard({{.PrimaryKey | toArgName}} {{.IDType}}) (e error) {
-	_, e = r.db.Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}}) 
+	_, e = r.db.Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", {{.PrimaryKey | toArgName}})
 	}
-	return 
+	return
+}
+
+// DeleteManyHard deletes {{.Table.Name}} objects in chunks
+func (r {{.Table.Name}}DAL) DeleteManyHard(modelSlice []models.{{.Table.Name}}) (e error) {
+
+	// Don't use a transaction if only a single value
+	if len(modelSlice) == 1 {
+		e = r.DeleteHard(modelSlice[0].{{.PrimaryKey}})
+		return
+	}
+
+	chunkSize := 25
+	chunks := [][]models.{{.Table.Name}}{}
+
+	for i := 0; i < len(modelSlice); i += chunkSize {
+		end := i + chunkSize
+		if end > len(modelSlice) {
+			end = len(modelSlice)
+		}
+		chunks = append(chunks, modelSlice[i:end])
+	}
+
+	for chunkID, chunk := range chunks {
+
+		var tx *sql.Tx
+		ctx := context.Background()
+		tx, e = r.db.BeginTx(ctx, nil)
+		if e != nil {
+			return
+		}
+
+		for deleteID, model := range chunk {
+
+			_, e = tx.ExecContext(ctx, "DELETE FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", model.{{.PrimaryKey}})
+			if e != nil {
+				r.log.Errorf("{{.Table.Name}}.DeleteManyHard([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, deleteID, e.Error())
+				break
+			} else {
+				r.log.Debugf("{{.Table.Name}}.DeleteManyHard([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
+			}
+		}
+
+		if e != nil {
+			return
+		}
+
+		e = tx.Commit()
+	}
+
+	return
 }
 
 // FromID gets a single {{.Table.Name}} object by its Primary Key
 func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
-	
+
 	model = &models.{{.Table.Name}}{}
-	
+
 	e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
-	
+
 	if e == nil {
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
 	} else if e == sql.ErrNoRows {
-		e = nil 
-		model = nil 
+		e = nil
+		model = nil
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
 	} else {
 		r.log.Errorf("{{.Table.Name}}DAL.FromID(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	}
-	
-	return 
+
+	return
+}
+
+// FromIDs returns a slice of {{.Table.Name}} objects by a set of primary keys
+func (r *{{.Table.Name}}DAL) FromIDs({{.PrimaryKey | toArgName}}s []{{.IDType}}) (model []models.{{.Table.Name}}, e error) {
+
+	model = []models.{{.Table.Name}}{}
+
+	ids := []string{}
+	for _, id := range {{.PrimaryKey | toArgName}}s {
+		ids = append(ids, fmt.Sprintf("%d", id))
+	}
+
+	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` IN (%s) AND IsDeleted = 0" + `", strings.Join(ids, ","))
+
+	e = r.db.Select(&model, query)
+
+	if e == nil {
+		r.log.Debugf("{{.Table.Name}}DAL.FromIDs(%v)", {{.PrimaryKey | toArgName}}s)
+	} else {
+		r.log.Errorf("{{.Table.Name}}DAL.FromIDs(%v) > %s", {{.PrimaryKey | toArgName}}s, e.Error())
+	}
+
+	return
 }
 
 {{range $col := .UpdateColumns}}
@@ -301,11 +559,11 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}) (mo
 func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (e error) {
 	_, e = r.db.Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
 	if e != nil {
-		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error()) 
+		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error())
 	} else {
-		r.log.Debugf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v)", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}) 
+		r.log.Debugf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v)", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}})
 	}
-	return 
+	return
 }
 {{end}}
 
@@ -445,7 +703,7 @@ func generateTableInsertAndUpdateFields(table *lib.Table) (fields string, e erro
 
 	tpl := `// {{.Table.Name}}DAL SQL
 const (
-	{{.Table.Name}}DALInsertSQL = "INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})" 
+	{{.Table.Name}}DALInsertSQL = "INSERT INTO ` + "`{{.Table.Name}}`" + ` ({{.Columns | insertFields}}) VALUES ({{.Columns | insertValues}})"
 	{{.Table.Name}}DALUpdateSQL = "UPDATE ` + "`{{.Table.Name}}`" + ` SET {{.Columns | updateFields}} WHERE {{.PrimaryKey}} = :{{.PrimaryKey}}"
 )`
 
@@ -594,7 +852,7 @@ type DAL struct {
 // BootstrapDAL bootstraps all of the DAL methods
 func BootstrapDAL(db integrations.IDB, log integrations.ILog) *DAL {
 
-	d := &DAL{} 
+	d := &DAL{}
 	{{range .Tables}}
 	d.{{.Name}} = New{{.Name}}DAL(db, log){{end}}
 
