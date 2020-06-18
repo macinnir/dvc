@@ -27,8 +27,8 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 
 	imports := []string{
 		g.Config.BasePackage + "/core/controllers",
-		g.Config.BasePackage + "/core/utils",
 		g.Config.BasePackage + "/core/utils/request",
+		g.Config.BasePackage + "/core/definitions/integrations",
 		"net/http",
 		"github.com/gorilla/mux",
 	}
@@ -60,7 +60,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 
 		var src []byte
 
-		log.Println(path.Join(dir, filePath.Name()))
+		// log.Println(path.Join(dir, filePath.Name()))
 		src, e = ioutil.ReadFile(path.Join(dir, filePath.Name()))
 
 		if e != nil {
@@ -92,7 +92,9 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/dtos")
 	}
 
-	final := `package main
+	final := `// Generated Code; DO NOT EDIT.
+
+package main
 
 import (
 `
@@ -104,7 +106,7 @@ import (
 	final += `)
 
 // mapRoutesToControllers maps the routes to the controllers
-func mapRoutesToControllers(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {
+func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {
 
 	`
 	final += code
@@ -364,22 +366,24 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string)
 
 	s := []string{
 		fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
-		fmt.Sprintf("func map%sRoutes(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {\n", controller.Name),
+		fmt.Sprintf("func map%sRoutes(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {\n", controller.Name),
 	}
 
 	for _, route := range controller.Routes {
 
+		// Method comments
 		s = append(s, fmt.Sprintf("\t// %s", route.Name))
 		s = append(s, fmt.Sprintf("\t// %s %s", route.Method, route.Raw))
 
+		// Method args
 		args := []string{
-			"w",
-			"r",
+			"w", // http.ResponseWriter
+			"r", // *http.Request
 		}
 
 		if route.IsAuth {
 			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
-			s = append(s, fmt.Sprintf("\t\tcurrentUser := utils.GetCurrentUser(r)\n"))
+			s = append(s, fmt.Sprintf("\t\tcurrentUser := auth.GetCurrentUser(r)\n"))
 			args = append(args, "currentUser")
 		} else {
 			s = append(s, fmt.Sprintf("\tr.HandleFunc(\"%s\", func(w http.ResponseWriter, r *http.Request) {\n", route.Path))

@@ -105,23 +105,72 @@ func (c *Cmd) Main(args []string) (err error) {
 
 	if cmd != CommandInit {
 		var e error
-		c.Config, e = loadConfigFromFile("./dvc.toml")
 
-		if e != nil {
-			fmt.Println("Could not load config file.")
-			// fmt.Printf("ERROR: %s\n", e.Error())
-			// os.Exit(1)
+		maxDepth := 5
+		curDepth := 0
+		// Find the file config file
+		configPath := "dvc.toml"
+		configFound := false
+
+		for {
+			if curDepth == maxDepth {
+				break
+			}
+
+			curDepth++
+
+			lib.Debugf("Looking for %s\n", c.Options, configPath)
+			_, e = os.Stat(configPath)
+
+			if os.IsNotExist(e) {
+				configPath = "../" + configPath
+			} else {
+				configFound = true
+				break
+			}
+		}
+
+		if configFound {
+			lib.Debugf("Found config at %s\n", c.Options, configPath)
+		} else {
+			lib.Errorf("Could not find config file (dvc.toml).", c.Options, configPath)
 			return
+		}
+
+		configDir := path.Dir(configPath)
+
+		if configDir != "." {
+
+			lib.Debugf("Changing CWD to %s\n", c.Options, configDir)
+			cwd := ""
+
+			if e = os.Chdir(configDir); e != nil {
+				lib.Errorf("Error (Chdir()): %s\n", c.Options, e.Error())
+				return
+			}
+
+			if cwd, e = os.Getwd(); e != nil {
+				lib.Errorf("Error (Getwd()): %s\n", c.Options, e.Error())
+				return
+			}
+
+			lib.Debugf("CWD now %s\n", c.Options, cwd)
+		}
+
+		c.Config, e = loadConfigFromFile("./dvc.toml")
+		if e != nil {
+			lib.Error("Error loading config (./dvc.toml)", c.Options)
 		}
 
 	}
 
 	switch cmd {
-	// case CommandRefresh:
-	// 	c.CommandImport(args)
-	// 	c.CommandGen([]string{"models"})
-	// 	c.CommandGen([]string{"dal"})
-	// 	c.CommandGen([]string{"repos"})
+	case CommandRefresh:
+		c.CommandImport(args)
+		c.CommandGen([]string{"models"})
+		c.CommandGen([]string{"dals"})
+		c.CommandGen([]string{"interfaces"})
+		c.CommandGen([]string{"routes"})
 	// 	c.CommandGen([]string{"services"})
 	// 	c.CommandGen([]string{"api"})
 	// case CommandInstall:
@@ -262,6 +311,7 @@ func (c *Cmd) CommandInit(args []string) {
 // and from that generates the json representation at `[schema name].schema.json`
 func (c *Cmd) CommandImport(args []string) {
 
+	fmt.Println("Importing...")
 	var e error
 	cmp := c.initCompare()
 
@@ -270,7 +320,8 @@ func (c *Cmd) CommandImport(args []string) {
 		os.Exit(1)
 	}
 
-	lib.Infof("Schema `%s`.`%s` imported to %s.", c.Options, c.Config.Connection.Host, c.Config.Connection.DatabaseName, c.Config.Connection.DatabaseName+".schema.json")
+	curDir, _ := os.Getwd()
+	lib.Infof("Schema `%s`.`%s` imported to %s", c.Options, c.Config.Connection.Host, c.Config.Connection.DatabaseName, path.Join(curDir, c.Config.Connection.DatabaseName+".schema.json"))
 }
 
 // CommandExport export SQL create statements to standard out
@@ -477,54 +528,9 @@ func (c *Cmd) CommandGen(args []string) {
 	// 		os.Exit(1)
 	// 	}
 	case CommandGenRepos:
-
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoRepos(c.Config.Dirs.Repos, database)
-		}
-
-		e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
-		g.EnsureDir(c.Config.Dirs.Definitions)
-		e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+		c.GenRepos(g, database)
 	case CommandGenDals:
-
-		for _, table := range database.Tables {
-
-			// fmt.Printf("Generating %sDAL...\n", table.Name)
-			e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
-			if e != nil {
-				lib.Error(e.Error(), c.Options)
-				os.Exit(1)
-			}
-		}
-		// Create the dal bootstrap file in the dal repo
-		e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
-		e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
-
+		c.GenDals(g, database)
 	case CommandGenDal:
 
 		if argLen == 0 {
@@ -577,108 +583,10 @@ func (c *Cmd) CommandGen(args []string) {
 		}
 
 	case CommandGenInterfaces:
-
-		genInterfaces := func(srcDir, srcType string) (e error) {
-
-			var files []os.FileInfo
-			// DAL
-			if files, e = ioutil.ReadDir(srcDir); e != nil {
-				return
-			}
-			for _, f := range files {
-
-				// Filter out files that don't have upper case first letter names
-				if !unicode.IsUpper([]rune(f.Name())[0]) {
-					continue
-				}
-
-				srcFile := path.Join(srcDir, f.Name())
-
-				// Remove the go extension
-				baseName := f.Name()[0 : len(f.Name())-3]
-
-				// Skip over EXT files
-				if baseName[len(baseName)-3:] == "Ext" {
-					continue
-				}
-
-				// Skip over test files
-				if baseName[len(baseName)-5:] == "_test" {
-					continue
-				}
-
-				// srcFile := path.Join(c.Config.Dirs.Dal, baseName + ".go")
-				destFile := path.Join(c.Config.Dirs.Definitions, srcType, "I"+baseName+".go")
-				interfaceName := "I" + baseName
-				packageName := srcType
-
-				srcFiles := []string{srcFile}
-				// var src []byte
-				// if src, e = ioutil.ReadFile(srcFile); e != nil {
-				// 	return
-				// }
-
-				// Check if EXT file exists
-				extFile := srcFile[0:len(srcFile)-3] + "Ext.go"
-				if _, e = os.Stat(extFile); e == nil {
-					srcFiles = append(srcFiles, extFile)
-					// concatenate the contents of the ext file with the contents of the regular file
-					// var extSrc []byte
-					// if extSrc, e = ioutil.ReadFile(extFile); e != nil {
-					// 	return
-					// }
-					// src = append(src, extSrc...)
-				}
-
-				var i []byte
-				i, e = gen.GenInterfaces(
-					srcFiles,
-					baseName,
-					"Generated Code; DO NOT EDIT.",
-					packageName,
-					interfaceName,
-					fmt.Sprintf("%s describes the %s", interfaceName, baseName),
-					true,
-					true,
-				)
-				if e != nil {
-					fmt.Println("ERROR", e.Error())
-					return
-				}
-
-				// fmt.Println("Generating ", destFile)
-				// fmt.Println("Writing to: ", destFile)
-
-				ioutil.WriteFile(destFile, i, 0644)
-
-				// fmt.Println("Name: ", baseName, "Path: ", srcFile)
-
-			}
-
-			return
-		}
-
-		e = genInterfaces(c.Config.Dirs.Dal, "dal")
-		if e != nil {
-			fmt.Println("ERROR", e.Error())
-			os.Exit(1)
-		}
-
-		e = genInterfaces(c.Config.Dirs.Services, "services")
-		if e != nil {
-			fmt.Println("ERROR", e.Error())
-			os.Exit(1)
-		}
-
-		os.Exit(0)
-
+		c.GenInterfaces(g)
 		// result, err := interfaces.Make(files, args.StructType, args.Comment, args.PkgName, args.IfaceName, args.IfaceComment, args.copyDocs, args.CopyTypeDoc)
 	case CommandGenRoutes:
-		e = g.GenRoutes("core/controllers")
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+		c.GenRoutes(g)
 	case CommandGenTests:
 
 		serviceSuffix := "Service"
@@ -725,24 +633,7 @@ func (c *Cmd) CommandGen(args []string) {
 
 	case CommandGenModels:
 
-		modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
-		if c.Options&lib.OptClean == lib.OptClean {
-			g.CleanGoModels(modelsDir, database)
-		}
-
-		for _, table := range database.Tables {
-			e = g.GenerateGoModel(modelsDir, table)
-			if e != nil {
-				lib.Error(e.Error(), c.Options)
-				os.Exit(1)
-			}
-		}
-
-		e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+		c.GenModels(g, database)
 
 		// // Config.go
 		// if _, e = os.Stat(path.Join(modelsDir, "Config.go")); os.IsNotExist(e) {
@@ -778,55 +669,55 @@ func (c *Cmd) CommandGen(args []string) {
 // PrintHelp prints help information
 func (c *Cmd) PrintHelp(args []string) {
 	help := `usage: dvc [OPTIONS] [COMMAND] [ARGS]
-	
-OPTIONS: 
-	-h, --help 		Show help 
-	-v, --verbose 	Show verbose logging 
+
+OPTIONS:
+	-h, --help 		Show help
+	-v, --verbose 	Show verbose logging
 	-vv, --debug 	Show very verbose (debug) logging
-	-s, --silent 	Disable all output 
+	-s, --silent 	Disable all output
 
-COMMANDS: 
-	
-	init 	Initialize a dvc.toml configuration file. 
+COMMANDS:
 
-	import	Build a schema definition file based on the target database. 
+	init 	Initialize a dvc.toml configuration file.
+
+	import	Build a schema definition file based on the target database.
 			This will overwrite any existing schema definition file.
-	
-	gen 	Generate go code based on the local schema json file. 
-			Will fail if no imported schema file json file exists. 
-			Requires one (and only one) of the following sub-commands: 
 
-		models 		Generate models. 
-		repos 		Generate repos 
-		schema 		Generate go-dal schema bootstrap code based on imported schema information. 
-		all 		Generate all above 
-	
+	gen 	Generate go code based on the local schema json file.
+			Will fail if no imported schema file json file exists.
+			Requires one (and only one) of the following sub-commands:
+
+		models 		Generate models.
+		repos 		Generate repos
+		schema 		Generate go-dal schema bootstrap code based on imported schema information.
+		all 		Generate all above
+
 	compare [-r|--reverse] [ ( write <path> | apply ) ]
-		
-		Default behavior (no arguments) is to compare local schema as authority against 
+
+		Default behavior (no arguments) is to compare local schema as authority against
 		remote database as target and write the resulting sql to stdout.
 
-		-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority 
+		-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority
 						and the local schema the target for updating.
 
-						Use this option when attempting to generate sql alter statements against a database that 
-						matches the structure of your local schema, in order to make it match a database with the structure 
+						Use this option when attempting to generate sql alter statements against a database that
+						matches the structure of your local schema, in order to make it match a database with the structure
 						of the remote.
 
 		write		After performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).
 
 					Example: dts compare write path/to/changeset.sql
-		
-		apply 		After performing the comparison, apply the the resulting sql statements directly to the target database. 
 
-					E.g. dts compare apply 
-	
-	import	[[path/to/local/schema.json]] 
-			
-			Generate a local schema json file based on the remote target database. 
-			
-			If no path is provided, the default path of ./[databaseName].json will be used. 
-			This overwrites any existing json schema file. 
+		apply 		After performing the comparison, apply the the resulting sql statements directly to the target database.
+
+					E.g. dts compare apply
+
+	import	[[path/to/local/schema.json]]
+
+			Generate a local schema json file based on the remote target database.
+
+			If no path is provided, the default path of ./[databaseName].json will be used.
+			This overwrites any existing json schema file.
 
 	`
 	fmt.Printf(help)
@@ -859,4 +750,197 @@ func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
 	}
 
 	return
+}
+
+func (c *Cmd) GenRepos(g *gen.Gen, database *lib.Database) {
+
+	var e error
+
+	if c.Options&lib.OptClean == lib.OptClean {
+		g.CleanGoRepos(c.Config.Dirs.Repos, database)
+	}
+
+	e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+
+	e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+
+	lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
+	g.EnsureDir(c.Config.Dirs.Definitions)
+	e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+}
+
+func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
+
+	fmt.Println("Generating models...")
+
+	var e error
+
+	modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
+	if c.Options&lib.OptClean == lib.OptClean {
+		g.CleanGoModels(modelsDir, database)
+	}
+
+	for _, table := range database.Tables {
+		e = g.GenerateGoModel(modelsDir, table)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	}
+
+	e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+}
+
+func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
+
+	fmt.Println("Generating dals...")
+	var e error
+
+	for _, table := range database.Tables {
+
+		// fmt.Printf("Generating %sDAL...\n", table.Name)
+		e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
+		if e != nil {
+			lib.Error(e.Error(), c.Options)
+			os.Exit(1)
+		}
+	}
+	// Create the dal bootstrap file in the dal repo
+	e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+
+	e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+}
+
+func (c *Cmd) GenInterfaces(g *gen.Gen) {
+
+	fmt.Println("Generating interfaces...")
+	var e error
+
+	genInterfaces := func(srcDir, srcType string) (e error) {
+
+		var files []os.FileInfo
+		// DAL
+		if files, e = ioutil.ReadDir(srcDir); e != nil {
+			return
+		}
+		for _, f := range files {
+
+			// Filter out files that don't have upper case first letter names
+			if !unicode.IsUpper([]rune(f.Name())[0]) {
+				continue
+			}
+
+			srcFile := path.Join(srcDir, f.Name())
+
+			// Remove the go extension
+			baseName := f.Name()[0 : len(f.Name())-3]
+
+			// Skip over EXT files
+			if baseName[len(baseName)-3:] == "Ext" {
+				continue
+			}
+
+			// Skip over test files
+			if baseName[len(baseName)-5:] == "_test" {
+				continue
+			}
+
+			// srcFile := path.Join(c.Config.Dirs.Dal, baseName + ".go")
+			destFile := path.Join(c.Config.Dirs.Definitions, srcType, "I"+baseName+".go")
+			interfaceName := "I" + baseName
+			packageName := srcType
+
+			srcFiles := []string{srcFile}
+			// var src []byte
+			// if src, e = ioutil.ReadFile(srcFile); e != nil {
+			// 	return
+			// }
+
+			// Check if EXT file exists
+			extFile := srcFile[0:len(srcFile)-3] + "Ext.go"
+			if _, e = os.Stat(extFile); e == nil {
+				srcFiles = append(srcFiles, extFile)
+				// concatenate the contents of the ext file with the contents of the regular file
+				// var extSrc []byte
+				// if extSrc, e = ioutil.ReadFile(extFile); e != nil {
+				// 	return
+				// }
+				// src = append(src, extSrc...)
+			}
+
+			var i []byte
+			i, e = gen.GenInterfaces(
+				srcFiles,
+				baseName,
+				"Generated Code; DO NOT EDIT.",
+				packageName,
+				interfaceName,
+				fmt.Sprintf("%s describes the %s", interfaceName, baseName),
+				true,
+				true,
+			)
+			if e != nil {
+				fmt.Println("ERROR", e.Error())
+				return
+			}
+
+			// fmt.Println("Generating ", destFile)
+			// fmt.Println("Writing to: ", destFile)
+
+			ioutil.WriteFile(destFile, i, 0644)
+
+			// fmt.Println("Name: ", baseName, "Path: ", srcFile)
+
+		}
+
+		return
+	}
+
+	e = genInterfaces(c.Config.Dirs.Dal, "dal")
+	if e != nil {
+		fmt.Println("ERROR", e.Error())
+		os.Exit(1)
+	}
+
+	e = genInterfaces(c.Config.Dirs.Services, "services")
+	if e != nil {
+		fmt.Println("ERROR", e.Error())
+		os.Exit(1)
+	}
+}
+
+func (c *Cmd) GenRoutes(g *gen.Gen) {
+
+	fmt.Println("Generating routes...")
+	var e error
+
+	e = g.GenRoutes("core/controllers")
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
 }

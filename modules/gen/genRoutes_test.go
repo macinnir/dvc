@@ -38,7 +38,7 @@ func NewAssignmentsController(assignmentService iservices.IAssignmentService) *A
 // @response 200 JSON *aggregates.AssignmentAggregate
 func (a *AssignmentsController) CreateAssignment(w http.ResponseWriter, r *http.Request, body *dtos.CreateAssignmentRequestDTO) {
 
-	currentUser := utils.GetCurrentUser(r)
+	currentUser := auth.GetCurrentUser(r)
 	var e error
 
 	dto := &dtos.CreateAssignmentRequestDTO{}
@@ -84,7 +84,7 @@ func (a *AssignmentsController) UpdateAssignment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
+	currentUser := auth.GetCurrentUser(r)
 
 	var assignment *models.Assignment
 	assignment, e = a.assignmentService.UpdateAssignment(currentUser, assignmentID, dto)
@@ -103,7 +103,7 @@ func (a *AssignmentsController) UpdateAssignment(w http.ResponseWriter, r *http.
 // @auth
 func (a *AssignmentsController) GetAssignmentsByCurrentUser(w http.ResponseWriter, r *http.Request) {
 
-	currentUser := utils.GetCurrentUser(r)
+	currentUser := auth.GetCurrentUser(r)
 
 	var e error
 	var assignments []models.Assignment
@@ -124,7 +124,7 @@ func (a *AssignmentsController) GetAssignmentsByCurrentUser(w http.ResponseWrite
 // @auth
 func (a *AssignmentsController) GetFooByAssignment(w http.ResponseWriter, r *http.Request, assignmentID int64) {
 
-	currentUser := utils.GetCurrentUser(r)
+	currentUser := auth.GetCurrentUser(r)
 
 	var e error
 	var foo []models.Foo
@@ -153,7 +153,7 @@ func (a *AssignmentsController) GetAssignmentByID(w http.ResponseWriter, r *http
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
+	currentUser := auth.GetCurrentUser(r)
 	agg, e = a.assignmentService.GetAssignmentByID(currentUser, assignmentID)
 
 	if e != nil {
@@ -178,7 +178,7 @@ func (a *AssignmentsController) DeleteAssignment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	currentUser := utils.GetCurrentUser(r)
+	currentUser := auth.GetCurrentUser(r)
 	e = a.assignmentService.DeleteAssignment(currentUser, assignmentID)
 
 	if e != nil {
@@ -191,7 +191,7 @@ func (a *AssignmentsController) DeleteAssignment(w http.ResponseWriter, r *http.
 `
 
 var routesCode = `// mapAssignmentsControllerRoutes maps all of the routes for AssignmentsController
-func mapAssignmentsControllerRoutes(r *mux.Router, auth *utils.Auth, c *controllers.Controllers) {
+func mapAssignmentsControllerRoutes(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {
 
 	// CreateAssignment
 	// POST /assignments
@@ -228,7 +228,7 @@ func mapAssignmentsControllerRoutes(r *mux.Router, auth *utils.Auth, c *controll
 	// GET /assignments?classID={fooID:[0-9a-zA-Z-]+}&barID={barID:[0-9]+}&any={any}
 	r.Handle("/assignments", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 
-		currentUser := utils.GetCurrentUser(r)
+		currentUser := auth.GetCurrentUser(r)
 
 		// Query Arg fooID
 		fooID := request.QueryArgString(r, "fooID", "")
@@ -254,7 +254,7 @@ func mapAssignmentsControllerRoutes(r *mux.Router, auth *utils.Auth, c *controll
 	// GET /assignments/{assignmentID:[0-9]+}/foo
 	r.Handle("/assignments/{assignmentID:[0-9]+}/foo", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 
-		currentUser := utils.GetCurrentUser(r)
+		currentUser := auth.GetCurrentUser(r)
 
 		// URL Param assignmentID
 		assignmentID := request.URLParamInt64(r, "assignmentID", 0)
@@ -282,7 +282,7 @@ func mapAssignmentsControllerRoutes(r *mux.Router, auth *utils.Auth, c *controll
 	// DELETE /assignments/{assignmentID:[0-9]+}
 	r.Handle("/assignments/{assignmentID:[0-9]+}", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
 
-		currentUser := utils.GetCurrentUser(r)
+		currentUser := auth.GetCurrentUser(r)
 
 		// URL Param assignmentID
 		assignmentID := request.URLParamInt64(r, "assignmentID", 0)

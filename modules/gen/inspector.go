@@ -159,7 +159,7 @@ func parseFileToAST(fileBytes []byte) (fileSet *token.FileSet, tree *ast.File, e
 
 func buildFileFromModelNode(modelNode *lib.GoStruct) (file []byte, e error) {
 
-	fileString := "package " + modelNode.Package + "\n\n"
+	fileString := "// Generated Code; DO NOT EDIT.\n\npackage " + modelNode.Package + "\n\n"
 	if modelNode.Imports.Len() > 0 {
 		fileString += modelNode.Imports.ToString() + "\n"
 	}

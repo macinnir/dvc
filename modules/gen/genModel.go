@@ -110,7 +110,8 @@ func (g *Gen) buildGoModelOld(p string, table *lib.Table) (e error) {
 		FileFoot:           fileFoot,
 	}
 
-	tpl := `
+	tpl := `// Generated Code; DO NOT EDIT.
+
 package models
 {{if .IncludeNullPackage}}
 import (
@@ -118,8 +119,8 @@ import (
 )
 {{end}}
 
-// {{.Name}} represents a {{.Name}} domain object 
-type {{.Name}} struct { 
+// {{.Name}} represents a {{.Name}} domain object
+type {{.Name}} struct {
 	{{range .Columns}}
 {{.Name}} {{.Type}} ` + "`db:\"{{.Name}}\" json:\"{{.Name}}\"`" + `{{end}}
 }

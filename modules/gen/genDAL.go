@@ -159,7 +159,10 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	insertColumnNames := []string{}
 	insertColumnVals := []string{}
 	insertColumnArgs := []string{}
-	for _, col := range sortedColumns {
+
+	insertColumns := fetchInsertColumns(sortedColumns)
+
+	for _, col := range insertColumns {
 		insertColumnNames = append(insertColumnNames, fmt.Sprintf("`%s`", col.Name))
 		insertColumnVals = append(insertColumnVals, "?")
 		insertColumnArgs = append(insertColumnArgs, fmt.Sprintf("model.%s", col.Name))
@@ -235,8 +238,8 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	// 	{{end}}
 	// }
 
-	tpl := `{{.FileHead}}
-// Package dal is the Data Access Layer
+	tpl := `// Generated Code; DO NOT EDIT.
+
 package dal
 
 import ({{range .Imports}}
@@ -565,9 +568,7 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.
 	}
 	return
 }
-{{end}}
-
-{{.FileFoot}}`
+{{end}}`
 
 	t := template.New("dal-" + table.Name)
 	t.Funcs(template.FuncMap{
@@ -772,6 +773,33 @@ func fetchTableInsertValuesString(columns lib.SortedColumns) string {
 	}
 
 	return strings.Join(fields, ",")
+}
+
+func isInsertColumn(column *lib.Column) bool {
+	if column.ColumnKey == "PRI" {
+		return false
+	}
+
+	if column.Name == "IsDeleted" {
+		return false
+	}
+
+	return true
+}
+
+func fetchInsertColumns(columns lib.SortedColumns) []*lib.Column {
+
+	insertColumns := []*lib.Column{}
+
+	for _, column := range columns {
+		if !isInsertColumn(column) {
+			continue
+		}
+
+		insertColumns = append(insertColumns, column)
+	}
+
+	return insertColumns
 }
 
 func isUpdateColumn(column *lib.Column) bool {
