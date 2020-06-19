@@ -230,6 +230,12 @@ type Column struct {
 	Extra        string `json:"extra"`
 }
 
+// ColumnWithTable is a column with the table name included
+type ColumnWithTable struct {
+	*Column
+	TableName string
+}
+
 const (
 	// OptLogInfo triggers verbose logging
 	OptLogInfo = 1 << iota
