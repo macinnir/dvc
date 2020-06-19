@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
-	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 func objectsAreSame(local interface{}, remote interface{}) (same bool, e error) {
@@ -70,21 +70,6 @@ type Compare struct {
 	Options            lib.Options
 }
 
-func (c *Compare) initCommand() (server *lib.Server) {
-
-	var e error
-	server, e = c.Connector.Connect()
-
-	if e != nil {
-		panic(e)
-	}
-
-	e = c.Connector.UseDatabase(server, c.Config.Connection.DatabaseName)
-
-	return
-
-}
-
 // ExportSchemaToSQL exports the current schema to sql
 func (c *Compare) ExportSchemaToSQL() (sql string, e error) {
 
@@ -110,45 +95,48 @@ func (c *Compare) ExportSchemaToSQL() (sql string, e error) {
 // @command compare [reverse] apply
 func (c *Compare) ApplyChangeset(changeset string) (e error) {
 
-	server := c.initCommand()
-
-	statements := strings.Split(changeset, ";")
-
-	defer server.Connection.Close()
-
-	tx, _ := server.Connection.Begin()
-
-	nonEmptyStatements := []string{}
-	for _, s := range statements {
-		if len(strings.Trim(strings.Trim(s, " "), "\n")) == 0 {
-			continue
-		}
-
-		nonEmptyStatements = append(nonEmptyStatements, s)
-	}
-
-	for i, s := range nonEmptyStatements {
-		sql := strings.Trim(strings.Trim(s, " "), "\n")
-		if len(sql) == 0 {
-			continue
-		}
-		// fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(nonEmptyStatements))
-		fmt.Printf("Running %d of %d: \n%s\n", i+1, len(nonEmptyStatements), sql)
-		// lib.Debugf("Running sql: \n%s\n", c.Options, sql)
-
-		_, e = tx.Exec(sql)
-		if e != nil {
-			tx.Rollback()
-			return
-		}
-	}
-	fmt.Print("Finished\n")
-	e = tx.Commit()
-	if e != nil {
-		panic(e)
-	}
-
+	x := lib.NewExecutor(c.Config, c.Connector)
+	e = x.RunSQL(changeset)
 	return
+	// server := c.initCommand()
+
+	// statements := strings.Split(changeset, ";")
+
+	// defer server.Connection.Close()
+
+	// tx, _ := server.Connection.Begin()
+
+	// nonEmptyStatements := []string{}
+	// for _, s := range statements {
+	// 	if len(strings.Trim(strings.Trim(s, " "), "\n")) == 0 {
+	// 		continue
+	// 	}
+
+	// 	nonEmptyStatements = append(nonEmptyStatements, s)
+	// }
+
+	// for i, s := range nonEmptyStatements {
+	// 	sql := strings.Trim(strings.Trim(s, " "), "\n")
+	// 	if len(sql) == 0 {
+	// 		continue
+	// 	}
+	// 	// fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(nonEmptyStatements))
+	// 	fmt.Printf("Running %d of %d: \n%s\n", i+1, len(nonEmptyStatements), sql)
+	// 	// lib.Debugf("Running sql: \n%s\n", c.Options, sql)
+
+	// 	_, e = tx.Exec(sql)
+	// 	if e != nil {
+	// 		tx.Rollback()
+	// 		return
+	// 	}
+	// }
+	// fmt.Print("Finished\n")
+	// e = tx.Commit()
+	// if e != nil {
+	// 	panic(e)
+	// }
+
+	// return
 }
 
 // CompareSchema returns a string that contains a new line (`\n`) separated list of sql statements
@@ -167,9 +155,9 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 		return
 	}
 
-	server := c.initCommand()
+	x := lib.NewExecutor(c.Config, c.Connector)
 
-	if remoteSchema, e = c.buildRemoteSchema(server); e != nil {
+	if remoteSchema, e = c.buildRemoteSchema(x.Connect()); e != nil {
 		return
 	}
 
@@ -214,8 +202,9 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 // @command import
 func (c *Compare) ImportSchema(fileName string) (e error) {
 
-	server := c.initCommand()
+	x := lib.NewExecutor(c.Config, c.Connector)
 
+	server := x.Connect()
 	database := &lib.Database{
 		Host: server.Host,
 		Name: c.Config.Connection.DatabaseName,

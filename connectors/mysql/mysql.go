@@ -121,24 +121,24 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 	var rows *sql.Rows
 
 	query := fmt.Sprintf(`
-		SELECT 
-			COLUMN_NAME, 
-			ORDINAL_POSITION, 
-			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT, 
-			CASE IS_NULLABLE 
+		SELECT
+			COLUMN_NAME,
+			ORDINAL_POSITION,
+			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
+			CASE IS_NULLABLE
 				WHEN 'YES' THEN 1
 				ELSE 0
 			END AS IS_NULLABLE,
-			DATA_TYPE, 
-			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength, 
-			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision, 
-			COALESCE(CHARACTER_SET_NAME, '') AS CharSet, 
+			DATA_TYPE,
+			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
+			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision,
+			COALESCE(CHARACTER_SET_NAME, '') AS CharSet,
 			COLUMN_TYPE,
 			COLUMN_KEY,
 			EXTRA,
-			COALESCE(NUMERIC_SCALE, 0) as NumericScale 
-		FROM information_schema.COLUMNS 
-		WHERE 
+			COALESCE(NUMERIC_SCALE, 0) as NumericScale
+		FROM information_schema.COLUMNS
+		WHERE
 			TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
 	`, databaseName, tableName)
 
@@ -707,7 +707,7 @@ func createColumnSegment(column *lib.Column) (sql string, e error) {
 		} else {
 			defaultString = "'" + column.Default + "'"
 		}
-		fmt.Println("string datatype: ", column.DataType, defaultString)
+		// fmt.Println("string datatype: ", column.DataType, defaultString)
 		sql += fmt.Sprintf(" DEFAULT %s", defaultString)
 	} else if len(column.Default) > 0 {
 		sql += fmt.Sprintf(" DEFAULT %s", column.Default)

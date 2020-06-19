@@ -635,14 +635,7 @@ func generateDALSQL(basePackage string, database *lib.Database) (out string, e e
 
 	sb.WriteString("package " + basePackage + "\n")
 
-	sortedTables := make(lib.SortedTables, 0, len(database.Tables))
-
-	// Find the primary key
-	for _, table := range database.Tables {
-		sortedTables = append(sortedTables, table)
-	}
-
-	sort.Sort(sortedTables)
+	sortedTables := database.ToSortedTables()
 
 	for _, table := range sortedTables {
 		var outTable string

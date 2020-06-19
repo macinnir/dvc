@@ -3,6 +3,7 @@ package lib
 import (
 	"database/sql"
 	"errors"
+	"sort"
 )
 
 // DatabaseType is the type of database to be used.
@@ -134,6 +135,21 @@ type Database struct {
 	// Logs          []ChangeLog
 }
 
+// ToSortedTables returns SortedTables
+func (d *Database) ToSortedTables() SortedTables {
+
+	sortedTables := make(SortedTables, 0, len(d.Tables))
+
+	for _, table := range d.Tables {
+		sortedTables = append(sortedTables, table)
+	}
+
+	sort.Sort(sortedTables)
+
+	return sortedTables
+
+}
+
 // FindTableByName finds a table by its name in the database
 func (d *Database) FindTableByName(tableName string) (table *Table, e error) {
 	// Search for table
@@ -162,6 +178,21 @@ type Table struct {
 	Collation     string             `json:"collation"`
 	AutoIncrement int64              `json:"-"`
 	Columns       map[string]*Column `json:"columns"`
+}
+
+// ToSortedColumns returns SortedColumns
+func (table *Table) ToSortedColumns() SortedColumns {
+
+	sortedColumns := make(SortedColumns, 0, len(table.Columns))
+
+	// Find the primary key
+	for _, column := range table.Columns {
+		sortedColumns = append(sortedColumns, column)
+	}
+
+	sort.Sort(sortedColumns)
+
+	return sortedColumns
 }
 
 // SortedTables is a slice of Table objects

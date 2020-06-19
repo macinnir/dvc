@@ -25,7 +25,10 @@ type Command string
 
 // Command Names
 const (
+	CommandAdd           Command = "add"
+	CommandRm            Command = "rm"
 	CommandInit          Command = "init"
+	CommandLs            Command = "ls"
 	CommandImport        Command = "import"
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
@@ -106,9 +109,9 @@ func (c *Cmd) Main(args []string) (err error) {
 	if cmd != CommandInit {
 		var e error
 
+		// Find the file config file
 		maxDepth := 5
 		curDepth := 0
-		// Find the file config file
 		configPath := "dvc.toml"
 		configFound := false
 
@@ -192,6 +195,12 @@ func (c *Cmd) Main(args []string) (err error) {
 		c.PrintHelp(args)
 	case CommandInit:
 		c.CommandInit(args)
+	case CommandLs:
+		c.CommandLs(args)
+	case CommandAdd:
+		c.CommandAdd(args)
+	case CommandRm:
+		c.CommandRm(args)
 	}
 
 	os.Exit(0)
@@ -304,7 +313,347 @@ func (c *Cmd) CommandInit(args []string) {
 	} else {
 		fmt.Println("dvc.toml already exists in this directory")
 	}
+}
 
+// SearchType is the type of search
+type SearchType int
+
+const (
+	// SearchTypeWildcard is a wildcard
+	SearchTypeWildcard SearchType = iota
+	// SearchTypeStartingWildcard is a wildcard at the start (e.g. `*foo`)
+	SearchTypeStartingWildcard
+	// SearchTypeEndingWildcard is a wildcard at the end (e.g. `foo*`)
+	SearchTypeEndingWildcard
+	// SearchTypeBoth is a wildcard on both the start and the end (e.g. `*foo*`)
+	SearchTypeBoth
+)
+
+// CommandLs lists database information
+func (c *Cmd) CommandLs(args []string) {
+
+	database := c.loadDatabase()
+
+	search := "*"
+	searchPartsPre := []string{}
+	searchParts := []string{}
+	tableName := ""
+	searchType := SearchTypeWildcard
+
+	if len(args) > 0 {
+
+		search = strings.Trim(args[0], " ")
+
+		if search != "*" {
+
+			// Has wildcard
+			if strings.Contains(search, "*") {
+				searchPartsPre = strings.Split(search, "*")
+
+				// Filter out empty parts
+				for k := range searchPartsPre {
+					if len(searchPartsPre[k]) != 0 {
+						searchParts = append(searchParts, strings.ToLower(searchPartsPre[k]))
+					}
+				}
+
+			} else {
+				tableName = search
+			}
+
+			if search[0:1] == "*" && search[len(search)-1:] == "*" {
+				// *foo*
+				searchType = SearchTypeBoth
+			} else if search[0:1] == "*" {
+				// *foo
+				searchType = SearchTypeStartingWildcard
+			} else {
+				// foo*
+				searchType = SearchTypeEndingWildcard
+			}
+		}
+	}
+
+	// Show a list of tables if no TableName is specified
+	if len(tableName) == 0 {
+
+		sortedTables := database.ToSortedTables()
+		results := []*lib.Table{}
+
+		if search != "*" {
+
+			fmt.Println("Searching for ", searchParts)
+
+			for k := range sortedTables {
+
+				if len(sortedTables[k].Name) < len(searchParts[0]) {
+					continue
+				}
+
+				switch searchType {
+				case SearchTypeStartingWildcard:
+					if strings.ToLower(sortedTables[k].Name[len(sortedTables[k].Name)-len(searchParts[0]):]) == strings.ToLower(searchParts[0]) {
+						results = append(results, sortedTables[k])
+					}
+				case SearchTypeEndingWildcard:
+					if sortedTables[k].Name[0:len(searchParts[0])] == searchParts[0] {
+						results = append(results, sortedTables[k])
+					}
+				case SearchTypeBoth:
+					if strings.Contains(strings.ToLower(sortedTables[k].Name), strings.ToLower(searchParts[0])) {
+						results = append(results, sortedTables[k])
+					}
+				}
+			}
+		} else {
+			for k := range sortedTables {
+				results = append(results, sortedTables[k])
+			}
+		}
+
+		t := lib.NewCLITable([]string{"Table", "Columns"})
+
+		for _, table := range results {
+			t.Row()
+			t.Col(table.Name)
+			t.Colf("%d", len(table.Columns))
+		}
+
+		fmt.Println(t.String())
+	}
+
+	// List columns for a specific table
+	if len(tableName) > 0 {
+
+		if _, ok := database.Tables[tableName]; !ok {
+			fmt.Printf("Table `%s` not found\n", args[0])
+			return
+		}
+
+		table := database.Tables[tableName]
+
+		sortedColumns := table.ToSortedColumns()
+
+		t := lib.NewCLITable([]string{"Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
+
+		for _, col := range sortedColumns {
+
+			t.Row()
+			t.Col(col.Name)
+			t.Col(col.DataType)
+			t.Colf("%d", col.MaxLength)
+
+			if col.IsNullable {
+				t.Col("YES")
+			} else {
+				t.Col("NO")
+			}
+
+			t.Col(col.Default)
+			t.Col(col.Extra)
+			t.Col(col.ColumnKey)
+		}
+
+		fmt.Println(t.String())
+	}
+}
+
+// CommandAdd adds an object to the database
+func (c *Cmd) CommandAdd(args []string) {
+
+	database := c.loadDatabase()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	sqlParts := []string{}
+	sql := ""
+
+	tableName := ""
+
+	if len(args) > 0 {
+		tableName = args[0]
+	} else {
+		tableName = lib.ReadCliInput(reader, "Table Name:")
+	}
+
+	if _, ok := database.Tables[tableName]; !ok {
+
+		fmt.Printf("Create table `%s`\n", tableName)
+
+		start := fmt.Sprintf("CREATE TABLE `%s` (", tableName)
+		sql += start
+		sqlParts = append(sqlParts, start)
+		cols := []string{}
+
+		n := 1
+		for {
+
+			col := lib.ReadCliInput(reader, fmt.Sprintf("`%s`.Column(%d):", tableName, n))
+			if len(col) == 0 {
+				break
+			}
+
+			// Remove trailing space
+			col = strings.Trim(col, " ")
+
+			// Remove trailing comma if exists
+			if col[len(col)-1:] == "," {
+				col = col[0 : len(col)-1]
+			}
+
+			colParts := strings.Split(col, " ")
+
+			// Validate the sql part
+			if len(colParts) < 2 {
+				fmt.Println("Invalid sql part. Try again...")
+				continue
+			}
+
+			// Validate the datatype
+			dataType := strings.ToLower(colParts[1])
+
+			if strings.Contains(dataType, "(") {
+				dataType = strings.Split(dataType, "(")[0]
+			}
+
+			if lib.IsValidSQLType(dataType) == false {
+				fmt.Printf("Invalid SQL type: %s. Try gain...\n", dataType)
+				continue
+			}
+
+			n++
+
+			for k := range colParts {
+
+				if k == 0 {
+					continue
+				}
+
+				colParts[k] = strings.ToUpper(colParts[k])
+			}
+
+			col = "`" + colParts[0] + "` " + strings.Join(colParts[1:], " ")
+			sqlParts = append(sqlParts, col)
+			cols = append(cols, col)
+		}
+
+		sql += strings.Join(cols, ", ") + ")"
+
+		sqlParts = append(sqlParts, ")")
+
+	} else {
+
+		col := lib.ReadCliInput(reader, fmt.Sprintf("`%s`.Column:", tableName))
+		if len(col) == 0 {
+			fmt.Println("Column cannot be empty")
+			return
+		}
+
+		colParts := strings.Split(col, " ")
+
+		if _, ok := database.Tables[tableName].Columns[colParts[0]]; ok {
+			fmt.Printf("Column `%s`.`%s` already exists", tableName, colParts[0])
+			return
+		}
+
+		for k := range colParts {
+
+			if k == 0 {
+				continue
+			}
+
+			colParts[k] = strings.ToUpper(colParts[k])
+		}
+
+		col = "`" + colParts[0] + "` " + strings.Join(colParts[1:], " ")
+		sql = fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s", tableName, col)
+		sqlParts = append(sqlParts, sql)
+	}
+
+	fmt.Print("\n------------------------------------------------------\n")
+	fmt.Print("--------------------- REVIEW -------------------------\n")
+	fmt.Print("------------------------------------------------------\n")
+
+	fmt.Println(sql)
+	// for k := range sqlParts {
+	// 	// Not first or last line
+	// 	if k != 0 && k != len(sqlParts)-1 {
+	// 		fmt.Print("\t")
+	// 	}
+	// 	fmt.Printf("%s", sqlParts[k])
+	// 	// Not first or last line
+	// 	if k != 0 && k != len(sqlParts)-1 {
+	// 		fmt.Print(",")
+	// 	}
+
+	// 	fmt.Print("\n")
+	// }
+
+	fmt.Print("\n------------------------------------------------------\n")
+
+	if lib.ReadCliInput(reader, "Are you sure want to execute the above SQL (Y/n)?") == "Y" {
+		connector, _ := connectorFactory(c.Config.DatabaseType, c.Config)
+		x := lib.NewExecutor(c.Config, connector)
+		x.RunSQL(sql)
+
+		c.CommandImport([]string{})
+	}
+}
+
+// CommandRm removes an object from the database
+func (c *Cmd) CommandRm(args []string) {
+
+	database := c.loadDatabase()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	sql := ""
+
+	tableName := ""
+	if len(args) > 0 {
+		tableName = args[0]
+	} else {
+		tableName = lib.ReadCliInput(reader, "Table Name:")
+		if _, ok := database.Tables[tableName]; !ok {
+			fmt.Printf("Table `%s` does not exist.", tableName)
+			return
+		}
+	}
+
+	tableOrColumn := lib.ReadCliInput(reader, fmt.Sprintf("Drop the (t)able `%s` or select a (c)olumn?", tableName))
+	if tableOrColumn == "t" {
+		sql = fmt.Sprintf("DROP TABLE `%s`", tableName)
+	} else if tableOrColumn == "c" {
+		columnName := lib.ReadCliInput(reader, fmt.Sprintf("`%s`.Column:", tableName))
+		if _, ok := database.Tables[tableName].Columns[columnName]; !ok {
+			fmt.Printf("Column `%s`.`%s` doesn't exist.", tableName, columnName)
+			return
+		}
+
+		sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`", tableName, columnName)
+	} else {
+		fmt.Println("Invalid entry")
+		return
+	}
+
+	fmt.Print("\n------------------------------------------------------\n")
+	fmt.Print("--------------------- REVIEW -------------------------\n")
+	fmt.Print("------------------------------------------------------\n")
+
+	fmt.Println(sql)
+
+	fmt.Print("\n------------------------------------------------------\n")
+
+	if lib.ReadCliInput(reader, "Are you sure want to execute the above SQL (Y/n)?") == "Y" {
+
+		// Apply the change
+		connector, _ := connectorFactory(c.Config.DatabaseType, c.Config)
+		x := lib.NewExecutor(c.Config, connector)
+		x.RunSQL(sql)
+
+		// Import the schema
+		c.CommandImport([]string{})
+	}
 }
 
 // CommandImport fetches the sql schema from the target database (specified in dvc.toml)
@@ -436,7 +785,6 @@ Main:
 		lib.Errorf("Unknown argument: `%s`", c.Options, cmd)
 		os.Exit(1)
 	}
-
 }
 
 func writeSQLToLog(sql string) {
@@ -458,14 +806,25 @@ func writeSQLToLog(sql string) {
 			panic(err)
 		}
 	}
+}
 
+// loadDatabase loads a database
+func (c *Cmd) loadDatabase() *lib.Database {
+	// Load the schema
+	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
+	database, e := lib.ReadSchemaFromFile(schemaFile)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+	return database
 }
 
 // CommandGen handles the `gen` command
 func (c *Cmd) CommandGen(args []string) {
 
 	var e error
-	var database *lib.Database
+
 	// fmt.Printf("Args: %v", args)
 	if len(args) < 1 {
 		lib.Error("Missing gen type [schema | models | repos | caches | ts]", c.Options)
@@ -500,18 +859,12 @@ func (c *Cmd) CommandGen(args []string) {
 
 	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
-	// Load the schema
-	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
-	database, e = lib.ReadSchemaFromFile(schemaFile)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
-		os.Exit(1)
-	}
-
 	g := &gen.Gen{
 		Options: c.Options,
 		Config:  c.Config,
 	}
+
+	database := c.loadDatabase()
 
 	switch subCmd {
 	// case CommandGenSchema:
@@ -671,6 +1024,7 @@ func (c *Cmd) PrintHelp(args []string) {
 	help := `usage: dvc [OPTIONS] [COMMAND] [ARGS]
 
 OPTIONS:
+
 	-h, --help 		Show help
 	-v, --verbose 	Show verbose logging
 	-vv, --debug 	Show very verbose (debug) logging
@@ -678,48 +1032,61 @@ OPTIONS:
 
 COMMANDS:
 
-	init 	Initialize a dvc.toml configuration file.
+	add 	Add an object to the database and then (by calling the import command) the local schema.
 
-	import	Build a schema definition file based on the target database.
-			This will overwrite any existing schema definition file.
+	compare Compare two schemas and output the difference.
+
+			[-r|--reverse] [ ( write <path> | apply ) ]
+
+			Default behavior (no arguments) is to compare local schema as authority against
+			remote database as target and write the resulting sql to stdout.
+
+				-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority
+								and the local schema the target for updating.
+
+								Use this option when attempting to generate sql alter statements against a database that
+								matches the structure of your local schema, in order to make it match a database with the structure
+								of the remote.
+
+				write			After performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).
+
+								Example: dvc compare write path/to/changeset.sql
+
+				apply 			After performing the comparison, apply the the resulting sql statements directly to the target database.
+
+								E.g. dvc compare apply
+
+	export 	Export the database to stdout
 
 	gen 	Generate go code based on the local schema json file.
 			Will fail if no imported schema file json file exists.
 			Requires one (and only one) of the following sub-commands:
 
-		models 		Generate models.
-		repos 		Generate repos
-		schema 		Generate go-dal schema bootstrap code based on imported schema information.
-		all 		Generate all above
+				dal [dalName] 	Generate dal [dalName]
+				dals 			Generate dals
+				interfaces 		Generate interfaces
+				models 			Generate models.
+				routes 			Generate routes
 
-	compare [-r|--reverse] [ ( write <path> | apply ) ]
+	help 	This output
 
-		Default behavior (no arguments) is to compare local schema as authority against
-		remote database as target and write the resulting sql to stdout.
+	import	Build a schema definition file based on the target database.
+			This will overwrite any existing schema definition file.
 
-		-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority
-						and the local schema the target for updating.
+	init 	Initialize a dvc.toml configuration file in the CWD
 
-						Use this option when attempting to generate sql alter statements against a database that
-						matches the structure of your local schema, in order to make it match a database with the structure
-						of the remote.
+	ls 		List objects in the schema.
 
-		write		After performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).
+			[tableName] 	List information about an object in the database (e.g. columns of a table)
 
-					Example: dts compare write path/to/changeset.sql
+	refresh Alias for running all of the following commands (in order):
 
-		apply 		After performing the comparison, apply the the resulting sql statements directly to the target database.
-
-					E.g. dts compare apply
-
-	import	[[path/to/local/schema.json]]
-
-			Generate a local schema json file based on the remote target database.
-
-			If no path is provided, the default path of ./[databaseName].json will be used.
-			This overwrites any existing json schema file.
-
-	`
+				1. import
+				2. gen models
+				3. gen dals
+				4. gen interfaces
+				5. gen routes
+`
 	fmt.Printf(help)
 }
 

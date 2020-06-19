@@ -1,6 +1,33 @@
 package lib
 
 // DataTypeToGoTypeString converts a database type to its equivalent golang datatype
+func IsValidSQLType(str string) bool {
+	switch str {
+	case "int":
+		return true
+	case "varchar":
+		return true
+	case "enum":
+		return true
+	case "text":
+		return true
+	case "date":
+		return true
+	case "datetime":
+		return true
+	case "bigint":
+		return true
+	case "tinyint":
+		return true
+	case "char":
+		return true
+	case "decimal":
+		return true
+	}
+	return false
+}
+
+// DataTypeToGoTypeString converts a database type to its equivalent golang datatype
 func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	fieldType = "int64"
 	switch column.DataType {
