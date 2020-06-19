@@ -195,6 +195,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	defaultImports := []string{
 		fmt.Sprintf("%s/%s/models", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
+		fmt.Sprintf("%s/core/utils/errors", g.Config.BasePackage),
 		"database/sql",
 		"context",
 		"fmt",
@@ -515,7 +516,7 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(modelSlice []models.{{.Table.Name}}) 
 }
 
 // FromID gets a single {{.Table.Name}} object by its Primary Key
-func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}) (model *models.{{.Table.Name}}, e error) {
+func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}, mustExist bool) (model *models.{{.Table.Name}}, e error) {
 
 	model = &models.{{.Table.Name}}{}
 
@@ -524,10 +525,21 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}) (mo
 	if e == nil {
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
 	} else if e == sql.ErrNoRows {
+		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
+
+		if mustExist {
+			e = errors.NewRecordNotFoundError()
+			return
+		}
+
 		e = nil
 		model = nil
-		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
 	} else {
+		{{ if .IsDeleted}}if model.IsDeleted == 1 && mustExist {
+			model = nil
+			e = errors.NewRecordNotFoundError()
+			return
+		}{{end}}
 		r.log.Errorf("{{.Table.Name}}DAL.FromID(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	}
 
