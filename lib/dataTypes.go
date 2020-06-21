@@ -64,3 +64,28 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	}
 	return
 }
+
+func IsString(column *Column) bool {
+
+	switch column.DataType {
+	case "tinyint":
+		return false
+	case "varchar":
+		return true
+	case "enum":
+		return true
+	case "text":
+		return true
+	case "date":
+		return true
+	case "datetime":
+		return true
+	case "char":
+		return true
+	case "decimal":
+		return false
+	default:
+		return false
+	}
+
+}

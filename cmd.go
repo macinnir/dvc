@@ -49,6 +49,7 @@ const (
 	CommandHelp          Command = "help"
 	CommandRefresh       Command = "refresh"
 	CommandInstall       Command = "install"
+	CommandInsert        Command = "insert"
 )
 
 // Cmd is a container for handling commands
@@ -182,6 +183,8 @@ func (c *Cmd) Main(args []string) (err error) {
 	// 	c.CommandGen([]string{"dal"})
 	// 	c.CommandGen([]string{"repos"})
 	// 	c.CommandGen([]string{"services"})
+	case CommandInsert:
+		c.CommandInsert(args)
 	case CommandImport:
 		c.CommandImport(args)
 	case CommandExport:
@@ -484,7 +487,85 @@ func (c *Cmd) CommandLs(args []string) {
 	fmt.Println(t.String())
 }
 
-func (c *Cmd) PrintColumns(columns []*lib.Column) {
+func (c *Cmd) CommandInsert(args []string) {
+
+	database := c.loadDatabase()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	tableName := ""
+
+	if len(args) > 0 {
+		tableName = args[0]
+	} else {
+		tableName = lib.ReadCliInput(reader, "Table:")
+	}
+
+	if len(tableName) == 0 {
+		fmt.Println("No table specified")
+		return
+	}
+
+	if _, ok := database.Tables[tableName]; !ok {
+		fmt.Printf("Table `%s` not found.\n", tableName)
+		return
+	}
+
+	table := database.Tables[tableName]
+
+	columns := table.ToSortedColumns()
+
+	sql := fmt.Sprintf("INSERT INTO `%s` (\n", tableName)
+
+	columnNames := []string{}
+	values := []string{}
+
+	for k := range columns {
+
+		if columns[k].ColumnKey == "PRI" {
+			continue
+		}
+
+		if columns[k].Name == "IsDeleted" {
+			continue
+		}
+
+		columnNames = append(columnNames, fmt.Sprintf("`%s`", columns[k].Name))
+
+		value := "?"
+		if columns[k].Name == "DateCreated" {
+			value = fmt.Sprintf("%d", time.Now().UnixNano()/1000000)
+		} else {
+			value = lib.ReadCliInput(reader, columns[k].Name+" ("+columns[k].DataType+"):")
+		}
+
+		if lib.IsString(columns[k]) {
+			value = "'" + value + "'"
+		} else {
+			if len(value) == 0 {
+				value = "0"
+			}
+		}
+
+		values = append(values, value)
+	}
+
+	sql += "\t" + strings.Join(columnNames, ",\n\t")
+	sql += "\n) VALUES (\n"
+	sql += "\t" + strings.Join(values, ",\n\t")
+	sql += "\n)\n"
+
+	fmt.Println(sql)
+
+	doInsertYN := lib.ReadCliInput(reader, "Run above SQL (Y/n")
+
+	if doInsertYN != "Y" {
+		return
+	}
+
+	connector, _ := connectorFactory(c.Config.DatabaseType, c.Config)
+	x := lib.NewExecutor(c.Config, connector)
+	x.RunSQL(sql)
 
 }
 
