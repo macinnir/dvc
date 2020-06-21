@@ -200,6 +200,9 @@ func (c *Cmd) Main(args []string) (err error) {
 		c.CommandAdd(args)
 	case CommandRm:
 		c.CommandRm(args)
+	default:
+		fmt.Printf("Invalid command `%s`\n", cmd)
+		c.PrintCommandNames(args)
 	}
 
 	os.Exit(0)
@@ -1046,6 +1049,27 @@ func (c *Cmd) CommandGen(args []string) {
 	}
 }
 
+// PrintCommandNames prints the list of possible dvc commands
+func (c *Cmd) PrintCommandNames(args []string) {
+	cmds := []string{
+		"add [table]",
+		"compare [-r|--reverse] [apply|write]",
+		"export",
+		"gen (dal (table)|dals|models|interfaces|routes)",
+		"help",
+		"import",
+		"init",
+		"ls [search]",
+		"refresh",
+	}
+	fmt.Println("Commands:")
+	fmt.Println("----------------------------")
+	for k := range cmds {
+		fmt.Println("\t" + cmds[k])
+	}
+	fmt.Println("----------------------------")
+}
+
 // PrintHelp prints help information
 func (c *Cmd) PrintHelp(args []string) {
 	help := `usage: dvc [OPTIONS] [COMMAND] [ARGS]
@@ -1302,7 +1326,7 @@ func (c *Cmd) GenInterfaces(g *gen.Gen) {
 				return
 			}
 
-			// fmt.Println("Generating ", destFile)
+			fmt.Println("Generating ", destFile)
 			// fmt.Println("Writing to: ", destFile)
 
 			ioutil.WriteFile(destFile, i, 0644)
