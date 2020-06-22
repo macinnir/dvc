@@ -712,6 +712,7 @@ func (c *Cmd) CommandAdd(args []string) {
 }
 
 // CommandRm removes an object from the database
+// dvc rm [table]
 func (c *Cmd) CommandRm(args []string) {
 
 	database := c.loadDatabase()
@@ -1142,6 +1143,7 @@ func (c *Cmd) PrintCommandNames(args []string) {
 		"init",
 		"ls [search]",
 		"refresh",
+		"rm [table]",
 	}
 	fmt.Println("Commands:")
 	fmt.Println("----------------------------")
