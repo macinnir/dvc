@@ -556,7 +556,7 @@ func (r *{{.Table.Name}}DAL) FromIDs({{.PrimaryKey | toArgName}}s []{{.IDType}})
 		ids = append(ids, fmt.Sprintf("%d", id))
 	}
 
-	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` IN (%s) AND IsDeleted = 0" + `", strings.Join(ids, ","))
+	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` IN (%s){{if .IsDeleted}} AND IsDeleted = 0{{end}}" + `", strings.Join(ids, ","))
 
 	e = r.db.Select(&model, query)
 
