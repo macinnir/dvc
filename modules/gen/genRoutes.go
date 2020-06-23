@@ -258,14 +258,23 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 							o.Pattern = strings.Join(queryValueParts[1:], ":")
 							o.Pattern = o.Pattern[0 : len(o.Pattern)-1]
 
+							// Check if the value isn't a constant value
 							if o.Pattern == "[0-9]" || o.Pattern == "[0-9]+" {
 								o.Type = "int64"
 							} else {
 								o.Type = "string"
 							}
 						} else {
+							// Try to parse the value as an int64
+							// e.g. param=123
+
 							o.VariableName = o.Name
-							o.Type = "string"
+
+							if _, e := strconv.ParseInt(o.ValueRaw, 10, 64); e != nil {
+								o.Type = "string"
+							} else {
+								o.Type = "int64"
+							}
 						}
 
 						route.Queries = append(route.Queries, o)
