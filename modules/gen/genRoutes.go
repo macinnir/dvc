@@ -28,7 +28,9 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 	imports := []string{
 		g.Config.BasePackage + "/core/controllers",
 		g.Config.BasePackage + "/core/utils/request",
+		g.Config.BasePackage + "/core/utils",
 		g.Config.BasePackage + "/core/definitions/integrations",
+		g.Config.BasePackage + "/core/definitions/constants/permissions",
 		"net/http",
 		"github.com/gorilla/mux",
 	}
@@ -39,6 +41,8 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 	controllerCalls := []string{}
 
 	hasBodyImports := false
+
+	allPerms := []string{}
 
 	for _, filePath := range files {
 
@@ -75,11 +79,15 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 			hasBodyImports = true
 		}
 
-		rest += "\n" + g.BuildRoutesCodeFromController(controller) + "\n"
+		routesString, perms := g.BuildRoutesCodeFromController(controller)
+
+		allPerms = append(allPerms, perms...)
+
+		rest += "\n" + routesString + "\n"
 
 		controllerCalls = append(
 			controllerCalls,
-			"map"+extractNameFromFile(filePath.Name())+"Routes(r, auth, c)",
+			"map"+extractNameFromFile(filePath.Name())+"Routes(res, r, auth, c)",
 		)
 	}
 
@@ -88,7 +96,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 	code += rest
 
 	if hasBodyImports {
-		imports = append(imports, g.Config.BasePackage+"/core/utils/response")
+		// imports = append(imports, g.Config.BasePackage+"/core/utils/response")
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/dtos")
 	}
 
@@ -106,12 +114,45 @@ import (
 	final += `)
 
 // mapRoutesToControllers maps the routes to the controllers
-func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {
+func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res integrations.IResponseLogger) {
 
 	`
 	final += code
 
 	ioutil.WriteFile("services/api/routes.go", []byte(final), 0777)
+
+	permissionsFile := `// Generated Code; DO NOT EDIT.
+
+package permissions
+
+// Permission is the name of a permission 
+type Permission string 
+
+const (
+`
+	for k := range allPerms {
+		permissionsFile += "\t// " + allPerms[k] + "Permission is the `" + allPerms[k] + "` permission\n"
+		permissionsFile += "\t" + allPerms[k] + "Permission Permission = \"" + allPerms[k] + "\"\n"
+	}
+
+	permissionsFile += `)
+
+// Permissions returns a slice of permissions 
+func Permissions() []Permission {
+	return []Permission{
+`
+
+	for k := range allPerms {
+		permissionsFile += "\t\t" + allPerms[k] + "Permission,\n"
+	}
+
+	permissionsFile += `	}
+}	
+
+`
+	permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
+	fmt.Println("Writing the permissions file to path ", permissionsFilePath)
+	ioutil.WriteFile(permissionsFilePath, []byte(permissionsFile), 0777)
 
 	return
 }
@@ -184,13 +225,14 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 				route.Description = strings.Join(lineParts[2:], " ")
 				continue
 			}
+			route.IsAuth = true
 
-			if doc == "// @auth" {
-				route.IsAuth = true
+			if len(doc) > 12 && doc[0:13] == "// @anonymous" {
+				route.IsAuth = false
 				continue
 			}
 
-			if len(doc) > 8 && doc[0:9] == "// @body " {
+			if len(doc) > 9 && doc[0:9] == "// @body " {
 				bodyComment := strings.Split(strings.Trim(doc[9:], " "), " ")
 				route.BodyFormat = bodyComment[0]
 
@@ -371,11 +413,13 @@ func (g *Gen) BuildControllerObjFromController(filePath string, src []byte) (con
 }
 
 // BuildRoutesCodeFromController builds controller code based on a route
-func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string) {
+func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string, perms []string) {
+
+	perms = []string{}
 
 	s := []string{
 		fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
-		fmt.Sprintf("func map%sRoutes(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {\n", controller.Name),
+		fmt.Sprintf("func map%sRoutes(res integrations.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {\n", controller.Name),
 	}
 
 	for _, route := range controller.Routes {
@@ -383,6 +427,9 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string)
 		// Method comments
 		s = append(s, fmt.Sprintf("\t// %s", route.Name))
 		s = append(s, fmt.Sprintf("\t// %s %s", route.Method, route.Raw))
+		if !route.IsAuth {
+			s = append(s, "\t// @anonymous")
+		}
 
 		// Method args
 		args := []string{
@@ -398,11 +445,24 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string)
 			s = append(s, fmt.Sprintf("\tr.HandleFunc(\"%s\", func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
 		}
 
+		// if len(route.Perms) > 0 && route.IsAuth {
+		if route.IsAuth {
+			permissionName := route.Name
+			perms = append(perms, permissionName)
+			// for k := range route.Perms {
+			// s = append(s, "\t\tif !utils.HasPerm(currentUser, \""+route.Perms[k]+"\") {")
+			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permissionName+"Permission) {")
+			s = append(s, "\t\t\tres.Forbidden(r, w)")
+			s = append(s, "\t\t\treturn")
+			s = append(s, "\t\t}\n")
+			// }
+		}
+
 		if len(route.BodyType) > 0 {
 			s = append(s, fmt.Sprintf("\t\tbody := &%s{}", route.BodyType))
 			s = append(s, "\t\te := request.GetBodyJSON(r, body)\n")
 			s = append(s, "\t\tif e != nil {")
-			s = append(s, "\t\t\tresponse.BadRequest(r, w, e)")
+			s = append(s, "\t\t\tres.BadRequest(r, w, e)")
 			s = append(s, "\t\t\treturn")
 			s = append(s, "\t\t}\n")
 		}

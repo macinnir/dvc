@@ -566,7 +566,6 @@ func (c *Cmd) CommandInsert(args []string) {
 	connector, _ := connectorFactory(c.Config.DatabaseType, c.Config)
 	x := lib.NewExecutor(c.Config, connector)
 	x.RunSQL(sql)
-
 }
 
 // CommandAdd adds an object to the database
