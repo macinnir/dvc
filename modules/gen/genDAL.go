@@ -584,7 +584,38 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.
 	}
 	return
 }
-{{end}}`
+{{end}}
+
+// ManyPaged returns a slice of {{.Table.Name}} models
+func (r *{{.Table.Name}}DAL) ManyPaged(limit, offset int64, orderBy, orderDir string) (collection []*models.{{.Table.Name}}, e error) {
+	collection = []*models.{{.Table.Name}}{}
+	orderDirString := "ASC"
+	if orderDir == "DESC" {
+		orderDirString = "DESC"
+	}
+
+	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE IsDeleted = 0 ORDER BY `%s` %s LIMIT ? OFFSET ?" + `", orderBy, orderDirString)
+
+	e = r.db.Select(&collection, query, limit, offset)
+	if e != nil {
+		r.log.Errorf("{{.Table.Name}}DAL.GetMany(%d, %d, %s, %s) > %s", limit, offset, orderBy, orderDir, e.Error())
+	} else {
+		r.log.Debugf("{{.Table.Name}}DAL.GetMany(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
+	}
+	return
+}
+
+// Count returns the number of {{.Table.Name}} records
+func (r *{{.Table.Name}}DAL) Count() (count int64, e error) {
+	count = 0
+	e = r.db.Get(&count, "SELECT COUNT(*) FROM ` + "`{{.Table.Name}}`" + ` WHERE IsDeleted = 0")
+	if e != nil {
+		r.log.Errorf("{{.Table.Name}}DAL.Count > %s", e.Error())
+	} else {
+		r.log.Debugf("{{.Table.Name}}DAL.Count()")
+	}
+	return
+}`
 
 	t := template.New("dal-" + table.Name)
 	t.Funcs(template.FuncMap{
