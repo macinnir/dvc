@@ -523,7 +523,15 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}, mus
 	e = r.db.Get(model, "SELECT * FROM ` + "`{{.Table.Name}}` WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
 
 	if e == nil {
+		
+		{{ if .IsDeleted}}if model.IsDeleted == 1 && mustExist {
+			model = nil
+			e = errors.NewRecordNotFoundError()
+			return
+		}{{end}}
+
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
+		
 	} else if e == sql.ErrNoRows {
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
 
@@ -535,11 +543,7 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}, mus
 		e = nil
 		model = nil
 	} else {
-		{{ if .IsDeleted}}if model.IsDeleted == 1 && mustExist {
-			model = nil
-			e = errors.NewRecordNotFoundError()
-			return
-		}{{end}}
+		
 		r.log.Errorf("{{.Table.Name}}DAL.FromID(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	}
 
