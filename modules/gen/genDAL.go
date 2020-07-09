@@ -342,16 +342,16 @@ func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
 }
 
 // UpdateMany updates a slice of {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []*models.{{.Table.Name}}) (e error) {
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
-		e = r.Update(&modelSlice[0])
+		e = r.Update(modelSlice[0])
 		return
 	}
 
 	chunkSize := 25
-	chunks := [][]models.{{.Table.Name}}{}
+	chunks := [][]*models.{{.Table.Name}}{}
 
 	for i := 0; i < len(modelSlice); i += chunkSize {
 		end := i + chunkSize
@@ -404,7 +404,7 @@ func (r *{{.Table.Name}}DAL) Delete({{.PrimaryKey | toArgName}} {{.IDType}}) (e 
 }
 
 // DeleteMany marks {{.Table.Name}} objects in chunks as deleted
-func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []*models.{{.Table.Name}}) (e error) {
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
@@ -413,7 +413,7 @@ func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []models.{{.Table.Name}}) (e e
 	}
 
 	chunkSize := 25
-	chunks := [][]models.{{.Table.Name}}{}
+	chunks := [][]*models.{{.Table.Name}}{}
 
 	for i := 0; i < len(modelSlice); i += chunkSize {
 		end := i + chunkSize
@@ -584,6 +584,76 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.
 	}
 	return
 }
+
+// ManyFrom{{$col.Name}} returns a slice of {{$.Table.Name}} models from {{$col.Name}}
+func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) (collection []*models.{{$.Table.Name}}, e error) {
+	
+	collection = []*models.{{$.Table.Name}}{}
+
+	orderDirString := "ASC"
+	if orderDir == "DESC" {
+		orderDirString = "DESC"
+	}
+
+	query := fmt.Sprintf("SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? AND IsDeleted = 0 ORDER BY `%s` %s LIMIT ? OFFSET ?" + `", orderBy, orderDirString)
+
+	e = r.db.Select(&collection, query, {{$col.Name | toArgName}}, limit, offset)
+
+	if e != nil {
+		r.log.Errorf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}({{$col | dataTypeToFormatString}}, %d, %d, %s, %s) > %s", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir, e.Error())
+	} else {
+		r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
+	}
+	return
+}
+
+// CountFrom{{$col.Name}} returns the number of {{$.Table.Name}} records from {{$col.Name}}
+func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (count int64, e error) {
+	
+	count = 0
+	
+	e = r.db.Get(&count, "SELECT COUNT(*) FROM ` + "`{{$.Table.Name}}`" + ` WHERE {{$col.Name}} = ? AND IsDeleted = 0", {{$col.Name | toArgName}})
+	
+	if e != nil {
+		r.log.Errorf("{{$.Table.Name}}DAL.CountFrom{{$col.Name}}({{$col | dataTypeToFormatString}}) > %s", {{$col.Name | toArgName}}, e.Error())
+	} else {
+		r.log.Debugf("{{$.Table.Name}}DAL.CountFrom{{$col.Name}}({{$col | dataTypeToFormatString}})", {{$col.Name | toArgName}})
+	}
+
+	return
+}
+
+// SingleFrom{{$col.Name}} returns a single {{$.Table.Name}} record by its {{$col.Name}}
+func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, mustExist bool) (model *models.{{$.Table.Name}}, e error) {
+
+	model = &models.{{$.Table.Name}}{}
+
+	e = r.db.Get(model, "SELECT * FROM ` + "`{{$.Table.Name}}`" + `WHERE {{$col.Name}} = ?", {{$col.Name | toArgName}})
+
+	if e == nil {
+
+		r.log.Debugf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}({{$col | dataTypeToFormatString}})", {{$col.Name | toArgName}})
+
+	} else if e == sql.ErrNoRows {
+
+		r.log.Debugf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}({{$col | dataTypeToFormatString}}) > NOT FOUND", {{$col.Name | toArgName}})
+
+		if mustExist {
+			e = errors.NewRecordNotFoundError()
+			return
+		}
+
+		e = nil
+		model = nil
+
+	} else {
+		r.log.Errorf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}({{$col | dataTypeToFormatString}}) > %s", {{$col.Name | toArgName}}, e.Error())
+	}
+
+	return
+}
+
+
 {{end}}
 
 // ManyPaged returns a slice of {{.Table.Name}} models
@@ -623,6 +693,7 @@ func (r *{{.Table.Name}}DAL) Count() (count int64, e error) {
 		"insertValues":           fetchTableInsertValuesString,
 		"updateFields":           fetchTableUpdateFieldsString,
 		"dataTypeToGoTypeString": lib.DataTypeToGoTypeString,
+		"dataTypeToFormatString": lib.DataTypeToFormatString,
 		"toArgName":              toArgName,
 	})
 

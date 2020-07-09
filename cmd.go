@@ -1408,7 +1408,7 @@ func (c *Cmd) GenInterfaces(g *gen.Gen) {
 				return
 			}
 
-			fmt.Println("Generating ", destFile)
+			// fmt.Println("Generating ", destFile)
 			// fmt.Println("Writing to: ", destFile)
 
 			ioutil.WriteFile(destFile, i, 0644)

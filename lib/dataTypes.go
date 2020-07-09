@@ -27,6 +27,33 @@ func IsValidSQLType(str string) bool {
 	return false
 }
 
+// DataTypeToFormatString converts a database type to its equivalent golang datatype
+func DataTypeToFormatString(column *Column) (fieldType string) {
+
+	fieldType = "%s"
+
+	switch column.DataType {
+	case "tinyint":
+		fieldType = "%d"
+	case "varchar":
+		fieldType = "%s"
+	case "enum":
+		fieldType = "%s"
+	case "text":
+		fieldType = "%s"
+	case "date":
+		fieldType = "%s"
+	case "datetime":
+		fieldType = "%s"
+	case "char":
+		fieldType = "%s"
+	case "decimal":
+		fieldType = "%f"
+	}
+
+	return
+}
+
 // DataTypeToGoTypeString converts a database type to its equivalent golang datatype
 func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	fieldType = "int64"
