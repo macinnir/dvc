@@ -394,7 +394,7 @@ func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []*models.{{.Table.Name}}) (e 
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
 func (r *{{.Table.Name}}DAL) Delete({{.PrimaryKey | toArgName}} {{.IDType}}) (e error) {
-	_, e = r.db.Exec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`" + ` = 1 WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
+	_, e = r.db.Exec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted` = 1 WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 	} else {
@@ -551,9 +551,9 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}, mus
 }
 
 // FromIDs returns a slice of {{.Table.Name}} objects by a set of primary keys
-func (r *{{.Table.Name}}DAL) FromIDs({{.PrimaryKey | toArgName}}s []{{.IDType}}) (model []models.{{.Table.Name}}, e error) {
+func (r *{{.Table.Name}}DAL) FromIDs({{.PrimaryKey | toArgName}}s []{{.IDType}}) (model []*models.{{.Table.Name}}, e error) {
 
-	model = []models.{{.Table.Name}}{}
+	model = []*models.{{.Table.Name}}{}
 
 	ids := []string{}
 	for _, id := range {{.PrimaryKey | toArgName}}s {
@@ -628,7 +628,7 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}({{$col.Name | toArgName}} 
 
 	model = &models.{{$.Table.Name}}{}
 
-	e = r.db.Get(model, "SELECT * FROM ` + "`{{$.Table.Name}}`" + `WHERE {{$col.Name}} = ?", {{$col.Name | toArgName}})
+	e = r.db.Get(model, "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ?" + `", {{$col.Name | toArgName}})
 
 	if e == nil {
 
