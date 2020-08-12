@@ -259,7 +259,7 @@ func New{{.Table.Name}}DAL(db integrations.IDB, log integrations.ILog) *{{.Table
 }
 
 // Create creates a new {{.Table.Name}} entry in the database
-func (r {{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
 {{if .IsDateCreated}}
 	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
 
@@ -277,16 +277,21 @@ func (r {{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
 }
 
 // CreateMany creates {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) CreateMany(modelSlice []models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) CreateMany(modelSlice []*models.{{.Table.Name}}) (e error) {
+
+	// No records 
+	if len(modelSlice) == 0 {
+		return 
+	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
-		e = r.Create(&modelSlice[0])
+		e = r.Create(modelSlice[0])
 		return
 	}
 
 	chunkSize := 25
-	chunks := [][]models.{{.Table.Name}}{}
+	chunks := [][]*models.{{.Table.Name}}{}
 
 	for i := 0; i < len(modelSlice); i += chunkSize {
 		end := i + chunkSize
@@ -343,6 +348,11 @@ func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
 
 // UpdateMany updates a slice of {{.Table.Name}} objects in chunks
 func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []*models.{{.Table.Name}}) (e error) {
+
+	// No records 
+	if len(modelSlice) == 0 {
+		return 
+	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
@@ -406,6 +416,11 @@ func (r *{{.Table.Name}}DAL) Delete({{.PrimaryKey | toArgName}} {{.IDType}}) (e 
 // DeleteMany marks {{.Table.Name}} objects in chunks as deleted
 func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []*models.{{.Table.Name}}) (e error) {
 
+	// No records 
+	if len(modelSlice) == 0 {
+		return 
+	}
+
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
 		e = r.Delete(modelSlice[0].{{.PrimaryKey}})
@@ -467,6 +482,11 @@ func (r *{{.Table.Name}}DAL) DeleteHard({{.PrimaryKey | toArgName}} {{.IDType}})
 
 // DeleteManyHard deletes {{.Table.Name}} objects in chunks
 func (r {{.Table.Name}}DAL) DeleteManyHard(modelSlice []models.{{.Table.Name}}) (e error) {
+
+	// No records 
+	if len(modelSlice) == 0 {
+		return 
+	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
@@ -554,6 +574,11 @@ func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}, mus
 func (r *{{.Table.Name}}DAL) FromIDs({{.PrimaryKey | toArgName}}s []{{.IDType}}) (model []*models.{{.Table.Name}}, e error) {
 
 	model = []*models.{{.Table.Name}}{}
+	
+	// No records 
+	if len({{.PrimaryKey | toArgName}}s) == 0 {
+		return 
+	}
 
 	ids := []string{}
 	for _, id := range {{.PrimaryKey | toArgName}}s {
@@ -595,9 +620,19 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}({{$col.Name | toArgName}} {{
 		orderDirString = "DESC"
 	}
 
-	query := fmt.Sprintf("SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? AND IsDeleted = 0 ORDER BY `%s` %s LIMIT ? OFFSET ?" + `", orderBy, orderDirString)
+	query := "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? AND IsDeleted = 0" + `"
 
-	e = r.db.Select(&collection, query, {{$col.Name | toArgName}}, limit, offset)
+	// Optional Order By 
+	if len(orderBy) > 0 {
+		query += fmt.Sprintf(" ORDER BY ` + "`%s` %s" + `", orderBy, orderDirString)
+	}
+
+	// Optional Limit 
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
+	}
+
+	e = r.db.Select(&collection, query, {{$col.Name | toArgName}})
 
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}({{$col | dataTypeToFormatString}}, %d, %d, %s, %s) > %s", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir, e.Error())
@@ -628,7 +663,7 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}({{$col.Name | toArgName}} 
 
 	model = &models.{{$.Table.Name}}{}
 
-	e = r.db.Get(model, "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ?" + `", {{$col.Name | toArgName}})
+	e = r.db.Get(model, "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? AND IsDeleted = 0" + `", {{$col.Name | toArgName}})
 
 	if e == nil {
 
