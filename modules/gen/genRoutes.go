@@ -82,6 +82,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 		routesString, perms := g.BuildRoutesCodeFromController(controller)
 
 		allPerms = append(allPerms, perms...)
+		allPerms = append(allPerms, "Manage"+controller.Name[0:len(controller.Name)-len("Controller")])
 
 		rest += "\n" + routesString + "\n"
 
