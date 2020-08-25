@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -44,6 +45,8 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 
 	allPerms := []string{}
 
+	controllers := []*Controller{}
+
 	for _, filePath := range files {
 
 		fileName := filePath.Name()
@@ -72,7 +75,11 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 			return
 		}
 
-		controller, _ := g.BuildControllerObjFromController(path.Join(dir, filePath.Name()), src)
+		// Build a controller object from the controller file
+		controller, _ := g.BuildControllerObjFromControllerFile(path.Join(dir, filePath.Name()), src)
+
+		// Documentation routes
+		controllers = append(controllers, controller)
 
 		// Include imports for dtos and response if necessary for JSON http body
 		if controller.HasDTOsImport == true {
@@ -88,7 +95,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 
 		controllerCalls = append(
 			controllerCalls,
-			"map"+extractNameFromFile(filePath.Name())+"Routes(res, r, auth, c)",
+			"map"+extractNameFromFile(filePath.Name())+"Routes(res, r, auth, c, log)",
 		)
 	}
 
@@ -115,7 +122,7 @@ import (
 	final += `)
 
 // mapRoutesToControllers maps the routes to the controllers
-func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res integrations.IResponseLogger) {
+func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res integrations.IResponseLogger, log integrations.ILog) {
 
 	`
 	final += code
@@ -155,34 +162,40 @@ func Permissions() []Permission {
 	fmt.Println("Writing the permissions file to path ", permissionsFilePath)
 	ioutil.WriteFile(permissionsFilePath, []byte(permissionsFile), 0777)
 
+	routesJSON, _ := json.MarshalIndent(controllers, "  ", "    ")
+	routesJSONFilePath := "routes.json"
+	fmt.Println("Writing Routes JSON to to path", routesJSONFilePath)
+	ioutil.WriteFile(routesJSONFilePath, routesJSON, 0777)
+
 	return
 }
 
 // Controller represents a REST controller
 type Controller struct {
-	Name              string
-	Path              string
-	Routes            []ControllerRoute
-	HasDTOsImport     bool
-	HasResponseImport bool
+	Name              string            `json:"Name"`
+	Description       string            `json:"Description"`
+	Path              string            `json:"-"`
+	Routes            []ControllerRoute `json:"Routes"`
+	HasDTOsImport     bool              `json:"-"`
+	HasResponseImport bool              `json:"-"`
 }
 
 // ControllerRoute represents a route inside a REST controller
 type ControllerRoute struct {
-	Name           string
-	Description    string
-	Raw            string
-	Path           string
-	Method         string
-	Params         []ControllerRouteParam
-	Queries        []ControllerRouteQuery
-	IsAuth         bool
-	BodyType       string
-	BodyFormat     string
-	HasBody        bool
-	ResponseType   string
-	ResponseFormat string
-	ResponseCode   int
+	Name           string                 `json:"Name"`
+	Description    string                 `json:"Description"`
+	Raw            string                 `json:"Path"`
+	Path           string                 `json:"-"`
+	Method         string                 `json:"Method"`
+	Params         []ControllerRouteParam `json:"Params"`
+	Queries        []ControllerRouteQuery `json:"Queries"`
+	IsAuth         bool                   `json:"IsAuth"`
+	BodyType       string                 `json:"BodyType"`
+	BodyFormat     string                 `json:"BodyFormat"`
+	HasBody        bool                   `json:"HasBody"`
+	ResponseType   string                 `json:"ResponseType"`
+	ResponseFormat string                 `json:"ResponseFormat"`
+	ResponseCode   int                    `json:"ResponseCode"`
 }
 
 // ControllerRouteParam represents a param inside a controller route
@@ -201,14 +214,63 @@ type ControllerRouteQuery struct {
 	ValueRaw     string
 }
 
-// ExtractRoutesFromController parses a file and extracts all of its @route comments
-func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes []ControllerRoute, e error) {
+// DocRoute is a route in the documentation
+type DocRoute struct {
+	Name           string
+	Description    string
+	Method         string
+	Path           string
+	HasBody        bool
+	BodyType       string
+	BodyFormat     string
+	ResponseType   string
+	ResponseFormat string
+	ResponseCode   int
+}
 
-	routes = []ControllerRoute{}
+func newDocRoute(route ControllerRoute) (docRoute *DocRoute) {
+	docRoute = &DocRoute{
+		Name:        route.Name,
+		Description: route.Description,
+		Method:      route.Method,
+		Path:        route.Path,
+		HasBody:     route.HasBody,
+		BodyType:    route.BodyType,
+	}
+
+	return
+}
+
+// DocRouteParam represents a parameter inside a route for documentation
+type DocRouteParam struct {
+	Name    string
+	Pattern string
+	Type    string
+}
+
+// DocRouteQuery represents a query inside a route for documentation
+type DocRouteQuery struct {
+	Name    string
+	Pattern string
+	Type    string
+}
+
+// BuildControllerObjFromControllerFile parses a file and extracts all of its @route comments
+func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) (controller *Controller, e error) {
+
+	controller = &Controller{
+		Name:   extractNameFromFile(filePath),
+		Path:   filePath,
+		Routes: []ControllerRoute{},
+	}
 
 	// Get the controller name
 	controllerName := extractNameFromFile(filePath)
-	methods, _, _ := lib.ParseStruct(src, controllerName, true, true, "controllers")
+	var methods []lib.Method
+	methods, _, controller.Description = lib.ParseStruct(src, controllerName, true, true, "controllers")
+
+	// Remove the name of the controller from the description
+	controller.Description = strings.TrimPrefix(controller.Description, controller.Name)
 
 	for _, method := range methods {
 
@@ -234,6 +296,7 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 			}
 
 			if len(doc) > 9 && doc[0:9] == "// @body " {
+
 				bodyComment := strings.Split(strings.Trim(doc[9:], " "), " ")
 				route.BodyFormat = bodyComment[0]
 
@@ -241,6 +304,8 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 					route.BodyType = bodyComment[1]
 				}
 
+				controller.HasDTOsImport = true
+				controller.HasResponseImport = true
 				route.HasBody = true
 				continue
 			}
@@ -337,7 +402,7 @@ func (g *Gen) ExtractRoutesFromController(filePath string, src []byte) (routes [
 
 		}
 
-		routes = append(routes, route)
+		controller.Routes = append(controller.Routes, route)
 	}
 
 	return
@@ -392,27 +457,6 @@ func matchPatternToDataType(pattern string) string {
 	return "string"
 }
 
-// BuildControllerObjFromController builds a controller object from a controller file
-func (g *Gen) BuildControllerObjFromController(filePath string, src []byte) (controller *Controller, e error) {
-
-	controller = &Controller{
-		Name: extractNameFromFile(filePath),
-		Path: filePath,
-	}
-
-	controller.Routes, e = g.ExtractRoutesFromController(filePath, src)
-
-	for _, r := range controller.Routes {
-		if r.HasBody {
-			controller.HasDTOsImport = true
-			controller.HasResponseImport = true
-			break
-		}
-	}
-
-	return
-}
-
 // BuildRoutesCodeFromController builds controller code based on a route
 func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string, perms []string) {
 
@@ -420,7 +464,7 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 	s := []string{
 		fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
-		fmt.Sprintf("func map%sRoutes(res integrations.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers) {\n", controller.Name),
+		fmt.Sprintf("func map%sRoutes(res integrations.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, log integrations.ILog) {\n", controller.Name),
 	}
 
 	for _, route := range controller.Routes {
@@ -445,6 +489,8 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 		} else {
 			s = append(s, fmt.Sprintf("\tr.HandleFunc(\"%s\", func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
 		}
+
+		s = append(s, fmt.Sprintf("\n\t\tlog.Debug(\"ROUTE: %s %s => %s\")\n\n", route.Method, route.Path, route.Name))
 
 		// if len(route.Perms) > 0 && route.IsAuth {
 		if route.IsAuth {
