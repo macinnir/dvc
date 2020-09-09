@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -23,9 +24,25 @@ import (
 // Command is a type that represents the possible commands passed in at run time
 type Command string
 
+// TablesCache stores an md5 hash of the JSON representation of a table in the schema.json file
+// These hashes are used to skip unchanged models for DAL and Model generation
+type TablesCache struct {
+	Dals   map[string]string
+	Models map[string]string
+}
+
+// NewTablesCache is a factory method for TablesCache
+func NewTablesCache() TablesCache {
+	return TablesCache{
+		Dals:   map[string]string{},
+		Models: map[string]string{},
+	}
+}
+
 // Command Names
 const (
 	CommandAdd           Command = "add"
+	CommandInspect       Command = "inspect"
 	CommandRm            Command = "rm"
 	CommandInit          Command = "init"
 	CommandLs            Command = "ls"
@@ -50,6 +67,7 @@ const (
 	CommandRefresh       Command = "refresh"
 	CommandInstall       Command = "install"
 	CommandInsert        Command = "insert"
+	CommandSelect        Command = "select"
 )
 
 // Cmd is a container for handling commands
@@ -57,8 +75,10 @@ type Cmd struct {
 	Options lib.Options
 
 	// errLog  *log.Logger
-	cmd    string
-	Config *lib.Config
+	cmd            string
+	Config         *lib.Config
+	existingModels TablesCache
+	newModels      map[string]string
 }
 
 // Main is the main function that handles commands arguments
@@ -169,72 +189,86 @@ func (c *Cmd) Main(args []string) (err error) {
 
 	switch cmd {
 	case CommandRefresh:
-		c.CommandImport(args)
-		c.CommandGen([]string{"models"})
-		c.CommandGen([]string{"dals"})
-		c.CommandGen([]string{"interfaces"})
-		c.CommandGen([]string{"routes"})
-	// 	c.CommandGen([]string{"services"})
-	// 	c.CommandGen([]string{"api"})
-	// case CommandInstall:
-	// 	c.CommandImport(args)
-	// 	c.CommandGen([]string{"app"})
-	// 	c.CommandGen([]string{"models"})
-	// 	c.CommandGen([]string{"dal"})
-	// 	c.CommandGen([]string{"repos"})
-	// 	c.CommandGen([]string{"services"})
+
+		if len(args) > 0 && args[0] == "help" {
+			helpRefresh()
+			return
+		}
+
+		c.CommandRefresh(args)
+
 	case CommandInsert:
+		if len(args) > 0 && args[0] == "help" {
+			helpInsert()
+			return
+		}
+
 		c.CommandInsert(args)
+
+	case CommandSelect:
+		if len(args) > 0 && args[0] == "help" {
+			helpSelect()
+			return
+		}
+		c.CommandSelect(args)
 	case CommandImport:
+		if len(args) > 0 && args[0] == "help" {
+			helpImport()
+			return
+		}
 		c.CommandImport(args)
 	case CommandExport:
+		if len(args) > 0 && args[0] == "help" {
+			helpExport()
+			return
+		}
 		c.CommandExport(args)
 	case CommandCompare:
+		if len(args) > 0 && args[0] == "help" {
+			helpCompare()
+			return
+		}
 		c.CommandCompare(args)
 	case CommandGen:
+		if len(args) > 0 && args[0] == "help" {
+			helpGen()
+			return
+		}
 		c.CommandGen(args)
 	case CommandHelp:
-		c.PrintHelp(args)
+		helpCommandNames()
 	case CommandInit:
+		if len(args) > 0 && args[0] == "help" {
+			helpInit()
+			return
+		}
 		c.CommandInit(args)
 	case CommandLs:
+		if len(args) > 0 && args[0] == "help" {
+			helpLs()
+			return
+		}
 		c.CommandLs(args)
 	case CommandAdd:
+		if len(args) > 0 && args[0] == "help" {
+			helpAdd()
+			return
+		}
 		c.CommandAdd(args)
+	case CommandInspect:
+		c.CommandInspect(args)
 	case CommandRm:
+		if len(args) > 0 && args[0] == "help" {
+			helpRm()
+			return
+		}
 		c.CommandRm(args)
 	default:
 		fmt.Printf("Invalid command `%s`\n", cmd)
-		c.PrintCommandNames(args)
+		helpCommandNames()
 	}
 
 	os.Exit(0)
-	return
-}
-
-func (c *Cmd) initCompare() *compare.Compare {
-	cmp, _ := compare.NewCompare(c.Config, c.Options)
-	cmp.Connector, _ = connectorFactory(c.Config.DatabaseType, c.Config)
-	return cmp
-}
-
-func connectorFactory(databaseType string, config *lib.Config) (connector lib.IConnector, e error) {
-
-	t := lib.DatabaseType(databaseType)
-
-	switch t {
-	case lib.DatabaseTypeMysql:
-		connector = &mysql.MySQL{
-			Config: config,
-		}
-	case lib.DatabaseTypeSqlite:
-		connector = &sqlite.Sqlite{
-			Config: config,
-		}
-	default:
-		e = errors.New("Invalid database type")
-	}
-
 	return
 }
 
@@ -487,7 +521,42 @@ func (c *Cmd) CommandLs(args []string) {
 	fmt.Println(t.String())
 }
 
+// CommandRefresh is the refresh command
+func (c *Cmd) CommandRefresh(args []string) {
+	totalTime := time.Now()
+
+	// Import
+	start := time.Now()
+	c.CommandImport(args)
+	fmt.Printf("Import: %f seconds\n", time.Since(start).Seconds())
+
+	// Gen Models
+	start = time.Now()
+	c.CommandGen([]string{"models"})
+	fmt.Printf("Models: %f seconds\n", time.Since(start).Seconds())
+
+	start = time.Now()
+	c.CommandGen([]string{"dals"})
+	fmt.Printf("DALs: %f seconds\n", time.Since(start).Seconds())
+
+	start = time.Now()
+	c.CommandGen([]string{"interfaces"})
+	fmt.Printf("Interfaces: %f seconds\n", time.Since(start).Seconds())
+
+	start = time.Now()
+	c.CommandGen([]string{"routes"})
+	fmt.Printf("Routes: %f seconds\n", time.Since(start).Seconds())
+
+	fmt.Printf("Total: %f seconds\n", time.Since(totalTime).Seconds())
+}
+
+// CommandInsert inserts data into the database
 func (c *Cmd) CommandInsert(args []string) {
+
+	if len(args) > 0 && args[0] == "help" {
+		helpInsert()
+		return
+	}
 
 	database := c.loadDatabase()
 
@@ -586,6 +655,7 @@ func (c *Cmd) CommandAdd(args []string) {
 		tableName = lib.ReadCliInput(reader, "Table Name:")
 	}
 
+	// Creating a new table
 	if _, ok := database.Tables[tableName]; !ok {
 
 		fmt.Printf("Create table `%s`\n", tableName)
@@ -593,9 +663,26 @@ func (c *Cmd) CommandAdd(args []string) {
 		start := fmt.Sprintf("CREATE TABLE `%s` (", tableName)
 		sql += start
 		sqlParts = append(sqlParts, start)
-		cols := []string{}
+		cols := []string{
+			fmt.Sprintf("%sID INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT", tableName),
+			fmt.Sprintf("IsDeleted TINYINT UNSIGNED NOT NULL DEFAULT 0"),
+			fmt.Sprintf("DateCreated BIGINT UNSIGNED NOT NULL DEFAULT 0"),
+			fmt.Sprintf("LastUpdated BIGINT UNSIGNED NOT NULL DEFAULT 0"),
+		}
+
+		for k := range cols {
+			fmt.Printf("`%s`.Column(%d): %s\n", tableName, k+1, cols[k])
+		}
+
+		includeColumns := lib.ReadCliInput(reader, fmt.Sprintf("Include the above columns (Y/n)?"))
 
 		n := 1
+		if includeColumns == "Y" {
+			n = len(cols) + 1
+		} else {
+			cols = []string{}
+		}
+
 		for {
 
 			col := lib.ReadCliInput(reader, fmt.Sprintf("`%s`.Column(%d):", tableName, n))
@@ -706,8 +793,44 @@ func (c *Cmd) CommandAdd(args []string) {
 		x := lib.NewExecutor(c.Config, connector)
 		x.RunSQL(sql)
 
-		c.CommandImport([]string{})
+		c.CommandRefresh([]string{})
 	}
+}
+
+// CommandInspect is the inspect command
+func (c *Cmd) CommandInspect(args []string) {
+
+	model, _ := gen.InspectFile(args[0])
+
+	k := 0
+	for k < model.Fields.Len() {
+		fmt.Println(model.Fields.Get(k).Name + " > " + model.Fields.Get(k).DataType)
+	}
+}
+
+// CommandSelect selects rows from the database
+func (c *Cmd) CommandSelect(args []string) {
+
+	// database := c.loadDatabase()
+
+	// reader := bufio.NewReader(os.Stdin)
+
+	// tableName := ""
+
+	// if len(args) > 0 {
+	// 	tableName = args[0]
+	// 	args = args[1:]
+	// } else {
+	// 	tableName = lib.ReadCliInput(reader, "Table Name:")
+	// }
+
+	// if _, ok := database.Tables[tableName]; !ok {
+	// 	fmt.Printf("Unknown table `%s`\n", tableName)
+	// 	return
+	// }
+
+	// query := fmt.Sprintf("SELECT * FROM `%s` LIMIT 100\n", tableName)
+
 }
 
 // CommandRm removes an object from the database
@@ -898,39 +1021,6 @@ Main:
 	}
 }
 
-func writeSQLToLog(sql string) {
-
-	sqlLog := time.Now().Format("20060102150405") + "\n"
-	sqlLog += sql
-
-	filePath := "./dvc-changes.log"
-
-	if _, e := os.Stat(filePath); os.IsNotExist(e) {
-		ioutil.WriteFile(filePath, []byte(sqlLog), 0600)
-	} else {
-		f, err := os.OpenFile("./dvc-changes.log", os.O_APPEND|os.O_WRONLY, 0600)
-		if err != nil {
-			panic(err)
-		}
-		defer f.Close()
-		if _, err = f.WriteString(sqlLog); err != nil {
-			panic(err)
-		}
-	}
-}
-
-// loadDatabase loads a database
-func (c *Cmd) loadDatabase() *lib.Database {
-	// Load the schema
-	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
-	database, e := lib.ReadSchemaFromFile(schemaFile)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
-		os.Exit(1)
-	}
-	return database
-}
-
 // CommandGen handles the `gen` command
 func (c *Cmd) CommandGen(args []string) {
 
@@ -976,6 +1066,7 @@ func (c *Cmd) CommandGen(args []string) {
 	}
 
 	database := c.loadDatabase()
+	c.genTableCache(database)
 
 	switch subCmd {
 	// case CommandGenSchema:
@@ -1130,28 +1221,6 @@ func (c *Cmd) CommandGen(args []string) {
 	}
 }
 
-// PrintCommandNames prints the list of possible dvc commands
-func (c *Cmd) PrintCommandNames(args []string) {
-	cmds := []string{
-		"add [table]",
-		"compare [-r|--reverse] [apply|write]",
-		"export",
-		"gen (dal (table)|dals|models|interfaces|routes)",
-		"help",
-		"import",
-		"init",
-		"ls [search]",
-		"refresh",
-		"rm [table]",
-	}
-	fmt.Println("Commands:")
-	fmt.Println("----------------------------")
-	for k := range cmds {
-		fmt.Println("\t" + cmds[k])
-	}
-	fmt.Println("----------------------------")
-}
-
 // PrintHelp prints help information
 func (c *Cmd) PrintHelp(args []string) {
 	help := `usage: dvc [OPTIONS] [COMMAND] [ARGS]
@@ -1165,93 +1234,26 @@ OPTIONS:
 
 COMMANDS:
 
-	add 	Add an object to the database and then (by calling the import command) the local schema.
+	
 
-	compare Compare two schemas and output the difference.
+	
 
-			[-r|--reverse] [ ( write <path> | apply ) ]
+	
 
-			Default behavior (no arguments) is to compare local schema as authority against
-			remote database as target and write the resulting sql to stdout.
-
-				-r, --reverse 	Switches the roles of the schemas. The remote database becomes the authority
-								and the local schema the target for updating.
-
-								Use this option when attempting to generate sql alter statements against a database that
-								matches the structure of your local schema, in order to make it match a database with the structure
-								of the remote.
-
-				write			After performing the comparison, the resulting sequel statements will be written to a filepath <path> (required).
-
-								Example: dvc compare write path/to/changeset.sql
-
-				apply 			After performing the comparison, apply the the resulting sql statements directly to the target database.
-
-								E.g. dvc compare apply
-
-	export 	Export the database to stdout
-
-	gen 	Generate go code based on the local schema json file.
-			Will fail if no imported schema file json file exists.
-			Requires one (and only one) of the following sub-commands:
-
-				dal [dalName] 	Generate dal [dalName]
-				dals 			Generate dals
-				interfaces 		Generate interfaces
-				models 			Generate models.
-				routes 			Generate routes
-
+	
 	help 	This output
 
-	import	Build a schema definition file based on the target database.
-			This will overwrite any existing schema definition file.
+	
+	
 
-	init 	Initialize a dvc.toml configuration file in the CWD
+		
 
-	ls 		List objects in the schema.
-
-			[tableName] 	List information about an object in the database (e.g. columns of a table)
-
-	refresh Alias for running all of the following commands (in order):
-
-				1. import
-				2. gen models
-				3. gen dals
-				4. gen interfaces
-				5. gen routes
+	
 `
 	fmt.Printf(help)
 }
 
-// loadConfigFromFile loads a config file
-func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
-
-	// fmt.Printf("Looking for config at path %s\n", configFilePath)
-	if _, e = os.Stat(configFilePath); os.IsNotExist(e) {
-		e = fmt.Errorf("Config file `%s` not found", configFilePath)
-		return
-	}
-
-	config = &lib.Config{
-		OneToMany: map[string]string{},
-		ManyToOne: map[string]string{},
-	}
-	_, e = toml.DecodeFile(configFilePath, config)
-
-	if e != nil {
-		return
-	}
-
-	if len(config.OneToMany) > 0 {
-
-		for col, subCol := range config.OneToMany {
-			config.ManyToOne[subCol] = col
-		}
-	}
-
-	return
-}
-
+// GenRepos generates repos
 func (c *Cmd) GenRepos(g *gen.Gen, database *lib.Database) {
 
 	var e error
@@ -1281,6 +1283,7 @@ func (c *Cmd) GenRepos(g *gen.Gen, database *lib.Database) {
 	}
 }
 
+// GenModels generates models
 func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 
 	fmt.Println("Generating models...")
@@ -1293,6 +1296,22 @@ func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 	}
 
 	for _, table := range database.Tables {
+
+		// If the model has been hashed before...
+		if _, ok := c.existingModels.Models[table.Name]; ok {
+
+			// And the hash hasn't changed, skip...
+			if c.newModels[table.Name] == c.existingModels.Models[table.Name] {
+
+				// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
+				continue
+			}
+		}
+
+		// Update the models cache
+		c.existingModels.Models[table.Name] = c.newModels[table.Name]
+
+		// fmt.Printf("Generating model `%s`\n", table.Name)
 		e = g.GenerateGoModel(modelsDir, table)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
@@ -1300,19 +1319,37 @@ func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 		}
 	}
 
-	e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
-		os.Exit(1)
-	}
+	c.saveTableCache()
+
+	// e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
+	// if e != nil {
+	// 	lib.Error(e.Error(), c.Options)
+	// 	os.Exit(1)
+	// }
 }
 
+// GenDals generates dals
 func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
 
 	fmt.Println("Generating dals...")
 	var e error
 
+	// Loop through the schema's tables and build md5 hashes of each to check against
 	for _, table := range database.Tables {
+
+		// If the model has been hashed before...
+		if _, ok := c.existingModels.Dals[table.Name]; ok {
+
+			// And the hash hasn't changed, skip...
+			if c.newModels[table.Name] == c.existingModels.Dals[table.Name] {
+
+				// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
+				continue
+			}
+		}
+
+		// Update the dals cache
+		c.existingModels.Dals[table.Name] = c.newModels[table.Name]
 
 		// fmt.Printf("Generating %sDAL...\n", table.Name)
 		e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
@@ -1321,6 +1358,9 @@ func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
 			os.Exit(1)
 		}
 	}
+
+	c.saveTableCache()
+
 	// Create the dal bootstrap file in the dal repo
 	e = g.GenerateDALsBootstrapFile(c.Config.Dirs.Dal, database)
 	if e != nil {
@@ -1443,4 +1483,134 @@ func (c *Cmd) GenRoutes(g *gen.Gen) {
 		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
+}
+
+func writeSQLToLog(sql string) {
+
+	sqlLog := time.Now().Format("20060102150405") + "\n"
+	sqlLog += sql
+
+	filePath := "./dvc-changes.log"
+
+	if _, e := os.Stat(filePath); os.IsNotExist(e) {
+		ioutil.WriteFile(filePath, []byte(sqlLog), 0600)
+	} else {
+		f, err := os.OpenFile("./dvc-changes.log", os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		if _, err = f.WriteString(sqlLog); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// loadDatabase loads a database
+func (c *Cmd) loadDatabase() *lib.Database {
+	// Load the schema
+	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
+	database, e := lib.ReadSchemaFromFile(schemaFile)
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+
+	return database
+}
+
+func (c *Cmd) genTableCache(database *lib.Database) {
+
+	var e error
+
+	tableCachePath := ".tables"
+
+	c.existingModels = NewTablesCache()
+
+	if _, e := os.Stat(tableCachePath); e == nil {
+		if fileBytes, e := ioutil.ReadFile(tableCachePath); e == nil {
+			if e = json.Unmarshal(fileBytes, &c.existingModels); e != nil {
+				panic("Can't read table cache")
+			}
+		}
+	}
+
+	c.newModels = map[string]string{}
+	for _, table := range database.Tables {
+
+		marshalledTable := []byte{}
+
+		if marshalledTable, e = json.Marshal(table); e != nil {
+			panic(e.Error())
+		}
+
+		// Build the list of new model hashes to check against
+		c.newModels[table.Name] = lib.HashStringMd5(string(marshalledTable))
+	}
+}
+
+func (c *Cmd) saveTableCache() {
+	var e error
+	newModelData := []byte{}
+	if newModelData, e = json.Marshal(c.existingModels); e != nil {
+		panic(fmt.Sprintf("Can't serialize newModels: %s", e.Error()))
+	}
+	if e = ioutil.WriteFile(".tables", newModelData, 0777); e != nil {
+		panic("Could not write table cache to file")
+	}
+}
+
+// loadConfigFromFile loads a config file
+func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
+
+	// fmt.Printf("Looking for config at path %s\n", configFilePath)
+	if _, e = os.Stat(configFilePath); os.IsNotExist(e) {
+		e = fmt.Errorf("Config file `%s` not found", configFilePath)
+		return
+	}
+
+	config = &lib.Config{
+		OneToMany: map[string]string{},
+		ManyToOne: map[string]string{},
+	}
+	_, e = toml.DecodeFile(configFilePath, config)
+
+	if e != nil {
+		return
+	}
+
+	if len(config.OneToMany) > 0 {
+
+		for col, subCol := range config.OneToMany {
+			config.ManyToOne[subCol] = col
+		}
+	}
+
+	return
+}
+
+func (c *Cmd) initCompare() *compare.Compare {
+	cmp, _ := compare.NewCompare(c.Config, c.Options)
+	cmp.Connector, _ = connectorFactory(c.Config.DatabaseType, c.Config)
+	return cmp
+}
+
+func connectorFactory(databaseType string, config *lib.Config) (connector lib.IConnector, e error) {
+
+	t := lib.DatabaseType(databaseType)
+
+	switch t {
+	case lib.DatabaseTypeMysql:
+		connector = &mysql.MySQL{
+			Config: config,
+		}
+	case lib.DatabaseTypeSqlite:
+		connector = &sqlite.Sqlite{
+			Config: config,
+		}
+	default:
+		e = errors.New("Invalid database type")
+	}
+
+	return
 }

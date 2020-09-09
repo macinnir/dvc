@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -56,6 +57,12 @@ func FetchDirFileNames(dirPath string) (dirs []string, e error) {
 	}
 
 	return
+}
+
+// HashStringMd5 genereates an MD5 hash of a string
+func HashStringMd5(s string) string {
+	data := []byte(s)
+	return fmt.Sprintf("%x", md5.Sum(data))
 }
 
 // HashFileMd5 returns an MD5 checksum of the file at `filePath`

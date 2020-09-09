@@ -30,6 +30,23 @@ func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 	return
 }
 
+// InspectFile inspects a file
+func InspectFile(filePath string) (s *lib.GoStruct, e error) {
+
+	fileBytes, e := ioutil.ReadFile(filePath)
+	if e != nil {
+		panic(e)
+	}
+
+	s, e = buildGoStructFromFile(fileBytes)
+	if e != nil {
+		panic(e)
+	}
+
+	return
+
+}
+
 func (g *Gen) updateGoModel(p string, table *lib.Table) (e error) {
 
 	var modelNode *lib.GoStruct
