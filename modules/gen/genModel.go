@@ -1,10 +1,10 @@
 package gen
 
 import (
+	"bufio"
 	"fmt"
 	"html/template"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"sort"
@@ -205,13 +205,18 @@ func (g *Gen) CleanGoModels(dir string, database *lib.Database) (e error) {
 	if err != nil {
 		panic(err)
 	}
+	reader := bufio.NewReader(os.Stdin)
 
 	for _, name := range dirFileNames {
 		fileNameNoExt := name[0 : len(name)-3]
 		if _, ok := database.Tables[fileNameNoExt]; !ok {
 			fullFilePath := path.Join(dir, name)
-			log.Printf("Removing %s\n", fullFilePath)
-			os.Remove(fullFilePath)
+			// log.Printf("Removing %s\n", fullFilePath)
+			result := lib.ReadCliInput(reader, fmt.Sprintf("Delete unused model `%s` (Y/n)?", fileNameNoExt))
+			if result == "Y" {
+				fmt.Printf("Deleting model `%s` at path `%s`...\n", fileNameNoExt, fullFilePath)
+				os.Remove(fullFilePath)
+			}
 		}
 	}
 	return

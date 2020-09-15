@@ -102,6 +102,10 @@ func (c *Cmd) Main(args []string) (err error) {
 		case "-s", "--silent":
 			c.Options &^= lib.OptLogDebug | lib.OptLogInfo
 			c.Options |= lib.OptSilent
+		case "-f", "--force":
+			c.Options |= lib.OptForce
+		case "-c", "--clean":
+			c.Options |= lib.OptClean
 		default:
 			lib.Debug(fmt.Sprintf("Arg: %s", arg), c.Options)
 			if len(arg) > 0 && arg[0] == '-' {
@@ -115,9 +119,9 @@ func (c *Cmd) Main(args []string) (err error) {
 
 		args = args[1:]
 
-		if len(cmd) > 0 {
-			break
-		}
+		// if len(cmd) > 0 {
+		// 	break
+		// }
 
 	}
 	if len(cmd) == 0 {
@@ -1028,7 +1032,7 @@ func (c *Cmd) CommandGen(args []string) {
 
 	// fmt.Printf("Args: %v", args)
 	if len(args) < 1 {
-		lib.Error("Missing gen type [schema | models | repos | caches | ts]", c.Options)
+		lib.Error("Missing gen type [schema | models | repos | caches | ts] [[--force|-f]] [[--clean|-c]]", c.Options)
 		os.Exit(1)
 	}
 	subCmd := Command(args[0])
@@ -1039,26 +1043,6 @@ func (c *Cmd) CommandGen(args []string) {
 	}
 
 	argLen := len(args)
-	n := 0
-
-	// dvc gen models -c
-	for n < argLen {
-		switch args[n] {
-		case "-c":
-			c.Options |= lib.OptClean
-		}
-		n++
-	}
-
-	// for len(args) > 0 {
-	// 	switch args[0] {
-	// 	case "-c", "--clean":
-	// 		c.Options |= lib.OptClean
-	// 	}
-	// 	args = args[1:]
-	// }
-
-	lib.Debugf("Gen Subcommand: %s", c.Options, subCmd)
 
 	g := &gen.Gen{
 		Options: c.Options,
@@ -1287,6 +1271,7 @@ func (c *Cmd) GenRepos(g *gen.Gen, database *lib.Database) {
 func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 
 	fmt.Println("Generating models...")
+	force := c.Options&lib.OptForce == lib.OptForce
 
 	var e error
 
@@ -1301,7 +1286,7 @@ func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 		if _, ok := c.existingModels.Models[table.Name]; ok {
 
 			// And the hash hasn't changed, skip...
-			if c.newModels[table.Name] == c.existingModels.Models[table.Name] {
+			if c.newModels[table.Name] == c.existingModels.Models[table.Name] && !force {
 
 				// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
 				continue
@@ -1311,7 +1296,7 @@ func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 		// Update the models cache
 		c.existingModels.Models[table.Name] = c.newModels[table.Name]
 
-		// fmt.Printf("Generating model `%s`\n", table.Name)
+		fmt.Printf("Generating model `%s`\n", table.Name)
 		e = g.GenerateGoModel(modelsDir, table)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)
@@ -1331,6 +1316,8 @@ func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 // GenDals generates dals
 func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
 
+	force := c.Options&lib.OptForce == lib.OptForce
+
 	fmt.Println("Generating dals...")
 	var e error
 
@@ -1341,7 +1328,7 @@ func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
 		if _, ok := c.existingModels.Dals[table.Name]; ok {
 
 			// And the hash hasn't changed, skip...
-			if c.newModels[table.Name] == c.existingModels.Dals[table.Name] {
+			if c.newModels[table.Name] == c.existingModels.Dals[table.Name] && !force {
 
 				// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
 				continue
@@ -1351,7 +1338,7 @@ func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
 		// Update the dals cache
 		c.existingModels.Dals[table.Name] = c.newModels[table.Name]
 
-		// fmt.Printf("Generating %sDAL...\n", table.Name)
+		fmt.Printf("Generating %sDAL...\n", table.Name)
 		e = g.GenerateGoDAL(table, c.Config.Dirs.Dal)
 		if e != nil {
 			lib.Error(e.Error(), c.Options)

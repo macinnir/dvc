@@ -249,6 +249,8 @@ const (
 	OptSummary
 	// OptClean cleans
 	OptClean
+	// OptForce forces
+	OptForce
 )
 
 // IConnector defines the shape of a connector to a database
