@@ -33,6 +33,8 @@ func DataTypeToFormatString(column *Column) (fieldType string) {
 	fieldType = "%s"
 
 	switch column.DataType {
+	case "int":
+		fieldType = "%d"
 	case "tinyint":
 		fieldType = "%d"
 	case "varchar":
@@ -58,6 +60,8 @@ func DataTypeToFormatString(column *Column) (fieldType string) {
 func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	fieldType = "int64"
 	switch column.DataType {
+	case "int":
+		fieldType = "int64"
 	case "tinyint":
 		fieldType = "int"
 	case "varchar":
