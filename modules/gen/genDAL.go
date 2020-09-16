@@ -1,6 +1,7 @@
 package gen
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"go/format"
@@ -50,6 +51,8 @@ func (g *Gen) GetOrphanedDals(dir string, database *lib.Database) []string {
 
 // CleanGoDALs removes any repo files that aren't in the database.Tables map
 func (g *Gen) CleanGoDALs(dir string, database *lib.Database) (e error) {
+
+	// EXT
 	dirHandle, err := os.Open(dir)
 	if err != nil {
 		log.Fatalf("Directory not found: %s", dir)
@@ -62,19 +65,42 @@ func (g *Gen) CleanGoDALs(dir string, database *lib.Database) (e error) {
 		panic(err)
 	}
 
+	reader := bufio.NewReader(os.Stdin)
+
 	for _, name := range dirFileNames {
 
-		// Skip tests
-		if (len(name) > 8 && name[len(name)-8:len(name)] == "_test.go") || name == "repos.go" {
+		// Skip anything that doesn't have the go extension
+		if len(name) < 4 || name[len(name)-3:] != ".go" {
 			continue
 		}
 
-		fileNameNoExt := name[0 : len(name)-3]
-		if _, ok := database.Tables[fileNameNoExt]; !ok {
-			if fileNameNoExt != "Config" {
+		// Remove the extension
+		modelName := name[0 : len(name)-3]
+
+		// Skip tests
+		if len(modelName) > 5 && modelName[len(modelName)-5:] == "_test" {
+			continue
+		}
+
+		if modelName == "bootstrap" {
+			continue
+		}
+
+		// DALExt
+		if len(modelName) > 6 && modelName[len(modelName)-6:] == "DALExt" {
+			fmt.Println("Ext file: ", name)
+			modelName = modelName[:len(modelName)-6] // DALExt
+		} else {
+			modelName = modelName[:len(modelName)-3] // DAL
+		}
+
+		if _, ok := database.Tables[modelName]; !ok {
+			if modelName != "Config" {
 				fullFilePath := path.Join(dir, name)
-				fmt.Printf("Removing %s\n", fullFilePath)
-				os.Remove(fullFilePath)
+				if result := lib.ReadCliInput(reader, fmt.Sprintf("Delete unused dal `%s`(Y/n)?", name)); result == "Y" {
+					fmt.Printf("Removing %s\n", fullFilePath)
+					os.Remove(fullFilePath)
+				}
 			}
 		}
 	}
