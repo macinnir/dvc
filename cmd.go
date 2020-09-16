@@ -81,15 +81,41 @@ type Cmd struct {
 	newModels      map[string]string
 }
 
+func isCommand(cmd string) bool {
+	commands := map[string]bool{
+		"add":     true,
+		"inspect": true,
+		"rm":      true,
+		"init":    true,
+		"ls":      true,
+		"import":  true,
+		"export":  true,
+		"gen":     true,
+		"compare": true,
+		"help":    true,
+		"refresh": true,
+		"install": true,
+		"insert":  true,
+		"select":  true,
+	}
+
+	_, ok := commands[cmd]
+	return ok
+}
+
 // Main is the main function that handles commands arguments
 // and routes them to their correct options and functions
-func (c *Cmd) Main(args []string) (err error) {
-	args = args[1:]
+func (c *Cmd) Main(inputArgs []string) (err error) {
+
+	inputArgs = inputArgs[1:]
 	var cmd Command
 	var arg string
+	args := []string{}
 
-	for len(args) > 0 {
-		arg = args[0]
+	for len(inputArgs) > 0 {
+
+		arg = inputArgs[0]
+
 		switch arg {
 		case "-h", "--help":
 			cmd = CommandHelp
@@ -107,23 +133,25 @@ func (c *Cmd) Main(args []string) (err error) {
 		case "-c", "--clean":
 			c.Options |= lib.OptClean
 		default:
+
 			lib.Debug(fmt.Sprintf("Arg: %s", arg), c.Options)
+
 			if len(arg) > 0 && arg[0] == '-' {
 				lib.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, arg)
 				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
 				return nil
 			}
 
-			cmd = Command(arg)
+			if isCommand(arg) && len(cmd) == 0 {
+				cmd = Command(arg)
+			} else {
+				args = append(args, arg)
+			}
 		}
 
-		args = args[1:]
-
-		// if len(cmd) > 0 {
-		// 	break
-		// }
-
+		inputArgs = inputArgs[1:]
 	}
+
 	if len(cmd) == 0 {
 		lib.Error("No command provided", c.Options)
 		return
@@ -385,8 +413,8 @@ func (c *Cmd) CommandLs(args []string) {
 	// ls [name] 					Show all Columns in table [name] is found
 	// ls [partialName] 			Show all tables with name containing [partialName]
 	// ls .[fieldPartialName] 		Show all columns with name containing [fieldPartialName]
-
 	// ls - Show all tables
+	fmt.Println("args", args)
 	if len(args) == 0 {
 
 		results := database.ToSortedTables()
@@ -1115,11 +1143,11 @@ func (c *Cmd) CommandGen(args []string) {
 			os.Exit(1)
 		}
 
-		e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
-		if e != nil {
-			lib.Error(e.Error(), c.Options)
-			os.Exit(1)
-		}
+		// e = g.GenerateDALSQL(c.Config.Dirs.Dal, database)
+		// if e != nil {
+		// 	lib.Error(e.Error(), c.Options)
+		// 	os.Exit(1)
+		// }
 
 	case CommandGenInterfaces:
 		c.GenInterfaces(g)
@@ -1317,6 +1345,11 @@ func (c *Cmd) GenModels(g *gen.Gen, database *lib.Database) {
 func (c *Cmd) GenDals(g *gen.Gen, database *lib.Database) {
 
 	force := c.Options&lib.OptForce == lib.OptForce
+	clean := c.Options&lib.OptClean == lib.OptClean
+
+	if clean {
+		g.CleanGoDALs(c.Config.Dirs.Dal, database)
+	}
 
 	fmt.Println("Generating dals...")
 	var e error
