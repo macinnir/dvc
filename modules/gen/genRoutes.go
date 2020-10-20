@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -16,7 +17,9 @@ import (
 )
 
 // GenRoutes generates a list of routes from a directory of controller files
-func (g *Gen) GenRoutes(dir string) (e error) {
+func (g *Gen) GenRoutes() (e error) {
+
+	dir := "core/controllers"
 
 	var files []os.FileInfo
 	files, e = ioutil.ReadDir(dir)
@@ -29,9 +32,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 	imports := []string{
 		g.Config.BasePackage + "/core/controllers",
 		g.Config.BasePackage + "/core/utils/request",
-		g.Config.BasePackage + "/core/utils",
 		g.Config.BasePackage + "/core/definitions/integrations",
-		g.Config.BasePackage + "/core/definitions/constants/permissions",
 		"net/http",
 		"github.com/gorilla/mux",
 	}
@@ -42,6 +43,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 	controllerCalls := []string{}
 
 	hasBodyImports := false
+	usesPermissions := false
 
 	allPerms := []string{}
 
@@ -76,7 +78,11 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 		}
 
 		// Build a controller object from the controller file
-		controller, _ := g.BuildControllerObjFromControllerFile(path.Join(dir, filePath.Name()), src)
+		controller, usesPerms, _ := g.BuildControllerObjFromControllerFile(path.Join(dir, filePath.Name()), src)
+
+		if usesPerms == true {
+			usesPermissions = true
+		}
 
 		// Documentation routes
 		controllers = append(controllers, controller)
@@ -89,7 +95,7 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 		routesString, perms := g.BuildRoutesCodeFromController(controller)
 
 		allPerms = append(allPerms, perms...)
-		allPerms = append(allPerms, "Manage"+controller.Name[0:len(controller.Name)-len("Controller")])
+		// allPerms = append(allPerms, "Manage"+controller.Name[0:len(controller.Name)-len("Controller")])
 
 		rest += "\n" + routesString + "\n"
 
@@ -106,6 +112,11 @@ func (g *Gen) GenRoutes(dir string) (e error) {
 	if hasBodyImports {
 		// imports = append(imports, g.Config.BasePackage+"/core/utils/response")
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/dtos")
+	}
+
+	if usesPermissions {
+		imports = append(imports, g.Config.BasePackage+"/core/utils")
+		imports = append(imports, g.Config.BasePackage+"/core/definitions/constants/permissions")
 	}
 
 	final := `// Generated Code; DO NOT EDIT.
@@ -129,45 +140,31 @@ func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 
 	ioutil.WriteFile("services/api/routes.go", []byte(final), 0777)
 
-	permissionsFile := `// Generated Code; DO NOT EDIT.
-
-package permissions
-
-// Permission is the name of a permission 
-type Permission string 
-
-const (
-`
-	for k := range allPerms {
-		permissionsFile += "\t// " + allPerms[k] + "Permission is the `" + allPerms[k] + "` permission\n"
-		permissionsFile += "\t" + allPerms[k] + "Permission Permission = \"" + allPerms[k] + "\"\n"
+	routesContainer := &RoutesJSONContainer{
+		Routes: controllers,
+		DTOs:   genDTOSMap(),
+		Models: genModelsMap(),
 	}
 
-	permissionsFile += `)
-
-// Permissions returns a slice of permissions 
-func Permissions() []Permission {
-	return []Permission{
-`
-
-	for k := range allPerms {
-		permissionsFile += "\t\t" + allPerms[k] + "Permission,\n"
+	if e = g.EnsureDir("meta"); e != nil {
+		return
 	}
 
-	permissionsFile += `	}
-}	
-
-`
-	permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
-	fmt.Println("Writing the permissions file to path ", permissionsFilePath)
-	ioutil.WriteFile(permissionsFilePath, []byte(permissionsFile), 0777)
-
-	routesJSON, _ := json.MarshalIndent(controllers, "  ", "    ")
-	routesJSONFilePath := "routes.json"
+	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
+	routesJSONFilePath := "meta/routes.json"
 	fmt.Println("Writing Routes JSON to to path", routesJSONFilePath)
 	ioutil.WriteFile(routesJSONFilePath, routesJSON, 0777)
 
+	g.buildPermissions()
+
 	return
+}
+
+// RoutesJSONContainer is a container for JSON Routes
+type RoutesJSONContainer struct {
+	Routes []*Controller                `json:"routes"`
+	DTOs   map[string]map[string]string `json:"dtos"`
+	Models map[string]map[string]string `json:"models"`
 }
 
 // Controller represents a REST controller
@@ -196,6 +193,7 @@ type ControllerRoute struct {
 	ResponseType   string                 `json:"ResponseType"`
 	ResponseFormat string                 `json:"ResponseFormat"`
 	ResponseCode   int                    `json:"ResponseCode"`
+	Permission     string                 `json:"Permission"`
 }
 
 // ControllerRouteParam represents a param inside a controller route
@@ -256,7 +254,7 @@ type DocRouteQuery struct {
 }
 
 // BuildControllerObjFromControllerFile parses a file and extracts all of its @route comments
-func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) (controller *Controller, e error) {
+func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) (controller *Controller, usesPerms bool, e error) {
 
 	controller = &Controller{
 		Name:   extractNameFromFile(filePath),
@@ -290,11 +288,13 @@ func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) 
 			}
 			route.IsAuth = true
 
+			// @anonymous
 			if len(doc) > 12 && doc[0:13] == "// @anonymous" {
 				route.IsAuth = false
 				continue
 			}
 
+			// @body
 			if len(doc) > 9 && doc[0:9] == "// @body " {
 
 				bodyComment := strings.Split(strings.Trim(doc[9:], " "), " ")
@@ -310,6 +310,7 @@ func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) 
 				continue
 			}
 
+			// @response
 			if len(doc) > 13 && doc[0:13] == "// @response " {
 
 				responseComment := strings.Split(strings.Trim(doc[13:], " "), " ")
@@ -329,6 +330,14 @@ func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) 
 				continue
 			}
 
+			// @perm
+			if len(doc) > 9 && doc[0:9] == "// @perm " {
+				route.Permission = strings.TrimSpace(doc[9:])
+				usesPerms = true
+				continue
+			}
+
+			// @route
 			if len(doc) > 9 && doc[0:9] == "// @route" {
 
 				lineParts := strings.Split(doc, " ")
@@ -457,9 +466,103 @@ func matchPatternToDataType(pattern string) string {
 	return "string"
 }
 
+func (g *Gen) buildPermissions() {
+
+	permissionMap := map[string]string{}
+	fileBytes, e := ioutil.ReadFile("meta/permissions.json")
+	if e != nil {
+		panic(e)
+	}
+	json.Unmarshal(fileBytes, &permissionMap)
+
+	permissions := make([]string, 0, len(permissionMap))
+	for k := range permissionMap {
+		permissions = append(permissions, k)
+	}
+
+	sort.Strings(permissions)
+
+	// for k := range permissions {
+
+	// 	permission := permissions[k]
+	// 	description := permissionMap[permissions[k]]
+
+	// 	// fmt.Println(permission + ": " + description)
+
+	// }
+
+	permissionsFile := `// Generated Code; DO NOT EDIT.
+
+	package permissions
+	
+	// Permission is the name of a permission 
+	type Permission string 
+	
+	const (
+	`
+	for k := range permissions {
+		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
+		permissionsFile += "\t// " + permTitle + "Permission is the `" + permissions[k] + "` permission\n"
+		permissionsFile += "\t" + permTitle + " Permission = \"" + permissions[k] + "\"\n"
+	}
+
+	permissionsFile += `)
+	
+	// Permissions returns a slice of permissions 
+	func Permissions() map[Permission]string {
+		return map[Permission]string {
+	`
+
+	for k := range permissions {
+		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
+		permissionsFile += "\t\t" + permTitle + ": \"" + permissionMap[permissions[k]] + "\",\n"
+	}
+
+	permissionsFile += `	}
+	}	
+	
+	`
+	permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
+	fmt.Println("Writing the permissions file to path ", permissionsFilePath)
+	var permissionsFileBytes []byte
+	permissionsFileBytes, e = lib.FormatCode(permissionsFile)
+	if e != nil {
+		panic(e)
+	}
+	ioutil.WriteFile(permissionsFilePath, []byte(permissionsFileBytes), 0777)
+}
+
+// BuildTypescriptPermissions returns a formatted typescript file of permission constants
+func (g *Gen) BuildTypescriptPermissions() string {
+
+	permissionMap := map[string]string{}
+	fileBytes, e := ioutil.ReadFile("meta/permissions.json")
+	if e != nil {
+		panic(e)
+	}
+	json.Unmarshal(fileBytes, &permissionMap)
+
+	permissions := make([]string, 0, len(permissionMap))
+	for k := range permissionMap {
+		permissions = append(permissions, k)
+	}
+
+	sort.Strings(permissions)
+
+	permissionsFile := "// Generated Code; DO NOT EDIT.\n\n"
+	for k := range permissions {
+		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
+		permissionsFile += "// " + permTitle + " -- " + permissionMap[permissions[k]] + "\n"
+		permissionsFile += "export const " + permTitle + "Permission = \"" + permissions[k] + "\";\n"
+	}
+
+	return permissionsFile
+}
+
 // BuildRoutesCodeFromController builds controller code based on a route
 func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string, perms []string) {
 
+	permsGate := map[string]bool{}
 	perms = []string{}
 
 	s := []string{
@@ -492,13 +595,20 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 		s = append(s, fmt.Sprintf("\n\t\tlog.Debug(\"ROUTE: %s %s => %s\")\n\n", route.Method, route.Path, route.Name))
 
-		// if len(route.Perms) > 0 && route.IsAuth {
-		if route.IsAuth {
-			permissionName := route.Name
-			perms = append(perms, permissionName)
+		// Permission
+		if route.IsAuth && len(route.Permission) > 0 {
+
+			// ucFirst
+			permission := string(unicode.ToUpper(rune(route.Permission[0]))) + route.Permission[1:]
+			if _, ok := permsGate[route.Permission]; !ok {
+				// fmt.Println("adding permission " + route.Permission)
+				permsGate[route.Permission] = true
+				perms = append(perms, route.Permission)
+			}
+
 			// for k := range route.Perms {
 			// s = append(s, "\t\tif !utils.HasPerm(currentUser, \""+route.Perms[k]+"\") {")
-			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permissionName+"Permission) {")
+			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permission+") {")
 			s = append(s, "\t\t\tres.Forbidden(r, w)")
 			s = append(s, "\t\t\treturn")
 			s = append(s, "\t\t}\n")
@@ -575,4 +685,102 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 func extractNameFromFile(fileName string) (name string) {
 	baseName := filepath.Base(fileName)
 	return baseName[0 : len(baseName)-3]
+}
+
+func genDTOSMap() map[string]map[string]string {
+
+	dtosDir := "core/definitions/dtos"
+
+	dirHandle, err := os.Open(dtosDir)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer dirHandle.Close()
+
+	var dirFileNames []string
+	dirFileNames, err = dirHandle.Readdirnames(-1)
+
+	if err != nil {
+		panic(err)
+	}
+	// reader := bufio.NewReader(os.Stdin)
+
+	result := map[string]map[string]string{}
+
+	for _, name := range dirFileNames {
+
+		if name == ".DS_Store" {
+			continue
+		}
+
+		// fileNameNoExt := name[0 : len(name)-3]
+		fullPath := path.Join(dtosDir, name)
+		// fmt.Println(fullPath)
+
+		model, e := InspectFile(fullPath)
+		if e != nil {
+			panic(e)
+		}
+		k := 0
+
+		result[model.Name] = map[string]string{}
+
+		for k < model.Fields.Len() {
+			result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
+			k++
+		}
+	}
+
+	return result
+}
+
+func genModelsMap() map[string]map[string]string {
+
+	modelsDir := "core/definitions/models"
+
+	dirHandle, err := os.Open(modelsDir)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer dirHandle.Close()
+
+	var dirFileNames []string
+	dirFileNames, err = dirHandle.Readdirnames(-1)
+
+	if err != nil {
+		panic(err)
+	}
+	// reader := bufio.NewReader(os.Stdin)
+
+	result := map[string]map[string]string{}
+
+	for _, name := range dirFileNames {
+
+		if name == ".DS_Store" {
+			continue
+		}
+
+		// fileNameNoExt := name[0 : len(name)-3]
+		fullPath := path.Join(modelsDir, name)
+		// fmt.Println(fullPath)
+
+		model, e := InspectFile(fullPath)
+		if e != nil {
+			panic(e)
+		}
+		k := 0
+
+		result[model.Name] = map[string]string{}
+
+		for k < model.Fields.Len() {
+			result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
+			k++
+		}
+	}
+
+	return result
 }

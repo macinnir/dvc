@@ -228,6 +228,7 @@ type Column struct {
 	ColumnKey    string `json:"columnKey"`
 	NumericScale int    `json:"numericScale"`
 	Extra        string `json:"extra"`
+	FmtType      string `json:"fmtType"`
 }
 
 // ColumnWithTable is a column with the table name included

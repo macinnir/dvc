@@ -35,7 +35,9 @@ func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) 
 		if s, ok := node.(*ast.File); ok {
 
 			modelNode.Package = s.Name.Name
-			modelNode.Comments = s.Comments[0].Text()
+			if len(s.Comments) > 0 {
+				modelNode.Comments = s.Comments[0].Text()
+			}
 			modelNode.Imports = &lib.GoFileImports{}
 
 			for _, i := range s.Imports {
@@ -73,19 +75,20 @@ func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) 
 					DataType: fieldType,
 					Comments: field.Comment.Text(),
 				}
-
-				tagString := field.Tag.Value[1 : len(field.Tag.Value)-1]
-				// fmt.Printf("Tag: %s\n", tagString)
-				tags, e := structtag.Parse(tagString)
-				if e != nil {
-					log.Fatal(e)
-				}
-				for _, tag := range tags.Tags() {
-					nodeField.Tags = append(nodeField.Tags, &lib.GoStructFieldTag{
-						Name:    tag.Key,
-						Value:   tag.Name,
-						Options: tag.Options,
-					})
+				if field.Tag != nil {
+					tagString := field.Tag.Value[1 : len(field.Tag.Value)-1]
+					// fmt.Printf("Tag: %s\n", tagString)
+					tags, e := structtag.Parse(tagString)
+					if e != nil {
+						log.Fatal(e)
+					}
+					for _, tag := range tags.Tags() {
+						nodeField.Tags = append(nodeField.Tags, &lib.GoStructFieldTag{
+							Name:    tag.Key,
+							Value:   tag.Name,
+							Options: tag.Options,
+						})
+					}
 				}
 
 				modelNode.Fields.Append(nodeField)

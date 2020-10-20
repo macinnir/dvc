@@ -40,6 +40,7 @@ func InspectFile(filePath string) (s *lib.GoStruct, e error) {
 
 	s, e = buildGoStructFromFile(fileBytes)
 	if e != nil {
+		fmt.Println("ERROR: ", filePath)
 		panic(e)
 	}
 
@@ -140,8 +141,7 @@ import (
 type {{.Name}} struct {
 	{{range .Columns}}
 {{.Name}} {{.Type}} ` + "`db:\"{{.Name}}\" json:\"{{.Name}}\"`" + `{{end}}
-}
-`
+}`
 	var sortedColumns = make(lib.SortedColumns, 0, len(table.Columns))
 
 	for _, column := range table.Columns {

@@ -136,6 +136,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		IDType            string
 		IsDeleted         bool
 		IsDateCreated     bool
+		IsLastUpdated     bool
 		Imports           []string
 		FileHead          string
 		FileFoot          string
@@ -147,6 +148,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		IDType:            "int64",
 		IsDeleted:         false,
 		IsDateCreated:     false,
+		IsLastUpdated:     false,
 		Imports:           []string{},
 		FileHead:          "",
 		FileFoot:          "",
@@ -212,6 +214,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 
 	_, data.IsDeleted = table.Columns["IsDeleted"]
 	_, data.IsDateCreated = table.Columns["DateCreated"]
+	_, data.IsLastUpdated = table.Columns["LastUpdated"]
 
 	switch data.PrimaryKeyType {
 	case "varchar":
@@ -232,7 +235,9 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		imports = append(imports, "gopkg.in/guregu/null.v3")
 	}
 
-	if data.IsDateCreated {
+	// If either of the fields "DateCreated" or "LastUpdated" exist on this model,
+	// the `time` package is needed
+	if data.IsDateCreated || data.IsLastUpdated {
 		imports = append(imports, "time")
 	}
 
@@ -288,6 +293,8 @@ func New{{.Table.Name}}DAL(db integrations.IDB, log integrations.ILog) *{{.Table
 func (r *{{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) (e error) {
 {{if .IsDateCreated}}
 	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
+{{if .IsLastUpdated}}
+	model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 
 	var result sql.Result
 	result, e = r.db.Exec("{{.InsertSQL}}", {{.InsertArgs}})
@@ -340,6 +347,8 @@ func (r *{{.Table.Name}}DAL) CreateMany(modelSlice []*models.{{.Table.Name}}) (e
 
 			{{if .IsDateCreated}}
 			model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
+			{{if .IsLastUpdated}}
+			model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 
 			_, e = tx.ExecContext(ctx, "{{.InsertSQL}}", {{.InsertArgs}})
 			if e != nil {
@@ -363,6 +372,8 @@ func (r *{{.Table.Name}}DAL) CreateMany(modelSlice []*models.{{.Table.Name}}) (e
 
 // Update updates an existing {{.Table.Name}} entry in the database
 func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) (e error) {
+{{if .IsLastUpdated}}
+	model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 	_, e = r.db.Exec("{{.UpdateSQL}}", {{.UpdateArgs}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Update(%d) > %s", model.{{.PrimaryKey}}, e.Error())
@@ -407,6 +418,8 @@ func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []*models.{{.Table.Name}}) (e 
 		}
 
 		for updateID, model := range chunk {
+{{if .IsLastUpdated}}
+			model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 
 			_, e = tx.ExecContext(ctx, "{{.UpdateSQL}}", {{.UpdateArgs}})
 			if e != nil {
@@ -474,7 +487,8 @@ func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []*models.{{.Table.Name}}) (e 
 		}
 
 		for deleteID, model := range chunk {
-
+{{if .IsLastUpdated}}
+			model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 			_, e = tx.ExecContext(ctx, "UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`= 1 WHERE `{{.PrimaryKey}}` = ?" + `", model.{{.PrimaryKey}})
 			if e != nil {
 				r.log.Errorf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, deleteID, e.Error())

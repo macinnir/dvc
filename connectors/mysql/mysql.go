@@ -171,6 +171,7 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 			return
 		}
 		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
+		column.FmtType = lib.DataTypeToFormatString(&column)
 
 		if column.Default == "''" {
 			column.Default = ""

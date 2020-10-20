@@ -1,4 +1,4 @@
-package main
+package commands
 
 import "fmt"
 
@@ -137,4 +137,36 @@ func helpRm() {
 	fmt.Println(`
 	rm Removes an object from the database schema (with prompts)
 	`)
+}
+
+// PrintHelp prints help information
+func (c *Cmd) PrintHelp(args []string) {
+	help := `usage: dvc [OPTIONS] [COMMAND] [ARGS]
+
+OPTIONS:
+
+	-h, --help 		Show help
+	-v, --verbose 	Show verbose logging
+	-vv, --debug 	Show very verbose (debug) logging
+	-s, --silent 	Disable all output
+
+COMMANDS:
+
+	
+
+	
+
+	
+
+	
+	help 	This output
+
+	
+	
+
+		
+
+	
+`
+	fmt.Printf(help)
 }
