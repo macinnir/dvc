@@ -221,7 +221,7 @@ func (c *Cmd) GenRepos(g *gen.Gen, database *lib.Database) {
 	}
 
 	lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
-	g.EnsureDir(c.Config.Dirs.Definitions)
+	lib.EnsureDir(c.Config.Dirs.Definitions)
 	e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
 	if e != nil {
 		lib.Error(e.Error(), c.Options)

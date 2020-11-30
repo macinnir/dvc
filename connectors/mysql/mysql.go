@@ -172,6 +172,7 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 		}
 		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
 		column.FmtType = lib.DataTypeToFormatString(&column)
+		column.GoType = lib.DataTypeToGoTypeString(&column)
 
 		if column.Default == "''" {
 			column.Default = ""
@@ -330,18 +331,18 @@ func (ss *MySQL) FetchEnums(server *lib.Server) (enums map[string][]map[string]i
 	enums = make(map[string][]map[string]interface{})
 	for _, enum := range ss.Config.Enums {
 		// fmt.Printf("Building Enum: %s\n", enum)
-		enums[enum] = fetchEnum(server, enum)
+		enums[enum] = ss.FetchEnum(server, enum)
 	}
 
 	return
 }
 
-func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{}) {
+func (ss *MySQL) FetchEnum(server *lib.Server, tableName string) (objects []map[string]interface{}) {
 
 	var e error
 	var rows *sql.Rows
 
-	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM `%s`", enum)); e != nil {
+	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM `%s`", tableName)); e != nil {
 		return
 	}
 
@@ -353,10 +354,14 @@ func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{
 
 		values := make([]interface{}, len(columnNames))
 		object := map[string]interface{}{}
+		// types := map[string]string{}
+
 		for i, column := range columnTypes {
 			switch column.ScanType().Name() {
 			case "RawBytes":
-				// fmt.Println("RawBytes", column.DatabaseTypeName())
+
+				fmt.Println(column.Name(), "RawBytes", column.DatabaseTypeName())
+
 				if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
 					v := 0.0
 					object[column.Name()] = &v
@@ -371,11 +376,14 @@ func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{
 					v := 0
 					object[column.Name()] = &v
 				}
+
 			case "NullTime":
 				v := ""
+				fmt.Println(column.Name(), "NullTime", column.DatabaseTypeName())
 				object[column.Name()] = &v
 				// fmt.Println("!!", column.ScanType().Name(), column.DatabaseTypeName())
 			default:
+				fmt.Println(column.Name(), "Default", column.DatabaseTypeName())
 				object[column.Name()] = reflect.New(column.ScanType()).Interface()
 			}
 
@@ -387,11 +395,49 @@ func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{
 			panic(err)
 		}
 
+		// for k :=
+
 		objects = append(objects, object)
 	}
 
 	return
 }
+
+// func mapType() {
+// 	row := map[string]interface{}{}
+// 	for j, l := range enums[k] {
+// 		// fmt.Printf("%s %v\n", j, l)
+
+// 		switch table.Columns[j].DataType {
+// 		case "int":
+// 			row[j] = *(l.(*uint32))
+// 			// fmt.Println(j, *(l.(*uint32)))
+// 		case "bigint":
+// 			row[j] = *(l.(*uint64))
+// 			// fmt.Println(j, *(l.(*uint64)))
+// 		case "tinyint":
+// 			if table.Columns[j].IsUnsigned {
+// 				row[j] = *(l.(*uint8))
+// 				// fmt.Println(j, *(l.(*uint8)))
+// 			} else {
+// 				row[j] = *(l.(*int8))
+// 				// fmt.Println(j, *(l.(*int8)))
+// 			}
+// 		// case "int":
+// 		// 	fmt.Println(j, l.(int8))
+// 		// case "float64":
+// 		// 	fmt.Println(j, l.(float64))
+// 		case "varchar", "char", "text":
+// 			row[j] = *(l.(*string))
+// 			// fmt.Println(j, *(l.(*string)))
+// 		default:
+// 			fmt.Println(j, "???")
+// 		}
+
+// 		// val := reflect.ValueOf(l)
+// 		// fmt.Println(j, val)
+// 	}
+// }
 
 func getBytes(src interface{}) []byte {
 

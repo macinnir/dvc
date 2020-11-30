@@ -64,7 +64,7 @@ func (c *Cmd) Compare(args []string) {
 
 Main:
 
-	cmp.Options = c.Options
+	cmp.SetOptions(c.Options)
 
 	// Do the comparison
 	// TODO pass all options (e.g. verbose)

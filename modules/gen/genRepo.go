@@ -18,7 +18,7 @@ func (g *Gen) GenerateGoRepoFile(dir string, table *lib.Table) (e error) {
 	fileFoot := ""
 	imports := []string{}
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	outFile := path.Join(dir, table.Name)
 
@@ -112,7 +112,7 @@ type I{{.Name}}Repo interface {
 		fmt.Println("Execute Error: ", e.Error())
 	}
 	f.Close()
-	g.FmtGoCode(p)
+	lib.FmtGoCode(p)
 	return
 }
 
@@ -353,7 +353,7 @@ func (r *{{.Name}}Repo) Count(q *query.CountQuery) (int64, error) {
 
 	f.Close()
 
-	g.FmtGoCode(p)
+	lib.FmtGoCode(p)
 
 	return
 }
@@ -405,7 +405,7 @@ func Bootstrap (config *models.Config, dal *definitions.Dal, store utils.IStore)
 	}
 
 	f.Close()
-	g.FmtGoCode(p)
+	lib.FmtGoCode(p)
 
 	return
 
@@ -415,7 +415,7 @@ func Bootstrap (config *models.Config, dal *definitions.Dal, store utils.IStore)
 func (g *Gen) GenerateReposBootstrapFile(dir string, database *lib.Database) (e error) {
 
 	// Make the repos dir if it does not exist.
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 	e = g.GenerateReposBootstrapGoCodeFromDatabase(database, dir)
 	return
 }

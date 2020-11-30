@@ -2,10 +2,7 @@ package gen
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
-	"log"
-	"os"
 	"regexp"
 	"strings"
 
@@ -16,84 +13,6 @@ import (
 type Gen struct {
 	Options lib.Options
 	Config  *lib.Config
-}
-
-// EnsureDir creates a new dir if the dir is not found
-func (g *Gen) EnsureDir(dir string) (e error) {
-
-	// lib.Debugf("Ensuring directory: %s", g.Options, dir)
-
-	if _, e = os.Stat(dir); os.IsNotExist(e) {
-
-		e = os.MkdirAll(dir, 0777)
-
-		if e != nil {
-			log.Fatalf("Could not created dir at path: %s", dir)
-		}
-
-	}
-	return
-}
-
-// FmtGoCode formats a go file
-func (g *Gen) FmtGoCode(filePath string) {
-	_, stdError, exitCode := lib.RunCommand("go", "fmt", filePath)
-
-	if exitCode > 0 {
-		lib.Warnf("fmt error: %s", g.Options, stdError)
-	}
-}
-
-// WriteGoCodeToFile writes a string of golang code to a file and then formats it with `go fmt`
-func (g *Gen) WriteGoCodeToFile(goCode string, filePath string) (e error) {
-	// outFile := "./repos/repos.go"
-
-	e = ioutil.WriteFile(filePath, []byte(goCode), 0644)
-	if e != nil {
-		return
-	}
-
-	g.FmtGoCode(filePath)
-	// cmd := exec.Command("go", "fmt", filePath)
-	// e = cmd.Run()
-	// fmt.Printf("WriteCodeToFile: %s\n", e.Error())
-	return
-}
-
-func (g *Gen) dirExists(dirPath string) bool {
-	if _, e := os.Stat(dirPath); os.IsNotExist(e) {
-		return false
-	}
-
-	return true
-}
-
-func (g *Gen) dirIsEmpty(dirPath string) bool {
-
-	f, e := os.Open(dirPath)
-	if e != nil {
-		return false
-	}
-
-	defer f.Close()
-
-	_, e = f.Readdirnames(1)
-	if e == io.EOF {
-		return true
-	}
-
-	return false
-}
-
-func (g *Gen) fileExists(filePath string) bool {
-	// Check if file exists
-	if _, e := os.Stat(filePath); os.IsNotExist(e) {
-		// fmt.Printf("File %s does not exist", filePath)
-		return false
-	}
-
-	return true
-
 }
 
 // scanFileParts scans a file for template parts, header, footer and import statements and returns those parts
@@ -109,7 +28,7 @@ func (g *Gen) scanFileParts(filePath string, trackImports bool) (fileHead string
 
 	return
 
-	if !g.fileExists(filePath) {
+	if !lib.FileExists(filePath) {
 		return
 	}
 

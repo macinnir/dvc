@@ -15,11 +15,11 @@ import (
 // GenerateGoModel returns a string for a model in golang
 func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	p := path.Join(dir, table.Name+".go")
 
-	if g.fileExists(p) {
+	if lib.FileExists(p) {
 		lib.Infof("Updating `%s`", g.Options, table.Name)
 		e = g.updateGoModel(p, table)
 		return
@@ -184,7 +184,7 @@ type {{.Name}} struct {
 	}
 
 	f.Close()
-	g.FmtGoCode(p)
+	lib.FmtGoCode(p)
 
 	return
 }
@@ -192,7 +192,7 @@ type {{.Name}} struct {
 // CleanGoModels removes model files that are not found in the database.Tables map
 func (g *Gen) CleanGoModels(dir string, database *lib.Database) (e error) {
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	dirHandle, err := os.Open(dir)
 	if err != nil {

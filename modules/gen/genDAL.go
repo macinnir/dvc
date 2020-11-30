@@ -116,7 +116,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 
 	imports := []string{}
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	p := path.Join(dir, table.Name+"DAL.go")
 
@@ -224,7 +224,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	defaultImports := []string{
 		fmt.Sprintf("%s/%s/models", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
-		fmt.Sprintf("%s/core/utils/errors", g.Config.BasePackage),
+		fmt.Sprintf("github.com/macinnir/dvc/modules/utils/errors", g.Config.BasePackage),
 		"database/sql",
 		"context",
 		"fmt",
@@ -733,15 +733,28 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}({{$col.Name | toArgName}} 
 
 // ManyPaged returns a slice of {{.Table.Name}} models
 func (r *{{.Table.Name}}DAL) ManyPaged(limit, offset int64, orderBy, orderDir string) (collection []*models.{{.Table.Name}}, e error) {
+	
 	collection = []*models.{{.Table.Name}}{}
+	
 	orderDirString := "ASC"
 	if orderDir == "DESC" {
 		orderDirString = "DESC"
 	}
 
-	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE IsDeleted = 0 ORDER BY `%s` %s LIMIT ? OFFSET ?" + `", orderBy, orderDirString)
+	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE IsDeleted = 0" + `") 
+	
+	// Optional Order By 
+	if len(orderBy) > 0 {
+		query += fmt.Sprintf(" ORDER BY ` + "`%s` %s" + `", orderBy, orderDirString)
+	}
 
-	e = r.db.Select(&collection, query, limit, offset)
+	// Optional Limit 
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
+	}
+
+	e = r.db.Select(&collection, query)
+
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.GetMany(%d, %d, %s, %s) > %s", limit, offset, orderBy, orderDir, e.Error())
 	} else {
@@ -791,7 +804,9 @@ func (r *{{.Table.Name}}DAL) Count() (count int64, e error) {
 
 	f.Close()
 
-	g.FmtGoCode(p)
+	if e = lib.FmtGoCode(p); e != nil {
+		lib.Warn(e.Error(), g.Options)
+	}
 
 	return
 }
@@ -802,7 +817,7 @@ func (g *Gen) GenerateDALSQL(dir string, database *lib.Database) (e error) {
 	var contents string
 	var formatted []byte
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	contents, e = generateDALSQL("dal", database)
 
@@ -1037,7 +1052,7 @@ func fetchTableUpdateFieldsString(columns lib.SortedColumns) string {
 func (g *Gen) GenerateDALsBootstrapFile(dir string, database *lib.Database) (e error) {
 
 	// Make the repos dir if it does not exist.
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	data := struct {
 		Tables              map[string]*lib.Table

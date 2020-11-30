@@ -2,9 +2,10 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"os"
 	"sort"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateGoCacheFile generates a repo file in golang
@@ -15,7 +16,7 @@ func (g *Gen) GenerateGoCacheFile(dir string, table *lib.Table) (e error) {
 	goCode := ""
 	imports := []string{}
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	outFile := fmt.Sprintf("%s/%s.go", dir, table.Name)
 
@@ -31,7 +32,7 @@ func (g *Gen) GenerateGoCacheFile(dir string, table *lib.Table) (e error) {
 	}
 	outFileContent := fileHead + goCode + fileFoot
 
-	e = g.WriteGoCodeToFile(outFileContent, outFile)
+	e = lib.WriteGoCodeToFile(outFileContent, outFile)
 	return
 }
 
@@ -81,7 +82,7 @@ func (g *Gen) GenerateGoCacheFiles(reposDir string, database *lib.Database) (e e
 func (g *Gen) GenerateCacheBootstrapFile(dir string, database *lib.Database) (e error) {
 
 	// Make the repos dir if it does not exist.
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	outFile := fmt.Sprintf("%s/repos.go", dir)
 	goCode, e := g.GenerateCacheBootstrapGoCodeFromDatabase(database)
@@ -90,7 +91,7 @@ func (g *Gen) GenerateCacheBootstrapFile(dir string, database *lib.Database) (e 
 		return
 	}
 
-	e = g.WriteGoCodeToFile(goCode, outFile)
+	e = lib.WriteGoCodeToFile(goCode, outFile)
 
 	return
 }

@@ -229,6 +229,7 @@ type Column struct {
 	NumericScale int    `json:"numericScale"`
 	Extra        string `json:"extra"`
 	FmtType      string `json:"fmtType"`
+	GoType       string `json:"goType"`
 }
 
 // ColumnWithTable is a column with the table name included
@@ -259,6 +260,7 @@ type IConnector interface {
 	Connect() (server *Server, e error)
 	FetchDatabases(server *Server) (databases map[string]*Database, e error)
 	FetchEnums(server *Server) (enums map[string][]map[string]interface{})
+	FetchEnum(server *Server, tableName string) []map[string]interface{}
 	UseDatabase(server *Server, databaseName string) (e error)
 	FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error)
 	FetchTableColumns(server *Server, databaseName string, tableName string) (columns map[string]*Column, e error)

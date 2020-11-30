@@ -11,7 +11,7 @@ import (
 // GenMeta returns a string for a model in golang
 func (g *Gen) GenMeta(dir string, database *lib.Database) (e error) {
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	p := path.Join(dir, "models.go")
 
@@ -27,7 +27,7 @@ func Tables() map[string]map[string][]string {
 	{{range .Tables}}
 		"{{.Name}}": { 
 			{{range .Columns}}
-			"{{.Name}}": {"{{.FmtType}}", "{{.DataType}}"}, 
+			"{{.Name}}": {"{{.FmtType}}", "{{.DataType}}", "{{.GoType}}"}, 
 			{{end}}
 		}, 
 	{{end}}
@@ -48,6 +48,6 @@ func Tables() map[string]map[string][]string {
 	}
 
 	f.Close()
-	g.FmtGoCode(p)
+	lib.FmtGoCode(p)
 	return
 }

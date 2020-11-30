@@ -115,7 +115,7 @@ func (g *Gen) GenRoutes() (e error) {
 	}
 
 	if usesPermissions {
-		imports = append(imports, g.Config.BasePackage+"/core/utils")
+		imports = append(imports, "github.com/macinnir/dvc/modules/utils")
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/constants/permissions")
 	}
 
@@ -146,7 +146,7 @@ func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 		Models: genModelsMap(),
 	}
 
-	if e = g.EnsureDir("meta"); e != nil {
+	if e = lib.EnsureDir("meta"); e != nil {
 		return
 	}
 
@@ -567,7 +567,7 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 	s := []string{
 		fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
-		fmt.Sprintf("func map%sRoutes(res integrations.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, log integrations.ILog) {\n", controller.Name),
+		fmt.Sprintf("func map%sRoutes(res request.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, log integrations.ILog) {\n", controller.Name),
 	}
 
 	for _, route := range controller.Routes {
@@ -581,16 +581,16 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 		// Method args
 		args := []string{
-			"w", // http.ResponseWriter
-			"r", // *http.Request
+			"w",   // http.ResponseWriter
+			"req", // *http.Request
 		}
 
 		if route.IsAuth {
-			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AuthMiddleware(func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
-			s = append(s, fmt.Sprintf("\t\tcurrentUser := auth.GetCurrentUser(r)\n"))
-			args = append(args, "currentUser")
+			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AuthMiddleware(func(w http.ResponseWriter, currentUser *aggregates.UserAggregate, req *request.Request) {\n", route.Path))
+			// s = append(s, fmt.Sprintf("\t\tcurrentUser := auth.GetCurrentUser(r)\n"))
+			// args = append(args, "currentUser")
 		} else {
-			s = append(s, fmt.Sprintf("\tr.HandleFunc(\"%s\", func(w http.ResponseWriter, r *http.Request) {\n", route.Path))
+			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AnonMiddleware(func(w http.ResponseWriter, req *request.Request) {\n", route.Path))
 		}
 
 		s = append(s, fmt.Sprintf("\n\t\tlog.Debug(\"ROUTE: %s %s => %s\")\n\n", route.Method, route.Path, route.Name))
@@ -609,7 +609,7 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 			// for k := range route.Perms {
 			// s = append(s, "\t\tif !utils.HasPerm(currentUser, \""+route.Perms[k]+"\") {")
 			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permission+") {")
-			s = append(s, "\t\t\tres.Forbidden(r, w)")
+			s = append(s, "\t\t\tres.Forbidden(req, w)")
 			s = append(s, "\t\t\treturn")
 			s = append(s, "\t\t}\n")
 			// }
@@ -617,20 +617,16 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 		if len(route.BodyType) > 0 {
 			s = append(s, fmt.Sprintf("\t\tbody := &%s{}", route.BodyType))
-			s = append(s, "\t\te := request.GetBodyJSON(r, body)\n")
-			s = append(s, "\t\tif e != nil {")
-			s = append(s, "\t\t\tres.BadRequest(r, w, e)")
-			s = append(s, "\t\t\treturn")
-			s = append(s, "\t\t}\n")
+			s = append(s, "\t\treq.BodyJSON(body)\n")
 		}
 
 		if len(route.Params) > 0 {
 			for _, param := range route.Params {
 				s = append(s, fmt.Sprintf("\t\t// URL Param %s", param.Name))
 				if param.Type == "int64" {
-					s = append(s, fmt.Sprintf("\t\t%s := request.URLParamInt64(r, \"%s\", 0)\n", param.Name, param.Name))
+					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", 0)\n", param.Name, param.Name))
 				} else {
-					s = append(s, fmt.Sprintf("\t\t%s := request.URLParamString(r, \"%s\", \"\")\n", param.Name, param.Name))
+					s = append(s, fmt.Sprintf("\t\t%s := req.Arg(\"%s\", \"\")\n", param.Name, param.Name))
 				}
 
 				args = append(args, param.Name)
@@ -641,9 +637,9 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 			for _, query := range route.Queries {
 				s = append(s, fmt.Sprintf("\t\t// Query Arg %s", query.VariableName))
 				if query.Type == "int64" {
-					s = append(s, fmt.Sprintf("\t\t%s := request.QueryArgInt64(r, \"%s\", 0)\n", query.VariableName, query.VariableName))
+					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", 0)\n", query.VariableName, query.VariableName))
 				} else {
-					s = append(s, fmt.Sprintf("\t\t%s := request.QueryArgString(r, \"%s\", \"\")\n", query.VariableName, query.VariableName))
+					s = append(s, fmt.Sprintf("\t\t%s := req.Arg(\"%s\", \"\")\n", query.VariableName, query.VariableName))
 				}
 
 				args = append(args, query.VariableName)

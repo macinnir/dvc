@@ -65,6 +65,7 @@ const (
 	CommandInsert        Command = "insert"
 	CommandSelect        Command = "select"
 	CommandGenTSPerms    Command = "tsperms"
+	CommandData          Command = "data"
 )
 
 // Cmd is a container for handling commands
@@ -94,6 +95,7 @@ func isCommand(cmd string) bool {
 		"install": true,
 		"insert":  true,
 		"select":  true,
+		"data":    true,
 	}
 
 	_, ok := commands[cmd]
@@ -243,6 +245,8 @@ func (c *Cmd) Run(inputArgs []string) (err error) {
 		c.CommandInspect(args)
 	case CommandRm:
 		c.Rm(args)
+	case CommandData:
+		c.Data(args)
 	default:
 		fmt.Printf("Invalid command `%s`\n", cmd)
 		helpCommandNames()
@@ -371,8 +375,8 @@ func loadConfigFromFile(configFilePath string) (config *lib.Config, e error) {
 }
 
 func (c *Cmd) initCompare() *compare.Compare {
-	cmp, _ := compare.NewCompare(c.Config, c.Options)
-	cmp.Connector, _ = connectorFactory(c.Config.DatabaseType, c.Config)
+	connector, _ := connectorFactory(c.Config.DatabaseType, c.Config)
+	cmp, _ := compare.NewCompare(c.Config, c.Options, connector)
 	return cmp
 }
 

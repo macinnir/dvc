@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"os"
 	"path"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateGoApp generates the base app code
@@ -104,7 +106,9 @@ func (a *App) Finish() {
 		return
 	}
 
-	g.FmtGoCode(p)
+	if e = lib.FmtGoCode(p); e != nil {
+		lib.Warn(e.Error(), g.Options)
+	}
 
 	return
 }

@@ -39,3 +39,22 @@ func (c *Cmd) Refresh(args []string) {
 
 	fmt.Printf("Total: %f seconds\n", time.Since(totalTime).Seconds())
 }
+
+func helpRefresh() {
+	fmt.Println(`
+	refresh 
+	
+	FLAGS
+
+		-c 	Clean 	Delete any previously generated files that have been orphaned due to a change in the Database Schema (e.g. a dropped table)
+		-f  Force 	Force file regeneration, regardless of whether or not a change has been detected for that schema. 
+
+	Alias for running all of the following commands (in order):
+
+		1. import
+		2. gen models
+		3. gen dals
+		4. gen interfaces
+		5. gen routes
+	`)
+}

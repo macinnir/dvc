@@ -2,14 +2,15 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"sort"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateGoSchemaFile generates a schema file in golang
 func (g *Gen) GenerateGoSchemaFile(dir string, database *lib.Database) (e error) {
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	var fileHead, fileFoot, goCode string
 
@@ -28,13 +29,13 @@ func (g *Gen) GenerateGoSchemaFile(dir string, database *lib.Database) (e error)
 	}
 
 	// Add package statement
-	if !g.fileExists(outFile) {
+	if !lib.FileExists(outFile) {
 		fileHead = "package schema\n\n"
 	}
 
 	outFileContent := fileHead + goCode + fileFoot
 
-	e = g.WriteGoCodeToFile(outFileContent, outFile)
+	e = lib.WriteGoCodeToFile(outFileContent, outFile)
 	return
 }
 

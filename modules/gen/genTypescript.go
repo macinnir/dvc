@@ -2,8 +2,9 @@ package gen
 
 import (
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 // GenerateTypescriptTypes returns a string for a typscript types file
@@ -63,7 +64,7 @@ func (g *Gen) GenerateTypescriptType(table *lib.Table) (goCode string, e error) 
 // GenerateTypescriptTypesFile generates a typescript type file
 func (g *Gen) GenerateTypescriptTypesFile(dir string, database *lib.Database) (e error) {
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
 	var goCode string
 

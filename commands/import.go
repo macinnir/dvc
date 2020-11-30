@@ -15,7 +15,6 @@ func (c *Cmd) Import(args []string) {
 		helpImport()
 		return
 	}
-	fmt.Println("Importing...")
 	var e error
 	cmp := c.initCompare()
 
@@ -24,6 +23,7 @@ func (c *Cmd) Import(args []string) {
 		os.Exit(1)
 	}
 
+	fmt.Println("Importing...")
 	curDir, _ := os.Getwd()
 	lib.Infof("Schema `%s`.`%s` imported to %s", c.Options, c.Config.Connection.Host, c.Config.Connection.DatabaseName, path.Join(curDir, c.Config.Connection.DatabaseName+".schema.json"))
 }

@@ -121,18 +121,6 @@ func helpLs() {
 	`)
 }
 
-func helpRefresh() {
-	fmt.Println(`
-	refresh Alias for running all of the following commands (in order):
-
-		1. import
-		2. gen models
-		3. gen dals
-		4. gen interfaces
-		5. gen routes
-	`)
-}
-
 func helpRm() {
 	fmt.Println(`
 	rm Removes an object from the database schema (with prompts)
