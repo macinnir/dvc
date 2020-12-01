@@ -1,20 +1,18 @@
 package utils
 
-import (
-	"joc-rfq-api/core/definitions/aggregates"
-	"joc-rfq-api/core/definitions/constants/permissions"
-)
+// Permission is the name of a permission
+type Permission string
 
 // HasPerm verifies that a permission exists in a userProfile's permissions
-func HasPerm(user *aggregates.UserAggregate, permName permissions.Permission) bool {
+func HasPerm(userID int64, perms []string, permName Permission) bool {
 
 	// Superuser
-	if user.UserID == 1 {
+	if userID == 1 {
 		return true
 	}
 
-	for k := range user.PermissionNames {
-		if user.PermissionNames[k] == string(permName) {
+	for k := range perms {
+		if perms[k] == string(permName) {
 			return true
 		}
 	}

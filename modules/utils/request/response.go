@@ -1,8 +1,9 @@
 package request
 
 import (
-	"joc-rfq-api/core/utils/errors"
 	"net/http"
+
+	"github.com/macinnir/dvc/modules/utils/errors"
 )
 
 // Response is the API response handler

@@ -5,8 +5,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"joc-rfq-api/core/utils/errors"
 	"os"
+
+	"github.com/macinnir/dvc/modules/utils/errors"
 )
 
 const (

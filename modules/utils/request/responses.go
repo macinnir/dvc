@@ -2,9 +2,10 @@ package request
 
 import (
 	"encoding/json"
-	"joc-rfq-api/core/utils/errors"
 	"log"
 	"net/http"
+
+	"github.com/macinnir/dvc/modules/utils/errors"
 )
 
 // HandleError handles errors returned from the service layer and

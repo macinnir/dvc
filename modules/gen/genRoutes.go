@@ -494,23 +494,24 @@ func (g *Gen) buildPermissions() {
 	permissionsFile := `// Generated Code; DO NOT EDIT.
 
 	package permissions
-	
-	// Permission is the name of a permission 
-	type Permission string 
+
+	import (
+		"github.com/macinnir/dvc/modules/utils"
+	)
 	
 	const (
 	`
 	for k := range permissions {
 		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
 		permissionsFile += "\t// " + permTitle + "Permission is the `" + permissions[k] + "` permission\n"
-		permissionsFile += "\t" + permTitle + " Permission = \"" + permissions[k] + "\"\n"
+		permissionsFile += "\t" + permTitle + " utils.Permission = \"" + permissions[k] + "\"\n"
 	}
 
 	permissionsFile += `)
 	
 	// Permissions returns a slice of permissions 
-	func Permissions() map[Permission]string {
-		return map[Permission]string {
+	func Permissions() map[utils.Permission]string {
+		return map[utils.Permission]string {
 	`
 
 	for k := range permissions {
@@ -608,7 +609,7 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 			// for k := range route.Perms {
 			// s = append(s, "\t\tif !utils.HasPerm(currentUser, \""+route.Perms[k]+"\") {")
-			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permission+") {")
+			s = append(s, "\t\tif !utils.HasPerm(currentUser.UserID, currentUser.PermissionNames, permissions."+permission+") {")
 			s = append(s, "\t\t\tres.Forbidden(req, w)")
 			s = append(s, "\t\t\treturn")
 			s = append(s, "\t\t}\n")
