@@ -224,7 +224,7 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 	defaultImports := []string{
 		fmt.Sprintf("%s/%s/models", g.Config.BasePackage, g.Config.Dirs.Definitions),
 		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
-		fmt.Sprintf("github.com/macinnir/dvc/modules/utils/errors", g.Config.BasePackage),
+		"github.com/macinnir/dvc/modules/utils/errors",
 		"database/sql",
 		"context",
 		"fmt",

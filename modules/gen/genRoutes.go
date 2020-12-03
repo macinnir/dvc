@@ -31,8 +31,8 @@ func (g *Gen) GenRoutes() (e error) {
 
 	imports := []string{
 		g.Config.BasePackage + "/core/controllers",
-		g.Config.BasePackage + "/core/utils/request",
 		g.Config.BasePackage + "/core/definitions/integrations",
+		g.Config.BasePackage + "/core/definitions/aggregates",
 		"net/http",
 		"github.com/gorilla/mux",
 	}
@@ -116,6 +116,7 @@ func (g *Gen) GenRoutes() (e error) {
 
 	if usesPermissions {
 		imports = append(imports, "github.com/macinnir/dvc/modules/utils")
+		imports = append(imports, "github.com/macinnir/dvc/modules/utils/request")
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/constants/permissions")
 	}
 
@@ -133,7 +134,7 @@ import (
 	final += `)
 
 // mapRoutesToControllers maps the routes to the controllers
-func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res integrations.IResponseLogger, log integrations.ILog) {
+func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res request.IResponseLogger, log integrations.ILog) {
 
 	`
 	final += code
@@ -503,7 +504,7 @@ func (g *Gen) buildPermissions() {
 	`
 	for k := range permissions {
 		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		permissionsFile += "\t// " + permTitle + "Permission is the `" + permissions[k] + "` permission\n"
+		permissionsFile += "\t// " + permTitle + " Permission is the `" + permissions[k] + "` permission\n"
 		permissionsFile += "\t" + permTitle + " utils.Permission = \"" + permissions[k] + "\"\n"
 	}
 
@@ -654,11 +655,7 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 		s = append(s, fmt.Sprintf("\t\tc.%s.%s(", controller.Name, route.Name)+strings.Join(args, ", ")+")\n")
 
-		if route.IsAuth {
-			s = append(s, "\t})).")
-		} else {
-			s = append(s, "\t}).")
-		}
+		s = append(s, "\t})).")
 
 		s = append(s, fmt.Sprintf("\t\tMethods(\"%s\").", route.Method))
 
