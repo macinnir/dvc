@@ -154,10 +154,10 @@ func (g *Gen) GenerateGoDAL(table *lib.Table, dir string) (e error) {
 		FileFoot:          "",
 	}
 
-	if data.FileHead, data.FileFoot, imports, e = g.scanFileParts(p, true); e != nil {
-		lib.Errorf("ERROR: %s", g.Options, e.Error())
-		return
-	}
+	// if data.FileHead, data.FileFoot, imports, e = g.scanFileParts(p, true); e != nil {
+	// 	lib.Errorf("ERROR: %s", g.Options, e.Error())
+	// 	return
+	// }
 
 	// funcSig := fmt.Sprintf(`^func \(r \*%sRepo\) [A-Z].*$`, table.Name)
 	// footMatches := g.scanStringForFuncSignature(fileFoot, funcSig)

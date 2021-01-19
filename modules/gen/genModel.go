@@ -93,14 +93,10 @@ func (g *Gen) buildGoModel(p string, table *lib.Table) (e error) {
 
 func (g *Gen) buildGoModelOld(p string, table *lib.Table) (e error) {
 
-	var fileHead, fileFoot string
 	oneToMany := g.Config.OneToMany[table.Name]
 	oneToOne := g.Config.OneToOne[table.Name]
 
 	lib.Debugf("Generating model for table %s", g.Options, table.Name)
-	if fileHead, fileFoot, _, e = g.scanFileParts(p, false); e != nil {
-		return
-	}
 
 	type Column struct {
 		Name         string
@@ -116,16 +112,12 @@ func (g *Gen) buildGoModelOld(p string, table *lib.Table) (e error) {
 		Name               string
 		IncludeNullPackage bool
 		Columns            []Column
-		FileHead           string
-		FileFoot           string
 	}{
 		OneToMany:          oneToMany,
 		OneToOne:           oneToOne,
 		Name:               table.Name,
 		IncludeNullPackage: false,
 		Columns:            []Column{},
-		FileHead:           fileHead,
-		FileFoot:           fileFoot,
 	}
 
 	tpl := `// Generated Code; DO NOT EDIT.
