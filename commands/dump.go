@@ -174,7 +174,7 @@ func (c *Cmd) Dump(args []string) {
 				// sql += "\n)\n"
 				// fmt.Println(sql)
 			}
-			fmt.Printf(";\nUNLOCK TABLES `%s` WRITE;\n\n", table.Name)
+			fmt.Print(";\nUNLOCK TABLES;\n\n")
 		}
 	}
 	// doInsertYN := lib.ReadCliInput(reader, "Run above SQL (Y/n")
