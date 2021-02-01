@@ -68,7 +68,9 @@ func (c *Cmd) Dump(args []string) {
 				if insertBatchCounter > insertBatchMax {
 					fmt.Println("; \n", insertStart)
 					insertBatchCounter = 0
-				} else {
+				}
+
+				if insertBatchCounter > 0 {
 					fmt.Print(",")
 				}
 
