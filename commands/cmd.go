@@ -38,34 +38,37 @@ func NewTablesCache() TablesCache {
 // Command Names
 const (
 	CommandAdd           Command = "add"
-	CommandInspect       Command = "inspect"
-	CommandRm            Command = "rm"
-	CommandInit          Command = "init"
-	CommandLs            Command = "ls"
-	CommandImport        Command = "import"
+	CommandCompare       Command = "compare"
+	CommandData          Command = "data"
+	CommandDump          Command = "dump"
 	CommandExport        Command = "export"
 	CommandGen           Command = "gen"
+	CommandGenAPI        Command = "api"
+	CommandGenAPITests   Command = "apitests"
 	CommandGenApp        Command = "app"
 	CommandGenCLI        Command = "cli"
-	CommandGenAPI        Command = "api"
 	CommandGenDal        Command = "dal"
 	CommandGenDals       Command = "dals"
-	CommandGenRepos      Command = "repos"
-	CommandGenModels     Command = "models"
 	CommandGenInterfaces Command = "interfaces"
-	CommandGenTests      Command = "tests"
 	CommandGenModel      Command = "model"
-	CommandGenServices   Command = "services"
+	CommandGenModels     Command = "models"
+	CommandGenRepos      Command = "repos"
 	CommandGenRoutes     Command = "routes"
-	CommandGenTypescript Command = "typescript"
-	CommandCompare       Command = "compare"
-	CommandHelp          Command = "help"
-	CommandRefresh       Command = "refresh"
-	CommandInstall       Command = "install"
-	CommandInsert        Command = "insert"
-	CommandSelect        Command = "select"
+	CommandGenServices   Command = "services"
+	CommandGenTests      Command = "tests"
 	CommandGenTSPerms    Command = "tsperms"
-	CommandData          Command = "data"
+	CommandGenTypescript Command = "typescript"
+	CommandHelp          Command = "help"
+	CommandImport        Command = "import"
+	CommandInit          Command = "init"
+	CommandInsert        Command = "insert"
+	CommandInspect       Command = "inspect"
+	CommandInstall       Command = "install"
+	CommandLs            Command = "ls"
+	CommandRefresh       Command = "refresh"
+	CommandRm            Command = "rm"
+	CommandSelect        Command = "select"
+	CommandTest          Command = "test"
 )
 
 // Cmd is a container for handling commands
@@ -82,20 +85,22 @@ type Cmd struct {
 func isCommand(cmd string) bool {
 	commands := map[string]bool{
 		"add":     true,
-		"inspect": true,
-		"rm":      true,
-		"init":    true,
-		"ls":      true,
-		"import":  true,
+		"compare": true,
+		"data":    true,
+		"dump":    true,
 		"export":  true,
 		"gen":     true,
-		"compare": true,
 		"help":    true,
-		"refresh": true,
-		"install": true,
+		"import":  true,
+		"init":    true,
 		"insert":  true,
+		"inspect": true,
+		"install": true,
+		"ls":      true,
+		"refresh": true,
+		"rm":      true,
 		"select":  true,
-		"data":    true,
+		"test":    true,
 	}
 
 	_, ok := commands[cmd]
@@ -223,12 +228,16 @@ func (c *Cmd) Run(inputArgs []string) (err error) {
 		c.Refresh(args)
 	case CommandInsert:
 		c.Insert(args)
+	case CommandDump:
+		c.Dump(args)
 	case CommandSelect:
 		c.CommandSelect(args)
 	case CommandImport:
 		c.Import(args)
 	case CommandExport:
 		c.Export(args)
+	case CommandTest:
+		c.Test(args)
 	case CommandCompare:
 		c.Compare(args)
 	case CommandGen:
@@ -272,15 +281,17 @@ const (
 
 func writeSQLToLog(sql string) {
 
+	lib.EnsureDir("meta")
+
 	sqlLog := time.Now().Format("20060102150405") + "\n"
 	sqlLog += sql
 
-	filePath := "./dvc-changes.log"
+	filePath := "meta/dvc-changes.log"
 
 	if _, e := os.Stat(filePath); os.IsNotExist(e) {
 		ioutil.WriteFile(filePath, []byte(sqlLog), 0600)
 	} else {
-		f, err := os.OpenFile("./dvc-changes.log", os.O_APPEND|os.O_WRONLY, 0600)
+		f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
 			panic(err)
 		}
@@ -308,7 +319,9 @@ func (c *Cmd) genTableCache(database *lib.Database) {
 
 	var e error
 
-	tableCachePath := ".tables"
+	lib.EnsureDir("meta")
+
+	tableCachePath := "meta/.tables"
 
 	c.existingModels = NewTablesCache()
 
@@ -335,12 +348,15 @@ func (c *Cmd) genTableCache(database *lib.Database) {
 }
 
 func (c *Cmd) saveTableCache() {
+
+	lib.EnsureDir("meta")
+
 	var e error
 	newModelData := []byte{}
 	if newModelData, e = json.Marshal(c.existingModels); e != nil {
 		panic(fmt.Sprintf("Can't serialize newModels: %s", e.Error()))
 	}
-	if e = ioutil.WriteFile(".tables", newModelData, 0777); e != nil {
+	if e = ioutil.WriteFile("meta/.tables", newModelData, 0777); e != nil {
 		panic("Could not write table cache to file")
 	}
 }

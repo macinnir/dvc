@@ -660,7 +660,9 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}({{$col.Name | toArgName}} {{
 		orderDirString = "DESC"
 	}
 
-	query := "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? AND IsDeleted = 0" + `"
+	query := "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? " + `"
+	{{if $.IsDeleted}}
+	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
 
 	// Optional Order By 
 	if len(orderBy) > 0 {
@@ -686,8 +688,13 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}({{$col.Name | toArgName}} {{
 func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (count int64, e error) {
 	
 	count = 0
-	
-	e = r.db.Get(&count, "SELECT COUNT(*) FROM ` + "`{{$.Table.Name}}`" + ` WHERE {{$col.Name}} = ? AND IsDeleted = 0", {{$col.Name | toArgName}})
+
+	query := "SELECT COUNT(*) FROM ` + "`{{$.Table.Name}}`" + ` WHERE {{$col.Name}} = ?"
+
+	{{if $.IsDeleted}}
+	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
+
+	e = r.db.Get(&count, query, {{$col.Name | toArgName}})
 	
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.CountFrom{{$col.Name}}({{$col | dataTypeToFormatString}}) > %s", {{$col.Name | toArgName}}, e.Error())
@@ -703,7 +710,11 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}({{$col.Name | toArgName}} 
 
 	model = &models.{{$.Table.Name}}{}
 
-	e = r.db.Get(model, "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ? AND IsDeleted = 0" + `", {{$col.Name | toArgName}})
+	query := "SELECT * FROM ` + "`{{$.Table.Name}}` WHERE `{{$col.Name}}` = ?" + `"
+	{{if $.IsDeleted}}
+	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
+	
+	e = r.db.Get(model, query, {{$col.Name | toArgName}})
 
 	if e == nil {
 
@@ -741,7 +752,10 @@ func (r *{{.Table.Name}}DAL) ManyPaged(limit, offset int64, orderBy, orderDir st
 		orderDirString = "DESC"
 	}
 
-	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE IsDeleted = 0" + `") 
+	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE 1=1" + `") 
+
+	{{if $.IsDeleted}}
+	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
 	
 	// Optional Order By 
 	if len(orderBy) > 0 {
@@ -766,7 +780,12 @@ func (r *{{.Table.Name}}DAL) ManyPaged(limit, offset int64, orderBy, orderDir st
 // Count returns the number of {{.Table.Name}} records
 func (r *{{.Table.Name}}DAL) Count() (count int64, e error) {
 	count = 0
-	e = r.db.Get(&count, "SELECT COUNT(*) FROM ` + "`{{.Table.Name}}`" + ` WHERE IsDeleted = 0")
+
+	query := "SELECT COUNT(*) FROM ` + "`{{.Table.Name}}`" + ` WHERE 1=1"
+	{{if $.IsDeleted}}
+	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
+
+	e = r.db.Get(&count, query)
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Count > %s", e.Error())
 	} else {

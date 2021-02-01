@@ -25,14 +25,17 @@ func (c *Cmd) Refresh(args []string) {
 	c.Gen([]string{"models"})
 	fmt.Printf("Models: %f seconds\n", time.Since(start).Seconds())
 
+	// Gen DALs
 	start = time.Now()
 	c.Gen([]string{"dals"})
 	fmt.Printf("DALs: %f seconds\n", time.Since(start).Seconds())
 
+	// Gen Interfaces
 	start = time.Now()
 	c.Gen([]string{"interfaces"})
 	fmt.Printf("Interfaces: %f seconds\n", time.Since(start).Seconds())
 
+	// Gen routes
 	start = time.Now()
 	c.Gen([]string{"routes"})
 	fmt.Printf("Routes: %f seconds\n", time.Since(start).Seconds())

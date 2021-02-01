@@ -44,12 +44,7 @@ func (c *Cmd) Gen(args []string) {
 	c.genTableCache(database)
 
 	switch subCmd {
-	// case CommandGenSchema:
-	// 	e = g.GenerateGoSchemaFile(c.Config.Dirs.Schema, database)
-	// 	if e != nil {
-	// 		lib.Error(e.Error(), c.Options)
-	// 		os.Exit(1)
-	// 	}
+
 	// case CommandGenCaches:
 	// 	fmt.Println("CommandGenCaches")
 	// 	e = g.GenerateGoCacheFiles(c.Config.Dirs.Cache, database)
@@ -57,8 +52,6 @@ func (c *Cmd) Gen(args []string) {
 	// 		lib.Error(e.Error(), c.Options)
 	// 		os.Exit(1)
 	// 	}
-	case CommandGenRepos:
-		c.GenRepos(g, database)
 	case CommandGenDals:
 		c.GenDals(g, database)
 	case CommandGenDal:
@@ -191,40 +184,12 @@ func (c *Cmd) Gen(args []string) {
 	case CommandGenTSPerms:
 		tsFile := g.BuildTypescriptPermissions()
 		fmt.Println(tsFile)
+	case CommandGenAPITests:
+		c.GenAPITests(g)
 	case "ts":
 		g.GenerateTypescriptTypesFile(c.Config.Dirs.Typescript, database)
 	default:
 		lib.Errorf("Unknown output type: `%s`", c.Options, subCmd)
-		os.Exit(1)
-	}
-}
-
-// GenRepos generates repos
-func (c *Cmd) GenRepos(g *gen.Gen, database *lib.Database) {
-
-	var e error
-
-	if c.Options&lib.OptClean == lib.OptClean {
-		g.CleanGoRepos(c.Config.Dirs.Repos, database)
-	}
-
-	e = g.GenerateGoRepoFiles(c.Config.Dirs.Repos, database)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
-		os.Exit(1)
-	}
-
-	e = g.GenerateReposBootstrapFile(c.Config.Dirs.Repos, database)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
-		os.Exit(1)
-	}
-
-	lib.Debug("Generating repo interfaces at "+c.Config.Dirs.Definitions, c.Options)
-	lib.EnsureDir(c.Config.Dirs.Definitions)
-	e = g.GenerateRepoInterfaces(database, c.Config.Dirs.Definitions)
-	if e != nil {
-		lib.Error(e.Error(), c.Options)
 		os.Exit(1)
 	}
 }
@@ -437,6 +402,19 @@ func (c *Cmd) GenRoutes(g *gen.Gen) {
 	var e error
 
 	e = g.GenRoutes()
+	if e != nil {
+		lib.Error(e.Error(), c.Options)
+		os.Exit(1)
+	}
+}
+
+// GenAPITests generates routes
+func (c *Cmd) GenAPITests(g *gen.Gen) {
+
+	fmt.Println("Generating api tests...")
+	var e error
+
+	e = g.GenAPITests()
 	if e != nil {
 		lib.Error(e.Error(), c.Options)
 		os.Exit(1)

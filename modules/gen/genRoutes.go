@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,8 @@ func (g *Gen) GenRoutes() (e error) {
 		"net/http",
 		"github.com/gorilla/mux",
 	}
+
+	// fmt.Println(imports)
 
 	code := ""
 
@@ -114,9 +117,10 @@ func (g *Gen) GenRoutes() (e error) {
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/dtos")
 	}
 
+	imports = append(imports, "github.com/macinnir/dvc/modules/utils/request")
+
 	if usesPermissions {
 		imports = append(imports, "github.com/macinnir/dvc/modules/utils")
-		imports = append(imports, "github.com/macinnir/dvc/modules/utils/request")
 		imports = append(imports, g.Config.BasePackage+"/core/definitions/constants/permissions")
 	}
 
@@ -133,6 +137,26 @@ import (
 
 	final += `)
 
+func hasPerm(currentUser *aggregates.UserAggregate, perm utils.Permission) bool {
+
+	if currentUser.UserID == 1 {
+		return true
+	}
+
+	if currentUser.IsActivated == 0 || currentUser.IsDisabled == 1 || currentUser.IsLocked == 1 {
+		return false
+	}
+
+	for k := range currentUser.PermissionNames {
+		if currentUser.PermissionNames[k] == string(perm) {
+			return true
+		}
+	}
+
+	return false
+}
+	
+
 // mapRoutesToControllers maps the routes to the controllers
 func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res request.IResponseLogger, log integrations.ILog) {
 
@@ -142,9 +166,18 @@ func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 	ioutil.WriteFile("services/api/routes.go", []byte(final), 0777)
 
 	routesContainer := &RoutesJSONContainer{
-		Routes: controllers,
-		DTOs:   genDTOSMap(),
-		Models: genModelsMap(),
+		Routes:     map[string]*ControllerRoute{},
+		DTOs:       genDTOSMap(),
+		Models:     genModelsMap(),
+		Aggregates: genAggregatesMap(),
+		Constants:  genConstantsMap(),
+	}
+
+	for k := range controllers {
+		for i := range controllers[k].Routes {
+			key := controllers[k].Routes[i].Name
+			routesContainer.Routes[key] = controllers[k].Routes[i]
+		}
 	}
 
 	if e = lib.EnsureDir("meta"); e != nil {
@@ -163,19 +196,21 @@ func mapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 
 // RoutesJSONContainer is a container for JSON Routes
 type RoutesJSONContainer struct {
-	Routes []*Controller                `json:"routes"`
-	DTOs   map[string]map[string]string `json:"dtos"`
-	Models map[string]map[string]string `json:"models"`
+	Routes     map[string]*ControllerRoute  `json:"routes"`
+	DTOs       map[string]map[string]string `json:"dtos"`
+	Models     map[string]map[string]string `json:"models"`
+	Aggregates map[string]map[string]string `json:"aggregates"`
+	Constants  map[string][]string          `json:"constants"`
 }
 
 // Controller represents a REST controller
 type Controller struct {
-	Name              string            `json:"Name"`
-	Description       string            `json:"Description"`
-	Path              string            `json:"-"`
-	Routes            []ControllerRoute `json:"Routes"`
-	HasDTOsImport     bool              `json:"-"`
-	HasResponseImport bool              `json:"-"`
+	Name              string             `json:"Name"`
+	Description       string             `json:"Description"`
+	Path              string             `json:"-"`
+	Routes            []*ControllerRoute `json:"Routes"`
+	HasDTOsImport     bool               `json:"-"`
+	HasResponseImport bool               `json:"-"`
 }
 
 // ControllerRoute represents a route inside a REST controller
@@ -260,7 +295,7 @@ func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) 
 	controller = &Controller{
 		Name:   extractNameFromFile(filePath),
 		Path:   filePath,
-		Routes: []ControllerRoute{},
+		Routes: []*ControllerRoute{},
 	}
 
 	// Get the controller name
@@ -273,7 +308,7 @@ func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) 
 
 	for _, method := range methods {
 
-		route := ControllerRoute{
+		route := &ControllerRoute{
 			Queries: []ControllerRouteQuery{},
 			Params:  []ControllerRouteParam{},
 		}
@@ -610,7 +645,7 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 
 			// for k := range route.Perms {
 			// s = append(s, "\t\tif !utils.HasPerm(currentUser, \""+route.Perms[k]+"\") {")
-			s = append(s, "\t\tif !utils.HasPerm(currentUser.UserID, currentUser.PermissionNames, permissions."+permission+") {")
+			s = append(s, "\t\tif !hasPerm(currentUser, permissions."+permission+") {")
 			s = append(s, "\t\t\tres.Forbidden(req, w)")
 			s = append(s, "\t\t\treturn")
 			s = append(s, "\t\t}\n")
@@ -618,6 +653,11 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 		}
 
 		if len(route.BodyType) > 0 {
+
+			if route.BodyType[0:1] == "*" {
+				route.BodyType = route.BodyType[1:]
+			}
+
 			s = append(s, fmt.Sprintf("\t\tbody := &%s{}", route.BodyType))
 			s = append(s, "\t\treq.BodyJSON(body)\n")
 		}
@@ -774,6 +814,210 @@ func genModelsMap() map[string]map[string]string {
 			result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
 			k++
 		}
+	}
+
+	return result
+}
+
+func genAggregatesMap() map[string]map[string]string {
+
+	modelsDir := "core/definitions/aggregates"
+
+	dirHandle, err := os.Open(modelsDir)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer dirHandle.Close()
+
+	var dirFileNames []string
+	dirFileNames, err = dirHandle.Readdirnames(-1)
+
+	if err != nil {
+		panic(err)
+	}
+	// reader := bufio.NewReader(os.Stdin)
+
+	result := map[string]map[string]string{}
+
+	for _, name := range dirFileNames {
+
+		if name == ".DS_Store" {
+			continue
+		}
+
+		// fileNameNoExt := name[0 : len(name)-3]
+		fullPath := path.Join(modelsDir, name)
+		// fmt.Println(fullPath)
+
+		fileBytes, e := ioutil.ReadFile(fullPath)
+		if e != nil {
+			panic(e)
+		}
+
+		contents := string(fileBytes)
+
+		re := regexp.MustCompile("^type [a-zA-Z0-9]+ struct {$")
+		contentLines := strings.Split(contents, "\n")
+		currentStruct := ""
+		for k := range contentLines {
+
+			if re.Match([]byte(contentLines[k])) {
+				structName := contentLines[k][5 : len(contentLines[k])-9]
+				// fmt.Println(k, structName)
+				result[structName] = map[string]string{}
+				currentStruct = structName
+				continue
+			}
+
+			if len(currentStruct) > 0 {
+
+				contentLines[k] = strings.TrimSpace(contentLines[k])
+
+				if contentLines[k] == "}" {
+					currentStruct = ""
+					continue
+				}
+
+				parts := []string{}
+				preParts := strings.Split(contentLines[k], " ")
+				for l := range preParts {
+					if len(preParts[l]) == 0 {
+						continue
+					}
+
+					parts = append(parts, preParts[l])
+				}
+
+				fieldName := ""
+				fieldType := ""
+				if len(parts) > 1 {
+					fieldName = parts[0]
+					fieldType = parts[1]
+				} else {
+					// This is an embedded type
+					if strings.Contains(parts[0], ".") {
+						sParts := strings.Split(parts[0], ".")
+						fieldName = sParts[1]
+						fieldType = parts[0]
+					}
+
+					// fmt.Println(">>>> " + strings.TrimSpace(parts[0]))
+				}
+
+				if len(fieldName) > 0 && len(fieldType) > 0 {
+					result[currentStruct][fieldName] = fieldType
+				}
+
+			}
+
+			// if len(contentLines[k]) > 5 && contentLines[k][0:5] == "type " {
+			// }
+		}
+		// model, e := InspectFile(fullPath)
+		// if e != nil {
+		// 	panic(e)
+		// }
+		// k := 0
+
+		// for k < model.Fields.Len() {
+		// 	result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
+		// 	k++
+		// }
+	}
+
+	return result
+}
+
+func genConstantsMap() map[string][]string {
+
+	modelsDir := "core/definitions/constants"
+
+	files, err := ioutil.ReadDir(modelsDir)
+
+	if err != nil {
+		panic(err)
+	}
+
+	// defer dirHandle.Close()
+
+	// var dirFileNames []string
+	// dirFileNames, err = dirHandle.Readdirnames(-1)
+
+	// reader := bufio.NewReader(os.Stdin)
+
+	result := map[string][]string{}
+
+	for _, file := range files {
+
+		if file.Name() == ".DS_Store" {
+			continue
+		}
+
+		if file.IsDir() {
+			continue
+		}
+
+		// fileNameNoExt := name[0 : len(name)-3]
+		fullPath := path.Join(modelsDir, file.Name())
+		// fmt.Println(fullPath)
+
+		fileBytes, e := ioutil.ReadFile(fullPath)
+
+		if e != nil {
+			panic(e)
+		}
+
+		contents := string(fileBytes)
+
+		re := regexp.MustCompile("^type [a-zA-Z0-9]+ [a-zA-Z0-9]+$")
+		contentLines := strings.Split(contents, "\n")
+		currentStruct := ""
+		isConsts := false
+		for k := range contentLines {
+			// fmt.Println(k, contentLines[k])
+			if re.Match([]byte(contentLines[k])) {
+				structName := contentLines[k][5:]
+				structName = strings.Split(structName, " ")[0]
+				// fmt.Println(k, structName)
+				result[structName] = []string{}
+				currentStruct = structName
+				continue
+			}
+
+			if contentLines[k] == "const (" {
+				isConsts = true
+				continue
+			}
+
+			if isConsts == true {
+				contentLines[k] = strings.TrimSpace(contentLines[k])
+				if contentLines[k] == ")" {
+					break
+				}
+
+				if len(contentLines[k]) > 2 && contentLines[k][0:2] == "//" {
+					continue
+				}
+
+				parts := strings.Split(contentLines[k], " ")
+				result[currentStruct] = append(result[currentStruct], parts[0])
+			}
+
+			// if len(contentLines[k]) > 5 && contentLines[k][0:5] == "type " {
+			// }
+		}
+		// model, e := InspectFile(fullPath)
+		// if e != nil {
+		// 	panic(e)
+		// }
+		// k := 0
+
+		// for k < model.Fields.Len() {
+		// 	result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
+		// 	k++
+		// }
 	}
 
 	return result

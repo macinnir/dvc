@@ -1,6 +1,6 @@
 module github.com/macinnir/dvc
 
-go 1.12
+go 1.13
 
 require (
 	github.com/BurntSushi/toml v0.3.1
@@ -15,5 +15,6 @@ require (
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
 	golang.org/x/tools v0.0.0-20190606124116-d0a3d012864b
 	google.golang.org/appengine v1.6.2 // indirect
+	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/yaml.v2 v2.2.2
 )

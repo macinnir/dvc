@@ -96,3 +96,9 @@ func (c *Cmd) Insert(args []string) {
 	x := lib.NewExecutor(c.Config, connector)
 	x.RunSQL(sql)
 }
+
+func helpInsert() {
+	fmt.Println(`
+	insert Builds a SQL insert query based upon field by field input and executes it
+	`)
+}

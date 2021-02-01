@@ -11,7 +11,6 @@ import (
 
 	// "gopkg.in/guregu/null.v3"
 	"log"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -348,56 +347,90 @@ func (ss *MySQL) FetchEnum(server *lib.Server, tableName string) (objects []map[
 
 	defer rows.Close()
 	columnNames, _ := rows.Columns()
-	columnTypes, _ := rows.ColumnTypes()
+	// columnTypes, _ := rows.ColumnTypes()
+
+	values := make([]interface{}, len(columnNames))
+	valuePtrs := make([]interface{}, len(columnNames))
 
 	for rows.Next() {
 
-		values := make([]interface{}, len(columnNames))
+		for i := range columnNames {
+			valuePtrs[i] = &values[i]
+		}
+
+		rows.Scan(valuePtrs...)
+
 		object := map[string]interface{}{}
-		// types := map[string]string{}
-
-		for i, column := range columnTypes {
-			switch column.ScanType().Name() {
-			case "RawBytes":
-
-				fmt.Println(column.Name(), "RawBytes", column.DatabaseTypeName())
-
-				if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
-					v := 0.0
-					object[column.Name()] = &v
-				}
-
-				if isString(column.DatabaseTypeName()) {
-					v := ""
-					object[column.Name()] = &v
-				}
-
-				if isInt(column.DatabaseTypeName()) {
-					v := 0
-					object[column.Name()] = &v
-				}
-
-			case "NullTime":
-				v := ""
-				fmt.Println(column.Name(), "NullTime", column.DatabaseTypeName())
-				object[column.Name()] = &v
-				// fmt.Println("!!", column.ScanType().Name(), column.DatabaseTypeName())
-			default:
-				fmt.Println(column.Name(), "Default", column.DatabaseTypeName())
-				object[column.Name()] = reflect.New(column.ScanType()).Interface()
+		for i, col := range columnNames {
+			val := values[i]
+			b, ok := val.([]byte)
+			var v interface{}
+			if ok {
+				v = string(b)
+			} else {
+				v = val
 			}
 
-			values[i] = object[column.Name()]
+			// fmt.Println(col, v)
+			object[col] = v
 		}
+		objects = append(objects, object)
 
-		// Scan the result into the column pointers...
-		if err := rows.Scan(values...); err != nil {
-			panic(err)
-		}
+		// object := map[string]interface{}{}
+		// // types := map[string]string{}
+
+		// for i, column := range columnTypes {
+
+		// 	fmt.Printf("%s.%s > %s > ScanTypeName: %s\n", tableName, column.Name(), column.DatabaseTypeName(), column.ScanType().Name())
+
+		// 	switch column.ScanType().Name() {
+		// 	case "RawBytes":
+
+		// 		// fmt.Println(column.Name(), "RawBytes", column.DatabaseTypeName())
+
+		// 		if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
+		// 			v := 0.0
+		// 			object[column.Name()] = &v
+		// 		}
+
+		// 		if isString(column.DatabaseTypeName()) {
+		// 			nullable, _ := column.Nullable()
+		// 			if nullable {
+		// 				fmt.Printf("Nullable String: %s.%s\n", tableName, column.Name())
+		// 				str := sql.NullString{}
+		// 				object[column.Name()] = &str
+		// 			} else {
+		// 				v := ""
+		// 				object[column.Name()] = &v
+		// 			}
+		// 		}
+
+		// 		if isInt(column.DatabaseTypeName()) {
+		// 			v := 0
+		// 			object[column.Name()] = &v
+		// 		}
+
+		// 	case "NullTime":
+		// 		v := ""
+		// 		// fmt.Println(column.Name(), "NullTime", column.DatabaseTypeName())
+		// 		object[column.Name()] = &v
+		// 		// fmt.Println("!!", column.ScanType().Name(), column.DatabaseTypeName())
+		// 	default:
+		// 		// fmt.Println(column.Name(), "Default", column.DatabaseTypeName())
+		// 		object[column.Name()] = reflect.New(column.ScanType()).Interface()
+		// 	}
+
+		// 	values[i] = object[column.Name()]
+		// }
+
+		// // Scan the result into the column pointers...
+		// if err := rows.Scan(values...); err != nil {
+		// 	panic(err)
+		// }
 
 		// for k :=
 
-		objects = append(objects, object)
+		// objects = append(objects, object)
 	}
 
 	return

@@ -26,6 +26,7 @@ func GenInterface(comment, pkgName, ifaceName, ifaceComment string, methods []st
 // GenInterfaces runs GenInterface on all the target files
 func GenInterfaces(files []string, structType, comment, pkgName, ifaceName, ifaceComment string, copyDocuments, copyTypeDoc bool) (result []byte, e error) {
 
+	// fmt.Printf("Generating interface: %s\n", files[0])
 	allMethods := []string{}
 	allImports := []string{}
 
@@ -63,6 +64,7 @@ func GenInterfaces(files []string, structType, comment, pkgName, ifaceName, ifac
 		ifaceComment += "\n" + typeDoc
 	}
 
+	// fmt.Println(allImports)
 	result, e = GenInterface(comment, pkgName, ifaceName, ifaceComment, allMethods, allImports)
 
 	return
