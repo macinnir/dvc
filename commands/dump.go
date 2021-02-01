@@ -35,10 +35,10 @@ func (c *Cmd) Dump(args []string) {
 	fmt.Printf("-- Host: %s\t Database: %s\n", c.Config.Connection.Host, c.Config.Connection.DatabaseName)
 
 	insertBatchMax := 100
-	insertBatchCounter := 0
 
 	for k := range tables {
 
+		insertBatchCounter := 0
 		table := tables[k]
 
 		fmt.Println("")
