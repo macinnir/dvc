@@ -38,6 +38,7 @@ func NewTablesCache() TablesCache {
 // Command Names
 const (
 	CommandAdd           Command = "add"
+	CommandClone         Command = "clone"
 	CommandCompare       Command = "compare"
 	CommandData          Command = "data"
 	CommandDump          Command = "dump"
@@ -85,6 +86,7 @@ type Cmd struct {
 func isCommand(cmd string) bool {
 	commands := map[string]bool{
 		"add":     true,
+		"clone":   true,
 		"compare": true,
 		"data":    true,
 		"dump":    true,
@@ -226,6 +228,8 @@ func (c *Cmd) Run(inputArgs []string) (err error) {
 	switch cmd {
 	case CommandRefresh:
 		c.Refresh(args)
+	case CommandClone:
+		c.Clone(args)
 	case CommandInsert:
 		c.Insert(args)
 	case CommandDump:

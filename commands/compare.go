@@ -25,44 +25,42 @@ func (c *Cmd) Compare(args []string) {
 	outfile := ""
 
 	// lib.Debugf("Args: %v", c.Options, args)
-	if len(args) == 0 {
-		goto Main
-	}
+	if len(args) > 0 {
 
-	for len(args) > 0 {
+		for len(args) > 0 {
 
-		switch args[0] {
-		case "-r", "--reverse":
-			c.Options |= lib.OptReverse
-		case "-u", "--summary":
-			c.Options |= lib.OptSummary
-		case "print":
-			cmd = "print"
-		case "apply":
-			cmd = "apply"
-		default:
+			switch args[0] {
+			case "-r", "--reverse":
+				c.Options |= lib.OptReverse
+			case "-u", "--summary":
+				c.Options |= lib.OptSummary
+			case "print":
+				cmd = "print"
+			case "apply":
+				cmd = "apply"
+			default:
 
-			if len(args[0]) > len("-o=") && args[0][0:len("-o=")] == "-o=" {
-				outfile = args[0][len("-o="):]
-				if len(outfile) == 0 {
-					lib.Error("Outfile argument cannot be empty", c.Options)
+				if len(args[0]) > len("-o=") && args[0][0:len("-o=")] == "-o=" {
+					outfile = args[0][len("-o="):]
+					if len(outfile) == 0 {
+						lib.Error("Outfile argument cannot be empty", c.Options)
+						os.Exit(1)
+					}
+					cmd = "write"
+				} else if args[0][0] == '-' {
+					lib.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, args[0])
 					os.Exit(1)
+					// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
 				}
-				cmd = "write"
-			} else if args[0][0] == '-' {
-				lib.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, args[0])
-				os.Exit(1)
-				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
+
+				// Check if outfile argument is non-empty
+
+				break
 			}
-
-			// Check if outfile argument is non-empty
-
-			goto Main
+			args = args[1:]
 		}
-		args = args[1:]
-	}
 
-Main:
+	}
 
 	cmp.SetOptions(c.Options)
 

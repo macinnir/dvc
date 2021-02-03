@@ -7,6 +7,17 @@ import (
 	"github.com/macinnir/dvc/lib"
 )
 
+func dbFieldCleanString(val string) string {
+
+	return strings.Replace(
+		strings.Replace(
+			val,
+			"\\", "\\\\", -1,
+		),
+		"'", `\'`, -1,
+	)
+}
+
 // Dump produces sql insert statements for the database
 func (c *Cmd) Dump(args []string) {
 
@@ -96,7 +107,8 @@ func (c *Cmd) Dump(args []string) {
 
 					switch table.Columns[colName].DataType {
 					case "char", "varchar", "text", "date", "datetime", "enum":
-						val = fmt.Sprintf("'%s'", strings.Replace(fmt.Sprintf("%s", tableData[rowNum][colName]), "'", "\\'", -1))
+
+						val = fmt.Sprintf("'%s'", dbFieldCleanString(fmt.Sprintf("%s", tableData[rowNum][colName])))
 					default:
 						val = fmt.Sprintf("%v", tableData[rowNum][colName])
 					}
