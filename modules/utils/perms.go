@@ -3,8 +3,37 @@ package utils
 // Permission is the name of a permission
 type Permission string
 
+type IUserContainer interface {
+	ID() int64
+	Activated() bool
+	Disabled() bool
+	Locked() bool
+	Permissions() []string
+}
+
+func HasPerm(user IUserContainer, perm Permission) bool {
+
+	// System user
+	if user.ID() == 1 {
+		return true
+	}
+
+	if !user.Activated() || user.Disabled() || user.Locked() {
+		return false
+	}
+
+	permissions := user.Permissions()
+	for k := range permissions {
+		if permissions[k] == string(perm) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // HasPerm verifies that a permission exists in a userProfile's permissions
-func HasPerm(userID int64, perms []string, permName Permission) bool {
+func HasPermOld(userID int64, perms []string, permName Permission) bool {
 
 	// Superuser
 	if userID == 1 {
