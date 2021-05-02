@@ -1,4 +1,4 @@
-package number
+package shard
 
 import (
 	"fmt"

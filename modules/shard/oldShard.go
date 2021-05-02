@@ -1,12 +1,12 @@
-package number
+package shard
 
 const (
 	// id size is the size of a full ID (in bits)
 	// Note this is out of a maximum of 64 bits
-	idSize int64 = 62
+	// idSize int64 = 62
 	// shardSize is 16 bits
 	// 62 - 16 = 46
-	shardSize int64 = 16
+	// shardSize int64 = 16
 	// typeSize is 10 bits
 	// 46 - 10 = 36
 	typeSize int64 = 10
