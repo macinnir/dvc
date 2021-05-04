@@ -8,6 +8,8 @@ import (
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 type apiPart struct {
@@ -224,6 +226,8 @@ func Bootstrap(r *mux.Router, re *repos.Repos, se *services.Services, store util
 
 	f.Close()
 
-	g.FmtGoCode(p)
+	if e = lib.FmtGoCode(p); e != nil {
+		lib.Warn(e.Error(), g.Options)
+	}
 
 }

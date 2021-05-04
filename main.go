@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/macinnir/dvc/commands"
 )
 
 var (
@@ -11,8 +13,8 @@ var (
 
 func main() {
 
-	cmd := &Cmd{}
-	e := cmd.Main(os.Args)
+	cmd := &commands.Cmd{}
+	e := cmd.Run(os.Args)
 
 	if e != nil {
 		fmt.Printf("ERROR: %s", e.Error())

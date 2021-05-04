@@ -3,12 +3,16 @@ package lib
 import (
 	"database/sql"
 	"errors"
+	"sort"
 )
 
+// DatabaseType is the type of database to be used.
 type DatabaseType string
 
 const (
-	DatabaseTypeMysql  DatabaseType = "mysql"
+	// DatabaseTypeMysql is the MySQL flavor of database
+	DatabaseTypeMysql DatabaseType = "mysql"
+	// DatabaseTypeSqlite is the Sqlite flavor of database
 	DatabaseTypeSqlite DatabaseType = "sqlite"
 )
 
@@ -131,6 +135,21 @@ type Database struct {
 	// Logs          []ChangeLog
 }
 
+// ToSortedTables returns SortedTables
+func (d *Database) ToSortedTables() SortedTables {
+
+	sortedTables := make(SortedTables, 0, len(d.Tables))
+
+	for _, table := range d.Tables {
+		sortedTables = append(sortedTables, table)
+	}
+
+	sort.Sort(sortedTables)
+
+	return sortedTables
+
+}
+
 // FindTableByName finds a table by its name in the database
 func (d *Database) FindTableByName(tableName string) (table *Table, e error) {
 	// Search for table
@@ -161,6 +180,39 @@ type Table struct {
 	Columns       map[string]*Column `json:"columns"`
 }
 
+// ToSortedColumns returns SortedColumns
+func (table *Table) ToSortedColumns() SortedColumns {
+
+	sortedColumns := make(SortedColumns, 0, len(table.Columns))
+
+	// Find the primary key
+	for _, column := range table.Columns {
+		sortedColumns = append(sortedColumns, column)
+	}
+
+	sort.Sort(sortedColumns)
+
+	return sortedColumns
+}
+
+// SortedTables is a slice of Table objects
+type SortedTables []*Table
+
+// Len is part of sort.Interface.
+func (c SortedTables) Len() int {
+	return len(c)
+}
+
+// Swap is part of sort.Interface.
+func (c SortedTables) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less is part of sort.Interface. We use count as the value to sort by
+func (c SortedTables) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
+}
+
 // Column represents a column in a table
 type Column struct {
 	Name         string `json:"column"`
@@ -176,6 +228,14 @@ type Column struct {
 	ColumnKey    string `json:"columnKey"`
 	NumericScale int    `json:"numericScale"`
 	Extra        string `json:"extra"`
+	FmtType      string `json:"fmtType"`
+	GoType       string `json:"goType"`
+}
+
+// ColumnWithTable is a column with the table name included
+type ColumnWithTable struct {
+	*Column
+	TableName string
 }
 
 const (
@@ -191,6 +251,8 @@ const (
 	OptSummary
 	// OptClean cleans
 	OptClean
+	// OptForce forces
+	OptForce
 )
 
 // IConnector defines the shape of a connector to a database
@@ -198,6 +260,7 @@ type IConnector interface {
 	Connect() (server *Server, e error)
 	FetchDatabases(server *Server) (databases map[string]*Database, e error)
 	FetchEnums(server *Server) (enums map[string][]map[string]interface{})
+	FetchEnum(server *Server, tableName string) []map[string]interface{}
 	UseDatabase(server *Server, databaseName string) (e error)
 	FetchDatabaseTables(server *Server, databaseName string) (tables map[string]*Table, e error)
 	FetchTableColumns(server *Server, databaseName string, tableName string) (columns map[string]*Column, e error)

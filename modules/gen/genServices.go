@@ -17,7 +17,7 @@ import (
 //  2. A services definition file in the definitions directory
 func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir string) (e error) {
 
-	g.EnsureDir(servicesDir)
+	lib.EnsureDir(servicesDir)
 
 	var data = struct {
 		BasePackage string
@@ -34,7 +34,7 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 
 	definitionsPath := fmt.Sprintf("%s/viewmodels", definitionsDir)
 
-	if g.dirExists(definitionsPath) && !g.dirIsEmpty(definitionsPath) {
+	if lib.DirExists(definitionsPath) && !lib.DirIsEmpty(definitionsPath) {
 		data.Imports = append(data.Imports, fmt.Sprintf("%s/definitions/viewmodels", g.Config.BasePackage))
 	}
 
@@ -109,7 +109,9 @@ type I{{$serviceName}}Service interface {
 		fmt.Println("Execute Error: ", e.Error())
 	}
 	f.Close()
-	g.FmtGoCode(p)
+	if e = lib.FmtGoCode(p); e != nil {
+		lib.Warn(e.Error(), g.Options)
+	}
 	return
 }
 
@@ -158,7 +160,9 @@ func Bootstrap(config *models.Config, repos *definitions.Repos, store utils.ISto
 		fmt.Println("Execute Error: ", e.Error())
 	}
 	f.Close()
-	g.FmtGoCode(p)
+	if e = lib.FmtGoCode(p); e != nil {
+		lib.Warn(e.Error(), g.Options)
+	}
 	return
 }
 

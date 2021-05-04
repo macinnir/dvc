@@ -8,9 +8,9 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
+
 	// "gopkg.in/guregu/null.v3"
 	"log"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -120,24 +120,24 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 	var rows *sql.Rows
 
 	query := fmt.Sprintf(`
-		SELECT 
-			COLUMN_NAME, 
-			ORDINAL_POSITION, 
-			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT, 
-			CASE IS_NULLABLE 
+		SELECT
+			COLUMN_NAME,
+			ORDINAL_POSITION,
+			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
+			CASE IS_NULLABLE
 				WHEN 'YES' THEN 1
 				ELSE 0
 			END AS IS_NULLABLE,
-			DATA_TYPE, 
-			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength, 
-			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision, 
-			COALESCE(CHARACTER_SET_NAME, '') AS CharSet, 
+			DATA_TYPE,
+			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
+			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision,
+			COALESCE(CHARACTER_SET_NAME, '') AS CharSet,
 			COLUMN_TYPE,
 			COLUMN_KEY,
 			EXTRA,
-			COALESCE(NUMERIC_SCALE, 0) as NumericScale 
-		FROM information_schema.COLUMNS 
-		WHERE 
+			COALESCE(NUMERIC_SCALE, 0) as NumericScale
+		FROM information_schema.COLUMNS
+		WHERE
 			TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
 	`, databaseName, tableName)
 
@@ -170,6 +170,13 @@ func (ss *MySQL) FetchTableColumns(server *lib.Server, databaseName string, tabl
 			return
 		}
 		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
+		column.FmtType = lib.DataTypeToFormatString(&column)
+		column.GoType = lib.DataTypeToGoTypeString(&column)
+
+		if column.Default == "''" {
+			column.Default = ""
+		}
+
 		columns[column.Name] = &column
 	}
 
@@ -323,68 +330,147 @@ func (ss *MySQL) FetchEnums(server *lib.Server) (enums map[string][]map[string]i
 	enums = make(map[string][]map[string]interface{})
 	for _, enum := range ss.Config.Enums {
 		// fmt.Printf("Building Enum: %s\n", enum)
-		enums[enum] = fetchEnum(server, enum)
+		enums[enum] = ss.FetchEnum(server, enum)
 	}
 
 	return
 }
 
-func fetchEnum(server *lib.Server, enum string) (objects []map[string]interface{}) {
+func (ss *MySQL) FetchEnum(server *lib.Server, tableName string) (objects []map[string]interface{}) {
 
 	var e error
 	var rows *sql.Rows
 
-	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM `%s`", enum)); e != nil {
+	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM `%s`", tableName)); e != nil {
 		return
 	}
 
 	defer rows.Close()
 	columnNames, _ := rows.Columns()
-	columnTypes, _ := rows.ColumnTypes()
+	// columnTypes, _ := rows.ColumnTypes()
+
+	values := make([]interface{}, len(columnNames))
+	valuePtrs := make([]interface{}, len(columnNames))
 
 	for rows.Next() {
 
-		values := make([]interface{}, len(columnNames))
+		for i := range columnNames {
+			valuePtrs[i] = &values[i]
+		}
+
+		rows.Scan(valuePtrs...)
+
 		object := map[string]interface{}{}
-		for i, column := range columnTypes {
-			switch column.ScanType().Name() {
-			case "RawBytes":
-				// fmt.Println("RawBytes", column.DatabaseTypeName())
-				if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
-					v := 0.0
-					object[column.Name()] = &v
-				}
-
-				if isString(column.DatabaseTypeName()) {
-					v := ""
-					object[column.Name()] = &v
-				}
-
-				if isInt(column.DatabaseTypeName()) {
-					v := 0
-					object[column.Name()] = &v
-				}
-			case "NullTime":
-				v := ""
-				object[column.Name()] = &v
-				// fmt.Println("!!", column.ScanType().Name(), column.DatabaseTypeName())
-			default:
-				object[column.Name()] = reflect.New(column.ScanType()).Interface()
+		for i, col := range columnNames {
+			val := values[i]
+			b, ok := val.([]byte)
+			var v interface{}
+			if ok {
+				v = string(b)
+			} else {
+				v = val
 			}
 
-			values[i] = object[column.Name()]
+			// fmt.Println(col, v)
+			object[col] = v
 		}
-
-		// Scan the result into the column pointers...
-		if err := rows.Scan(values...); err != nil {
-			panic(err)
-		}
-
 		objects = append(objects, object)
+
+		// object := map[string]interface{}{}
+		// // types := map[string]string{}
+
+		// for i, column := range columnTypes {
+
+		// 	fmt.Printf("%s.%s > %s > ScanTypeName: %s\n", tableName, column.Name(), column.DatabaseTypeName(), column.ScanType().Name())
+
+		// 	switch column.ScanType().Name() {
+		// 	case "RawBytes":
+
+		// 		// fmt.Println(column.Name(), "RawBytes", column.DatabaseTypeName())
+
+		// 		if isFloatingPointType(column.DatabaseTypeName()) || isFixedPointType(column.DatabaseTypeName()) {
+		// 			v := 0.0
+		// 			object[column.Name()] = &v
+		// 		}
+
+		// 		if isString(column.DatabaseTypeName()) {
+		// 			nullable, _ := column.Nullable()
+		// 			if nullable {
+		// 				fmt.Printf("Nullable String: %s.%s\n", tableName, column.Name())
+		// 				str := sql.NullString{}
+		// 				object[column.Name()] = &str
+		// 			} else {
+		// 				v := ""
+		// 				object[column.Name()] = &v
+		// 			}
+		// 		}
+
+		// 		if isInt(column.DatabaseTypeName()) {
+		// 			v := 0
+		// 			object[column.Name()] = &v
+		// 		}
+
+		// 	case "NullTime":
+		// 		v := ""
+		// 		// fmt.Println(column.Name(), "NullTime", column.DatabaseTypeName())
+		// 		object[column.Name()] = &v
+		// 		// fmt.Println("!!", column.ScanType().Name(), column.DatabaseTypeName())
+		// 	default:
+		// 		// fmt.Println(column.Name(), "Default", column.DatabaseTypeName())
+		// 		object[column.Name()] = reflect.New(column.ScanType()).Interface()
+		// 	}
+
+		// 	values[i] = object[column.Name()]
+		// }
+
+		// // Scan the result into the column pointers...
+		// if err := rows.Scan(values...); err != nil {
+		// 	panic(err)
+		// }
+
+		// for k :=
+
+		// objects = append(objects, object)
 	}
 
 	return
 }
+
+// func mapType() {
+// 	row := map[string]interface{}{}
+// 	for j, l := range enums[k] {
+// 		// fmt.Printf("%s %v\n", j, l)
+
+// 		switch table.Columns[j].DataType {
+// 		case "int":
+// 			row[j] = *(l.(*uint32))
+// 			// fmt.Println(j, *(l.(*uint32)))
+// 		case "bigint":
+// 			row[j] = *(l.(*uint64))
+// 			// fmt.Println(j, *(l.(*uint64)))
+// 		case "tinyint":
+// 			if table.Columns[j].IsUnsigned {
+// 				row[j] = *(l.(*uint8))
+// 				// fmt.Println(j, *(l.(*uint8)))
+// 			} else {
+// 				row[j] = *(l.(*int8))
+// 				// fmt.Println(j, *(l.(*int8)))
+// 			}
+// 		// case "int":
+// 		// 	fmt.Println(j, l.(int8))
+// 		// case "float64":
+// 		// 	fmt.Println(j, l.(float64))
+// 		case "varchar", "char", "text":
+// 			row[j] = *(l.(*string))
+// 			// fmt.Println(j, *(l.(*string)))
+// 		default:
+// 			fmt.Println(j, "???")
+// 		}
+
+// 		// val := reflect.ValueOf(l)
+// 		// fmt.Println(j, val)
+// 	}
+// }
 
 func getBytes(src interface{}) []byte {
 
@@ -688,7 +774,21 @@ func createColumnSegment(column *lib.Column) (sql string, e error) {
 
 	// Add single quotes to string default
 	if hasDefaultString(column.DataType) {
-		sql += fmt.Sprintf(" DEFAULT '%s'", column.Default)
+
+		defaultString := ""
+		// Just use the NULL default (instead of a null string) if the field is nullable and the default is NULL
+		// Sometimes default strings include their own single quotes
+		if column.IsNullable && column.Default == "NULL" {
+			// Don't add quotes
+			defaultString = column.Default
+		} else if len(column.Default) > 0 && column.Default[0:1] == "'" {
+			// Don't add quotes
+			defaultString = column.Default
+		} else {
+			defaultString = "'" + column.Default + "'"
+		}
+		// fmt.Println("string datatype: ", column.DataType, defaultString)
+		sql += fmt.Sprintf(" DEFAULT %s", defaultString)
 	} else if len(column.Default) > 0 {
 		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
 	}

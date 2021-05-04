@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"syscall"
@@ -34,11 +36,11 @@ func FetchNonDirFileNames(dirPath string) (files []string, e error) {
 	return
 }
 
-// FetchDirFileNames fetches returns a slice of strings of the name of the files in a directory (non-recursive)
-func FetchDirFileNames(dirPath string) (dirs []string, e error) {
+// FetchDirFileNames fetches returns a slice of strings of the name of the directories in a directory (non-recursive)
+func FetchDirFileNames(dirPath string) (fileNames []string, e error) {
 
 	var filesInfo []os.FileInfo
-	dirs = []string{}
+	fileNames = []string{}
 
 	if filesInfo, e = ioutil.ReadDir(dirPath); e != nil {
 		return
@@ -52,10 +54,16 @@ func FetchDirFileNames(dirPath string) (dirs []string, e error) {
 			continue
 		}
 
-		dirs = append(dirs, f.Name())
+		fileNames = append(fileNames, f.Name())
 	}
 
 	return
+}
+
+// HashStringMd5 genereates an MD5 hash of a string
+func HashStringMd5(s string) string {
+	data := []byte(s)
+	return fmt.Sprintf("%x", md5.Sum(data))
 }
 
 // HashFileMd5 returns an MD5 checksum of the file at `filePath`
@@ -87,9 +95,9 @@ func HashFileMd5(filePath string) (string, error) {
 	returnMD5String = hex.EncodeToString(hashInBytes)
 
 	return returnMD5String, nil
-
 }
 
+// RunCommand runs a system command
 func RunCommand(name string, args ...string) (stdout string, stderr string, exitCode int) {
 	// log.Println("run command:", name, args)
 	var outbuf, errbuf bytes.Buffer
@@ -124,4 +132,83 @@ func RunCommand(name string, args ...string) (stdout string, stderr string, exit
 	}
 	// log.Printf("command result, stdout: %v, stderr: %v, exitCode: %v", stdout, stderr, exitCode)
 	return
+}
+
+// EnsureDir creates a new dir if the dir is not found
+func EnsureDir(dir string) (e error) {
+
+	// lib.Debugf("Ensuring directory: %s", g.Options, dir)
+
+	if _, e = os.Stat(dir); os.IsNotExist(e) {
+
+		e = os.MkdirAll(dir, 0777)
+
+		if e != nil {
+			log.Fatalf("Could not created dir at path: %s", dir)
+		}
+
+	}
+	return
+}
+
+// FmtGoCode formats a go file
+func FmtGoCode(filePath string) (e error) {
+	_, stdError, exitCode := RunCommand("go", "fmt", filePath)
+
+	if exitCode > 0 {
+		e = fmt.Errorf("fmt error: %s", stdError)
+	}
+	return
+}
+
+// WriteGoCodeToFile writes a string of golang code to a file and then formats it with `go fmt`
+func WriteGoCodeToFile(goCode string, filePath string) (e error) {
+	// outFile := "./repos/repos.go"
+
+	e = ioutil.WriteFile(filePath, []byte(goCode), 0644)
+	if e != nil {
+		return
+	}
+
+	FmtGoCode(filePath)
+	// cmd := exec.Command("go", "fmt", filePath)
+	// e = cmd.Run()
+	// fmt.Printf("WriteCodeToFile: %s\n", e.Error())
+	return
+}
+
+func DirExists(dirPath string) bool {
+	if _, e := os.Stat(dirPath); os.IsNotExist(e) {
+		return false
+	}
+
+	return true
+}
+
+func DirIsEmpty(dirPath string) bool {
+
+	f, e := os.Open(dirPath)
+	if e != nil {
+		return false
+	}
+
+	defer f.Close()
+
+	_, e = f.Readdirnames(1)
+	if e == io.EOF {
+		return true
+	}
+
+	return false
+}
+
+func FileExists(filePath string) bool {
+	// Check if file exists
+	if _, e := os.Stat(filePath); os.IsNotExist(e) {
+		// fmt.Printf("File %s does not exist", filePath)
+		return false
+	}
+
+	return true
+
 }

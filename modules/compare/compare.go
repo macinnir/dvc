@@ -5,9 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/macinnir/dvc/lib"
 	"io/ioutil"
-	"strings"
+
+	"github.com/macinnir/dvc/lib"
 )
 
 func objectsAreSame(local interface{}, remote interface{}) (same bool, e error) {
@@ -49,46 +49,32 @@ func objectsAreSame(local interface{}, remote interface{}) (same bool, e error) 
 }
 
 // NewCompare creates a new Compare instance
-func NewCompare(config *lib.Config, options lib.Options) (compare *Compare, e error) {
+func NewCompare(config *lib.Config, options lib.Options, connector lib.IConnector) (compare *Compare, e error) {
 
 	compare = &Compare{
-		Config:  config,
-		Options: options,
+		config:    config,
+		options:   options,
+		connector: connector,
 	}
 
 	return
 }
 
 type Compare struct {
-	Config             *lib.Config              // Config is the config object
+	config             *lib.Config    // Config is the config object
+	connector          lib.IConnector // IConnector is the injected server manager
+	options            lib.Options
 	LocalSQLPaths      []string                 // LocalSQLPaths is a list of paths pulled from the changesets.json file
 	ChangesetSignature string                   // ChangesetSignature is a SHA signature for the changesets.json file
 	LocalChangeFiles   []lib.ChangeFile         // LocalChangeFiles is a list of paths to local change files
 	Files              *lib.Files               // Files is the injected file manager
-	Connector          lib.IConnector           // IConnector is the injected server manager
 	Databases          map[string]*lib.Database // A map of databases
-	Options            lib.Options
-}
-
-func (c *Compare) initCommand() (server *lib.Server) {
-
-	var e error
-	server, e = c.Connector.Connect()
-
-	if e != nil {
-		panic(e)
-	}
-
-	e = c.Connector.UseDatabase(server, c.Config.Connection.DatabaseName)
-
-	return
-
 }
 
 // ExportSchemaToSQL exports the current schema to sql
 func (c *Compare) ExportSchemaToSQL() (sql string, e error) {
 
-	schemaFile := c.Config.Connection.DatabaseName + ".schema.json"
+	schemaFile := c.config.Connection.DatabaseName + ".schema.json"
 
 	var localSchema *lib.Database
 	emptySchema := &lib.Database{}
@@ -97,8 +83,13 @@ func (c *Compare) ExportSchemaToSQL() (sql string, e error) {
 		return
 	}
 
-	sql, e = c.Connector.CreateChangeSQL(localSchema, emptySchema)
+	sql, e = c.connector.CreateChangeSQL(localSchema, emptySchema)
 	return
+}
+
+// SetOptions sets the options
+func (c *Compare) SetOptions(options lib.Options) {
+	c.options = options
 }
 
 // func (c *Compare) ExportDataToSQL(tableName string)
@@ -110,45 +101,47 @@ func (c *Compare) ExportSchemaToSQL() (sql string, e error) {
 // @command compare [reverse] apply
 func (c *Compare) ApplyChangeset(changeset string) (e error) {
 
-	server := c.initCommand()
-
-	statements := strings.Split(changeset, ";")
-
-	defer server.Connection.Close()
-
-	tx, _ := server.Connection.Begin()
-
-	nonEmptyStatements := []string{}
-	for _, s := range statements {
-		if len(strings.Trim(strings.Trim(s, " "), "\n")) == 0 {
-			continue
-		}
-
-		nonEmptyStatements = append(nonEmptyStatements, s)
-	}
-
-	for i, s := range nonEmptyStatements {
-		sql := strings.Trim(strings.Trim(s, " "), "\n")
-		if len(sql) == 0 {
-			continue
-		}
-		// fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(nonEmptyStatements))
-		fmt.Printf("Running %d of %d: \n%s\n", i+1, len(nonEmptyStatements), sql)
-		// lib.Debugf("Running sql: \n%s\n", c.Options, sql)
-
-		_, e = tx.Exec(sql)
-		if e != nil {
-			tx.Rollback()
-			return
-		}
-	}
-	fmt.Print("Finished\n")
-	e = tx.Commit()
-	if e != nil {
-		panic(e)
-	}
-
+	e = lib.NewExecutor(c.config, c.connector).RunSQL(changeset)
 	return
+	// server := c.initCommand()
+
+	// statements := strings.Split(changeset, ";")
+
+	// defer server.Connection.Close()
+
+	// tx, _ := server.Connection.Begin()
+
+	// nonEmptyStatements := []string{}
+	// for _, s := range statements {
+	// 	if len(strings.Trim(strings.Trim(s, " "), "\n")) == 0 {
+	// 		continue
+	// 	}
+
+	// 	nonEmptyStatements = append(nonEmptyStatements, s)
+	// }
+
+	// for i, s := range nonEmptyStatements {
+	// 	sql := strings.Trim(strings.Trim(s, " "), "\n")
+	// 	if len(sql) == 0 {
+	// 		continue
+	// 	}
+	// 	// fmt.Printf("\rRunning %d of %d sql statements...", i+1, len(nonEmptyStatements))
+	// 	fmt.Printf("Running %d of %d: \n%s\n", i+1, len(nonEmptyStatements), sql)
+	// 	// lib.Debugf("Running sql: \n%s\n", c.Options, sql)
+
+	// 	_, e = tx.Exec(sql)
+	// 	if e != nil {
+	// 		tx.Rollback()
+	// 		return
+	// 	}
+	// }
+	// fmt.Print("Finished\n")
+	// e = tx.Commit()
+	// if e != nil {
+	// 	panic(e)
+	// }
+
+	// return
 }
 
 // CompareSchema returns a string that contains a new line (`\n`) separated list of sql statements
@@ -167,7 +160,7 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 		return
 	}
 
-	server := c.initCommand()
+	server := lib.NewExecutor(c.config, c.connector).Connect()
 
 	if remoteSchema, e = c.buildRemoteSchema(server); e != nil {
 		return
@@ -187,18 +180,18 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 	local := localSchema
 	remote := remoteSchema
 
-	if c.Options&lib.OptReverse == lib.OptReverse {
+	if c.options&lib.OptReverse == lib.OptReverse {
 		local = remoteSchema
 		remote = localSchema
 	}
 
-	sql, e = c.Connector.CreateChangeSQL(local, remote)
+	sql, e = c.connector.CreateChangeSQL(local, remote)
 
 	if len(localSchema.Enums) > 0 {
 		// Compare remote to local
 		for tableName := range localSchema.Enums {
 			if same, _ = objectsAreSame(localSchema.Enums[tableName], remoteSchema.Enums[tableName]); !same {
-				sql += c.Connector.CompareEnums(remoteSchema, localSchema, tableName)
+				sql += c.connector.CompareEnums(remoteSchema, localSchema, tableName)
 			}
 		}
 	}
@@ -214,14 +207,13 @@ func (c *Compare) CompareSchema(schemaFile string) (sql string, e error) {
 // @command import
 func (c *Compare) ImportSchema(fileName string) (e error) {
 
-	server := c.initCommand()
-
+	server := lib.NewExecutor(c.config, c.connector).Connect()
 	database := &lib.Database{
 		Host: server.Host,
-		Name: c.Config.Connection.DatabaseName,
+		Name: c.config.Connection.DatabaseName,
 	}
-	database.Tables, e = c.Connector.FetchDatabaseTables(server, c.Config.Connection.DatabaseName)
-	database.Enums = c.Connector.FetchEnums(server)
+	database.Tables, e = c.connector.FetchDatabaseTables(server, c.config.Connection.DatabaseName)
+	database.Enums = c.connector.FetchEnums(server)
 
 	if e != nil {
 		return
@@ -238,9 +230,9 @@ func (c *Compare) buildRemoteSchema(server *lib.Server) (remoteSchema *lib.Datab
 	remoteSchema = &lib.Database{}
 
 	remoteSchema.Host = server.Host
-	remoteSchema.Name = c.Config.Connection.DatabaseName
-	remoteSchema.Tables, e = c.Connector.FetchDatabaseTables(server, c.Config.Connection.DatabaseName)
-	remoteSchema.Enums = c.Connector.FetchEnums(server)
+	remoteSchema.Name = c.config.Connection.DatabaseName
+	remoteSchema.Tables, e = c.connector.FetchDatabaseTables(server, c.config.Connection.DatabaseName)
+	remoteSchema.Enums = c.connector.FetchEnums(server)
 
 	return
 }

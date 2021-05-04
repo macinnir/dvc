@@ -1,8 +1,10 @@
 package gen
 
 import (
+	"bufio"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -13,17 +15,88 @@ import (
 // GenerateGoModel returns a string for a model in golang
 func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 
-	g.EnsureDir(dir)
+	lib.EnsureDir(dir)
 
-	var fileHead, fileFoot string
+	p := path.Join(dir, table.Name+".go")
+
+	if lib.FileExists(p) {
+		lib.Infof("Updating `%s`", g.Options, table.Name)
+		e = g.updateGoModel(p, table)
+		return
+	}
+
+	lib.Infof("Creating `%s`", g.Options, table.Name)
+	e = g.buildGoModel(p, table)
+	return
+}
+
+// InspectFile inspects a file
+func InspectFile(filePath string) (s *lib.GoStruct, e error) {
+
+	fileBytes, e := ioutil.ReadFile(filePath)
+	if e != nil {
+		panic(e)
+	}
+
+	s, e = buildGoStructFromFile(fileBytes)
+	if e != nil {
+		fmt.Println("ERROR: ", filePath)
+		panic(e)
+	}
+
+	return
+
+}
+
+func (g *Gen) updateGoModel(p string, table *lib.Table) (e error) {
+
+	var modelNode *lib.GoStruct
+	var outFile []byte
+
+	fileBytes, e := ioutil.ReadFile(p)
+	modelNode, e = buildGoStructFromFile(fileBytes)
+	resolveTableToModel(modelNode, table)
+
+	if e != nil {
+		return
+	}
+
+	outFile, e = buildFileFromModelNode(modelNode)
+	if e != nil {
+		return
+	}
+
+	e = ioutil.WriteFile(p, outFile, 0644)
+
+	return
+}
+
+func (g *Gen) buildGoModel(p string, table *lib.Table) (e error) {
+	var modelNode *lib.GoStruct
+	var outFile []byte
+
+	lib.Debugf("Generating model for table %s", g.Options, table.Name)
+
+	modelNode, e = buildModelNodeFromTable(table)
+	if e != nil {
+		return
+	}
+
+	outFile, e = buildFileFromModelNode(modelNode)
+	if e != nil {
+		return
+	}
+
+	e = ioutil.WriteFile(p, outFile, 0644)
+	return
+}
+
+func (g *Gen) buildGoModelOld(p string, table *lib.Table) (e error) {
+
 	oneToMany := g.Config.OneToMany[table.Name]
 	oneToOne := g.Config.OneToOne[table.Name]
 
-	p := path.Join(dir, table.Name+".go")
-	lib.Debugf("Generating model for table %s at path %s", g.Options, table.Name, p)
-	if fileHead, fileFoot, _, e = g.scanFileParts(p, false); e != nil {
-		return
-	}
+	lib.Debugf("Generating model for table %s", g.Options, table.Name)
 
 	type Column struct {
 		Name         string
@@ -39,64 +112,28 @@ func (g *Gen) GenerateGoModel(dir string, table *lib.Table) (e error) {
 		Name               string
 		IncludeNullPackage bool
 		Columns            []Column
-		FileHead           string
-		FileFoot           string
 	}{
 		OneToMany:          oneToMany,
 		OneToOne:           oneToOne,
 		Name:               table.Name,
 		IncludeNullPackage: false,
 		Columns:            []Column{},
-		FileHead:           fileHead,
-		FileFoot:           fileFoot,
 	}
 
-	tpl := `
-{{.FileHead}} 
-// #genStart
+	tpl := `// Generated Code; DO NOT EDIT.
 
 package models
+{{if .IncludeNullPackage}}
 import (
-	q "github.com/macinnir/dvc/modules/query" 
-	{{if .IncludeNullPackage}}"gopkg.in/guregu/null.v3"{{end}}
+	"gopkg.in/guregu/null.v3"
 )
+{{end}}
 
-// {{.Name}} represents a {{.Name}} domain object 
-type {{.Name}} struct { 
-	q.BaseDomainObject
+// {{.Name}} represents a {{.Name}} domain object
+type {{.Name}} struct {
 	{{range .Columns}}
 {{.Name}} {{.Type}} ` + "`db:\"{{.Name}}\" json:\"{{.Name}}\"`" + `{{end}}
-{{if ne .OneToMany ""}}
-	{{.OneToMany}}s []*{{.OneToMany}}{{end}}
-{{if ne .OneToOne ""}}
-	{{.OneToOne}} *{{.OneToOne}}{{end}}
-}
-
-// New{{.Name}} returns a new {{.Name}} domain object
-func New{{.Name}}() *{{.Name}} {
-	o := &{{.Name}}{}
-	o.Build()
-	return o
-}
-
-// Build builds the internal meta data for a {{.Name}} domain object
-func (o *{{.Name}}) Build() {
-	o.BaseDomainObject.TableName = "{{.Name}}"
-	o.BaseDomainObject.FieldList = map[string]*q.DomainObjectField{
-		{{range.Columns}}
-		"{{.Name}}": {
-			Name: "{{.Name}}", 
-			Type: "{{.Type}}", 
-			IsPrimaryKey: {{.IsPrimaryKey}}, 
-			IsNull: {{.IsNull}}, 
-			Ordinal: {{.Ordinal}}, 
-		}, 
-		{{end}}
-	}
-}
-// #genEnd
-{{.FileFoot}}
-`
+}`
 	var sortedColumns = make(lib.SortedColumns, 0, len(table.Columns))
 
 	for _, column := range table.Columns {
@@ -109,37 +146,10 @@ func (o *{{.Name}}) Build() {
 
 	for _, column := range sortedColumns {
 
-		fieldType := "int64"
-		switch column.DataType {
-		case "varchar":
-			fieldType = "string"
-		case "enum":
-			fieldType = "string"
-		case "text":
-			fieldType = "string"
-		case "date":
-			fieldType = "string"
-		case "datetime":
-			fieldType = "string"
-		case "char":
-			fieldType = "string"
-		case "decimal":
-			fieldType = "float64"
-		}
+		fieldType := lib.DataTypeToGoTypeString(column)
 
-		if column.IsNullable == true {
+		if column.IsNullable {
 			includeNullPackage = true
-			switch fieldType {
-			case "string":
-				// fieldType = "sql.NullString"
-				fieldType = "null.String"
-			case "int64":
-				// fieldType = "sql.NullInt64"
-				fieldType = "null.Int"
-			case "float64":
-				// fieldType = "sql.NullFloat64"
-				fieldType = "null.Float"
-			}
 		}
 
 		data.Columns = append(data.Columns, Column{
@@ -166,90 +176,16 @@ func (o *{{.Name}}) Build() {
 	}
 
 	f.Close()
-	g.FmtGoCode(p)
+	lib.FmtGoCode(p)
 
 	return
 }
 
-// GenerateDefaultConfigModelFile generates a default config model file
-func (g *Gen) GenerateDefaultConfigModelFile(dir string) {
-
-	model := &lib.Table{
-		Columns: map[string]*lib.Column{},
-		Name:    "Config",
-	}
-
-	model.Columns["AppName"] = &lib.Column{Name: "AppName", DataType: "varchar"}
-	model.Columns["DBName"] = &lib.Column{Name: "DBName", DataType: "varchar"}
-	model.Columns["DBHost"] = &lib.Column{Name: "DBHost", DataType: "varchar"}
-	model.Columns["DBUser"] = &lib.Column{Name: "DBUser", DataType: "varchar"}
-	model.Columns["DBPass"] = &lib.Column{Name: "DBPass", DataType: "varchar"}
-	model.Columns["Domain"] = &lib.Column{Name: "Domain", DataType: "varchar"}
-	model.Columns["Port"] = &lib.Column{Name: "Port", DataType: "varchar"}
-	model.Columns["HTTPS"] = &lib.Column{Name: "HTTPS", DataType: "varchar"}
-	model.Columns["URLVersionPrefix"] = &lib.Column{Name: "URLVersionPrefix", DataType: "varchar"}
-	model.Columns["TokenExpiryMinute"] = &lib.Column{Name: "TokenExpiryMinute", DataType: "int"}
-	model.Columns["TokenIssuerName"] = &lib.Column{Name: "TokenIssuerName", DataType: "varchar"}
-	model.Columns["PublicDomain"] = &lib.Column{Name: "PublicDomain", DataType: "varchar"}
-	model.Columns["RedisHost"] = &lib.Column{Name: "RedisHost", DataType: "varchar"}
-	model.Columns["RedisPassword"] = &lib.Column{Name: "RedisPassword", DataType: "varchar"}
-	model.Columns["RedisDB"] = &lib.Column{Name: "RedisDB", DataType: "int"}
-	model.Columns["WSURL"] = &lib.Column{Name: "WSURL", DataType: "varchar"}
-	model.Columns["HTMLURL"] = &lib.Column{Name: "HTMLURL", DataType: "varchar"}
-
-	g.GenerateGoModel(dir, model)
-}
-
-// GenerateDefaultConfigJsonFile generates a default json configuration file
-// in the root of the project directory
-func (g *Gen) GenerateDefaultConfigJsonFile(dir string) {
-
-	data := map[string]string{
-		"DatabaseName": g.Config.Connection.DatabaseName,
-		"Host":         g.Config.Connection.Host,
-		"Username":     g.Config.Connection.Username,
-		"Password":     g.Config.Connection.Password,
-		"AppName":      g.Config.BasePackage,
-	}
-	tpl := `{
-	"AppName": "{{ .AppName }}",
-	"DBName": "{{ .DatabaseName }}", 
-	"DBHost": "{{ .Host }}", 
-	"DBUser": "{{ .Username }}", 
-	"DBPass": "{{ .Password }}", 
-	"URLVersionPrefix": "v1",
-	"TokenExpiryMinute": 1440,
-	"TokenIssuerName": "{{ .AppName }}",
-	"Domain": "0.0.0.0",
-	"Port": "8081",
-	"HTTPS": "http",
-	"PublicDomain": "localhost",
-	"RedisHost": "127.0.0.1:6379",
-	"RedisPassword": "",
-	"RedisDB": 0,
-	"WSURL": ":8082",
-	"HTMLURL": ":8080"
-}
-`
-	t := template.Must(template.New("config-json").Parse(tpl))
-	p := path.Join(dir, "config.json")
-	f, err := os.Create(p)
-	if err != nil {
-		fmt.Println("ERROR: ", err.Error())
-		return
-	}
-
-	err = t.Execute(f, data)
-	if err != nil {
-		fmt.Println("Execute Error: ", err.Error())
-		return
-	}
-
-	f.Close()
-}
-
 // CleanGoModels removes model files that are not found in the database.Tables map
 func (g *Gen) CleanGoModels(dir string, database *lib.Database) (e error) {
+
+	lib.EnsureDir(dir)
+
 	dirHandle, err := os.Open(dir)
 	if err != nil {
 		panic(err)
@@ -261,13 +197,16 @@ func (g *Gen) CleanGoModels(dir string, database *lib.Database) (e error) {
 	if err != nil {
 		panic(err)
 	}
+	reader := bufio.NewReader(os.Stdin)
 
 	for _, name := range dirFileNames {
 		fileNameNoExt := name[0 : len(name)-3]
 		if _, ok := database.Tables[fileNameNoExt]; !ok {
-			if fileNameNoExt != "Config" {
-				fullFilePath := path.Join(dir, name)
-				fmt.Printf("TEST: Removing %s\n", fullFilePath)
+			fullFilePath := path.Join(dir, name)
+			// log.Printf("Removing %s\n", fullFilePath)
+			result := lib.ReadCliInput(reader, fmt.Sprintf("Delete unused model `%s` (Y/n)?", fileNameNoExt))
+			if result == "Y" {
+				fmt.Printf("Deleting model `%s` at path `%s`...\n", fileNameNoExt, fullFilePath)
 				os.Remove(fullFilePath)
 			}
 		}
