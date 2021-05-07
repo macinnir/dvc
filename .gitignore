@@ -1,7 +1,8 @@
 dvc
-modules/.DS_Store
 dvc\.exe
 dbTest.schema.json
 dvc.toml
 dbTest.db
 .idea/*
+.build
+.DS_Store
