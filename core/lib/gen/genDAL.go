@@ -1236,7 +1236,7 @@ func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schem
 	}{
 		BasePackage:         config.BasePackage,
 		Tables:              tables,
-		IntegrationsPackage: fmt.Sprintf("%s/%s", config.BasePackage, lib.IntegrationsDir),
+		IntegrationsPackage: fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.Integrations),
 	}
 
 	tpl := `
