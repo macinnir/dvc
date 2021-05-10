@@ -31,8 +31,8 @@ func GenRoutes(config *lib.Config) (e error) {
 	}
 
 	imports := []string{
-		path.Join(config.BasePackage, config.Dirs.API),
-		path.Join(config.BasePackage, config.Dirs.Integrations),
+		path.Join(config.BasePackage, config.Dirs.Controllers),
+		path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
 		path.Join(config.BasePackage, config.Dirs.Aggregates),
 		"net/http",
 		"github.com/gorilla/mux",

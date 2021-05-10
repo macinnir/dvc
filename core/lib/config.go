@@ -44,20 +44,21 @@ type Config struct {
 	} `json:"packages"`
 
 	Dirs struct {
-		Dals              string `json:"dals"`
-		DalInterfaces     string `json:"dalInterfaces"`
-		Repos             string `json:"repos"`
-		Cache             string `json:"cache"`
-		Models            string `json:"models"`
-		Integrations      string `json:"integrations"`
-		Aggregates        string `json:"aggregates"`
-		Schema            string `json:"schema"`
-		Typescript        string `json:"typescript"`
-		Services          string `json:"services"`
-		ServiceInterfaces string `json:"serviceInterfaces"`
-		Controllers       string `json:"controllers"`
-		API               string `json:"api"`
-		Permissions       string `json:"permissions"`
+		Dals                  string `json:"dals"`
+		DalInterfaces         string `json:"dalInterfaces"`
+		Repos                 string `json:"repos"`
+		Cache                 string `json:"cache"`
+		Models                string `json:"models"`
+		Integrations          string `json:"integrations"`
+		IntegrationInterfaces string `json:"integrationInterfaces"`
+		Aggregates            string `json:"aggregates"`
+		Schema                string `json:"schema"`
+		Typescript            string `json:"typescript"`
+		Services              string `json:"services"`
+		ServiceInterfaces     string `json:"serviceInterfaces"`
+		Controllers           string `json:"controllers"`
+		API                   string `json:"api"`
+		Permissions           string `json:"permissions"`
 	} `json:"dirs"`
 }
 
