@@ -49,6 +49,7 @@ type Config struct {
 		Repos             string `json:"repos"`
 		Cache             string `json:"cache"`
 		Models            string `json:"models"`
+		Integrations      string `json:"integrations"`
 		Schema            string `json:"schema"`
 		Typescript        string `json:"typescript"`
 		Services          string `json:"services"`

@@ -304,8 +304,8 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 	}
 
 	defaultImports := []string{
-		fmt.Sprintf("%s/%s", config.BasePackage, lib.ModelsDir),
-		fmt.Sprintf("%s/%s", config.BasePackage, lib.IntegrationsDir),
+		fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.Models),
+		fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.Integrations),
 		"github.com/macinnir/dvc/core/lib/utils/errors",
 		"database/sql",
 		"context",
