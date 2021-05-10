@@ -50,6 +50,7 @@ type Config struct {
 		Cache             string `json:"cache"`
 		Models            string `json:"models"`
 		Integrations      string `json:"integrations"`
+		Aggregates        string `json:"aggregates"`
 		Schema            string `json:"schema"`
 		Typescript        string `json:"typescript"`
 		Services          string `json:"services"`
