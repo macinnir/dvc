@@ -47,31 +47,21 @@ func LoadTableCache() (TablesCache, error) {
 	return tableCache, nil
 }
 
-// GenerateTableCache generates a new TableCache
-func GenerateTableCache(database *schema.Schema) (map[string]string, error) {
+func HashTable(table *schema.Table) (string, error) {
 
-	newModels := map[string]string{}
+	var marshalledTable []byte
+	var e error
 
-	for _, table := range database.Tables {
-
-		var marshalledTable []byte
-		var e error
-
-		if marshalledTable, e = json.Marshal(table); e != nil {
-			return newModels, e
-		}
-
-		// Build the list of new model hashes to check against
-		newModels[table.Name] = lib.HashStringMd5(string(marshalledTable))
+	if marshalledTable, e = json.Marshal(table); e != nil {
+		return "", e
 	}
 
-	return newModels, nil
+	// Build the list of new model hashes to check against
+	return lib.HashStringMd5(string(marshalledTable)), nil
 }
 
 // SaveTableCache writes a table cache to the table cache file
 func SaveTableCache(tablesCache TablesCache) error {
-
-	lib.EnsureDir(lib.MetaDirectory)
 
 	var e error
 	var tableCacheSerialized []byte

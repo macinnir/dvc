@@ -6,6 +6,17 @@ import (
 	"sort"
 )
 
+const (
+	RenameTable  = "RENAME_TABLE"
+	CreateTable  = "CREATE_TABLE"
+	DropTable    = "DROP_TABLE"
+	ChangeColumn = "CHANGE_COLUMN"
+	AddColumn    = "ADD_COLUMN"
+	DropColumn   = "DROP_COLUMN"
+	AddIndex     = "ADD_INDEX"
+	DropIndex    = "DROP_INDEX"
+)
+
 type SchemaList struct {
 	Schemas []*Schema `json:"schemas"`
 }

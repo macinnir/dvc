@@ -1,14 +1,54 @@
 package gen
 
 import (
+	"errors"
+
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/gen"
 	"go.uber.org/zap"
 )
 
 const CommandName = "gen"
 
 // Gen handles the `gen` command
-func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
+func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
+
+	if len(args) == 0 {
+		log.Warn("Missing gen type")
+		return errors.New("Missing gen type")
+	}
+
+	cmd := args[0]
+	force := false
+	clean := false
+
+	for k := range args {
+		switch args[k] {
+		case "-f", "--force":
+			force = true
+		case "-c", "--clean":
+			clean = true
+		}
+	}
+
+	switch cmd {
+	case "models":
+		gen.GenModels(config.Dirs.Models, force, clean)
+	case "dals":
+		gen.GenDALs(config.Dirs.Dals, config, force, clean)
+	case "interfaces":
+		gen.GenInterfaces(config.Dirs.Dals, config.Dirs.DalInterfaces)
+		gen.GenInterfaces(config.Dirs.Services, config.Dirs.ServiceInterfaces)
+	case "routes":
+		if e := gen.GenRoutes(config); e != nil {
+			return e
+		}
+		gen.GenPermissionsGoFile()
+
+	default:
+		return errors.New("unknown gen type")
+
+	}
 
 	return nil
 
@@ -188,43 +228,6 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 // 	}
 // }
 
-// // GenModels generates models
-// func (c *Cmd) GenModels(g *gen.Gen, database *schema.Schema) {
-
-// 	fmt.Println("Generating models...")
-// 	force := c.Options&lib.OptForce == lib.OptForce
-
-// 	var e error
-
-// 	modelsDir := path.Join(c.Config.Dirs.Definitions, "models")
-// 	if c.Options&lib.OptClean == lib.OptClean {
-// 		g.CleanGoModels(modelsDir, database)
-// 	}
-
-// 	for _, table := range database.Tables {
-
-// 		// If the model has been hashed before...
-// 		if _, ok := c.existingModels.Models[table.Name]; ok {
-
-// 			// And the hash hasn't changed, skip...
-// 			if c.newModels[table.Name] == c.existingModels.Models[table.Name] && !force {
-
-// 				// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
-// 				continue
-// 			}
-// 		}
-
-// 		// Update the models cache
-// 		c.existingModels.Models[table.Name] = c.newModels[table.Name]
-
-// 		fmt.Printf("Generating model `%s`\n", table.Name)
-// 		e = g.GenerateGoModel(modelsDir, table)
-// 		if e != nil {
-// 			lib.Error(e.Error(), c.Options)
-// 			os.Exit(1)
-// 		}
-// 	}
-
 // 	g.GenMeta("meta", database)
 
 // 	c.saveTableCache()
@@ -296,91 +299,11 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 // 	fmt.Println("Generating interfaces...")
 // 	var e error
 
-// 	genInterfaces := func(srcDir, srcType string) (e error) {
-
-// 		var files []os.FileInfo
-// 		// DAL
-// 		if files, e = ioutil.ReadDir(srcDir); e != nil {
-// 			return
-// 		}
-// 		for _, f := range files {
-
-// 			// Filter out files that don't have upper case first letter names
-// 			if !unicode.IsUpper([]rune(f.Name())[0]) {
-// 				continue
-// 			}
-
-// 			srcFile := path.Join(srcDir, f.Name())
-
-// 			// Remove the go extension
-// 			baseName := f.Name()[0 : len(f.Name())-3]
-
-// 			// Skip over EXT files
-// 			if baseName[len(baseName)-3:] == "Ext" {
-// 				continue
-// 			}
-
-// 			// Skip over test files
-// 			if baseName[len(baseName)-5:] == "_test" {
-// 				continue
-// 			}
-
-// 			// srcFile := path.Join(c.Config.Dirs.Dal, baseName + ".go")
-// 			destFile := path.Join(c.Config.Dirs.Definitions, srcType, "I"+baseName+".go")
-// 			interfaceName := "I" + baseName
-// 			packageName := srcType
-
-// 			srcFiles := []string{srcFile}
-// 			// var src []byte
-// 			// if src, e = ioutil.ReadFile(srcFile); e != nil {
-// 			// 	return
-// 			// }
-
-// 			// Check if EXT file exists
-// 			extFile := srcFile[0:len(srcFile)-3] + "Ext.go"
-// 			if _, e = os.Stat(extFile); e == nil {
-// 				srcFiles = append(srcFiles, extFile)
-// 				// concatenate the contents of the ext file with the contents of the regular file
-// 				// var extSrc []byte
-// 				// if extSrc, e = ioutil.ReadFile(extFile); e != nil {
-// 				// 	return
-// 				// }
-// 				// src = append(src, extSrc...)
-// 			}
-
-// 			var i []byte
-// 			i, e = gen.GenInterfaces(
-// 				srcFiles,
-// 				baseName,
-// 				"Generated Code; DO NOT EDIT.",
-// 				packageName,
-// 				interfaceName,
-// 				fmt.Sprintf("%s describes the %s", interfaceName, baseName),
-// 				true,
-// 				true,
-// 			)
-// 			if e != nil {
-// 				fmt.Println("ERROR", e.Error())
-// 				return
-// 			}
-
-// 			// fmt.Println("Generating ", destFile)
-// 			// fmt.Println("Writing to: ", destFile)
-
-// 			ioutil.WriteFile(destFile, i, 0644)
-
-// 			// fmt.Println("Name: ", baseName, "Path: ", srcFile)
-
-// 		}
-
-// 		return
-// 	}
-
-// 	e = genInterfaces(c.Config.Dirs.Dal, "dal")
-// 	if e != nil {
-// 		fmt.Println("ERROR", e.Error())
-// 		os.Exit(1)
-// 	}
+// e = genInterfaces(c.Config.Dirs.Dal, "dal")
+// if e != nil {
+// 	fmt.Println("ERROR", e.Error())
+// 	os.Exit(1)
+// }
 
 // 	e = genInterfaces(c.Config.Dirs.Services, "services")
 // 	if e != nil {

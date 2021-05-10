@@ -3,8 +3,11 @@ package mysql
 import (
 	"testing"
 
+	"github.com/macinnir/dvc/core/connectors/mysql/testassets"
+	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDropIndex(t *testing.T) {
@@ -15,9 +18,9 @@ func TestDropIndex(t *testing.T) {
 	column := new(schema.Column)
 	column.Name = "bar"
 
-	result, e := dropIndex(table, column)
-	assert.Nil(t, e)
-	assert.Equal(t, "ALTER TABLE `foo` DROP INDEX `i_foo_bar`;", result)
+	result := dropIndex(table, column)
+	assert.Equal(t, result.Type, schema.DropIndex)
+	assert.Equal(t, "ALTER TABLE `foo` DROP INDEX `i_foo_bar`;", result.SQL)
 }
 
 func TestDropUniqueIndex(t *testing.T) {
@@ -28,9 +31,12 @@ func TestDropUniqueIndex(t *testing.T) {
 	column := new(schema.Column)
 	column.Name = "bar"
 
-	result, e := dropUniqueIndex(table, column)
-	assert.Nil(t, e)
-	assert.Equal(t, "ALTER TABLE `foo` DROP INDEX `ui_foo_bar`;", result)
+	result := dropUniqueIndex(table, column)
+	assert.Equal(
+		t,
+		"ALTER TABLE `foo` DROP INDEX `ui_foo_bar`;",
+		result.SQL)
+	assert.Equal(t, schema.DropIndex, result.Type)
 }
 
 func TestHasDefaultString(t *testing.T) {
@@ -75,11 +81,104 @@ func TestCreateColumnEnum(t *testing.T) {
 	column.Type = "ENUM('bar','baz')"
 	column.Default = "bar"
 	column.IsNullable = false
-	result, e := createColumnSegment(column)
-	assert.Nil(t, e)
+	result := createColumnSegment(column)
 	assert.Equal(t, "`foo` ENUM('bar','baz') NOT NULL DEFAULT 'bar'", result)
 }
 
-// func TestCreateColumn(t *testing.T) {
-// 	m := new(MySQL)
-// }
+func TestCreateChangeSQL_NoChanges(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesNoChange()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	assert.Equal(t, 0, len(comparison.Changes))
+
+	if len(comparison.Changes) > 0 {
+		for k := range comparison.Changes {
+			t.Log(comparison.Changes[k].SQL)
+		}
+	}
+
+}
+
+func TestCreateChangeSQL_DropColumn(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesDropColumn()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 1, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 1, len(comparison.Changes))
+
+	assert.Equal(t, schema.DropColumn, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` DROP COLUMN `Name`;", comparison.Changes[0].SQL)
+
+}
+
+func TestCreateChangeSQL_AddColumn(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesAddColumn()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+
+	assert.Equal(t, 1, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 1, len(comparison.Changes))
+
+	assert.Equal(t, schema.AddColumn, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` ADD COLUMN `Name` varchar(200) NOT NULL DEFAULT '';", comparison.Changes[0].SQL)
+}
+
+func TestCreateTable(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesAddTable()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	assert.Equal(t, 1, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 1, len(comparison.Changes))
+
+	assert.Equal(t, schema.CreateTable, comparison.Changes[0].Type)
+	assert.Equal(t, "CREATE TABLE `Foo` (\n\t`FooID` int(10) UNSIGNED NOT NULL auto_increment,\n\t`IsDeleted` tinyint(4) SIGNED NOT NULL DEFAULT 0,\n\t`DateCreated` bigint(20) UNSIGNED NOT NULL DEFAULT 0,\n\tPRIMARY KEY(`FooID`)\n);", comparison.Changes[0].SQL)
+
+	for k := range comparison.Changes {
+		t.Log(comparison.Changes[k].SQL)
+	}
+
+}
+
+func TestDropTable(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesDropTable()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 1, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 1, len(comparison.Changes))
+
+	assert.Equal(t, schema.DropTable, comparison.Changes[0].Type)
+	assert.Equal(t, "DROP TABLE `Foo`;", comparison.Changes[0].SQL)
+
+	for k := range comparison.Changes {
+		t.Log(comparison.Changes[k].SQL)
+	}
+
+}

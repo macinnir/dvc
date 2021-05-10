@@ -2,6 +2,7 @@ package gen
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -18,22 +18,22 @@ import (
 )
 
 // GenRoutes generates a list of routes from a directory of controller files
-func (g *Gen) GenRoutes() (e error) {
+func GenRoutes(config *lib.Config) (e error) {
 
-	dir := "core/api/controllers"
+	permissionMap := loadPermissions()
 
 	var files []os.FileInfo
-	files, e = ioutil.ReadDir(dir)
+	files, e = ioutil.ReadDir(config.Dirs.Controllers)
 
 	if e != nil {
-		log.Println("Error with path ", dir, e.Error())
+		log.Println("Error with path ", config.Dirs.Controllers, e.Error())
 		return
 	}
 
 	imports := []string{
-		g.Config.BasePackage + "/core/api/controllers",
-		g.Config.BasePackage + "/core/definitions/integrations",
-		g.Config.BasePackage + "/core/definitions/aggregates",
+		path.Join(config.BasePackage, config.Dirs.API),
+		config.BasePackage + "/core/definitions/integrations",
+		config.BasePackage + "/core/definitions/aggregates",
 		"net/http",
 		"github.com/gorilla/mux",
 	}
@@ -73,15 +73,15 @@ func (g *Gen) GenRoutes() (e error) {
 		var src []byte
 
 		// log.Println(path.Join(dir, filePath.Name()))
-		src, e = ioutil.ReadFile(path.Join(dir, filePath.Name()))
+		src, e = ioutil.ReadFile(path.Join(config.Dirs.Controllers, filePath.Name()))
 
 		if e != nil {
-			log.Println("Error with ", path.Join(dir, filePath.Name()))
+			log.Println("Error with ", path.Join(config.Dirs.Controllers, filePath.Name()))
 			return
 		}
 
 		// Build a controller object from the controller file
-		controller, usesPerms, _ := g.BuildControllerObjFromControllerFile(path.Join(dir, filePath.Name()), src)
+		controller, usesPerms, _ := BuildControllerObjFromControllerFile(path.Join(config.Dirs.Controllers, filePath.Name()), src)
 
 		if usesPerms == true {
 			usesPermissions = true
@@ -95,7 +95,14 @@ func (g *Gen) GenRoutes() (e error) {
 			hasBodyImports = true
 		}
 
-		routesString, perms := g.BuildRoutesCodeFromController(controller)
+		var routesString string
+		var perms []string
+
+		routesString, perms, e = BuildRoutesCodeFromController(permissionMap, controller)
+
+		if e != nil {
+			return
+		}
 
 		allPerms = append(allPerms, perms...)
 		// allPerms = append(allPerms, "Manage"+controller.Name[0:len(controller.Name)-len("Controller")])
@@ -114,14 +121,14 @@ func (g *Gen) GenRoutes() (e error) {
 
 	if hasBodyImports {
 		// imports = append(imports, g.Config.BasePackage+"/core/utils/response")
-		imports = append(imports, g.Config.BasePackage+"/core/definitions/dtos")
+		imports = append(imports, config.BasePackage+"/core/definitions/dtos")
 	}
 
 	imports = append(imports, "github.com/macinnir/dvc/core/lib/utils/request")
 
 	if usesPermissions {
 		imports = append(imports, "github.com/macinnir/dvc/core/lib/utils")
-		imports = append(imports, g.Config.BasePackage+"/core/definitions/constants/permissions")
+		imports = append(imports, path.Join(config.BasePackage, config.Dirs.Permissions))
 	}
 
 	final := `// Generated Code; DO NOT EDIT.
@@ -167,8 +174,6 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
 	fmt.Println("Writing Routes JSON to to path", lib.RoutesFilePath)
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
-
-	g.buildPermissions()
 
 	return
 }
@@ -269,7 +274,7 @@ type DocRouteQuery struct {
 }
 
 // BuildControllerObjFromControllerFile parses a file and extracts all of its @route comments
-func (g *Gen) BuildControllerObjFromControllerFile(filePath string, src []byte) (controller *Controller, usesPerms bool, e error) {
+func BuildControllerObjFromControllerFile(filePath string, src []byte) (controller *Controller, usesPerms bool, e error) {
 
 	controller = &Controller{
 		Name:   extractNameFromFile(filePath),
@@ -481,103 +486,8 @@ func matchPatternToDataType(pattern string) string {
 	return "string"
 }
 
-func (g *Gen) buildPermissions() {
-
-	permissionMap := map[string]string{}
-	fileBytes, e := ioutil.ReadFile("meta/permissions.json")
-	if e != nil {
-		panic(e)
-	}
-	json.Unmarshal(fileBytes, &permissionMap)
-
-	permissions := make([]string, 0, len(permissionMap))
-	for k := range permissionMap {
-		permissions = append(permissions, k)
-	}
-
-	sort.Strings(permissions)
-
-	// for k := range permissions {
-
-	// 	permission := permissions[k]
-	// 	description := permissionMap[permissions[k]]
-
-	// 	// fmt.Println(permission + ": " + description)
-
-	// }
-
-	permissionsFile := `// Generated Code; DO NOT EDIT.
-
-	package permissions
-
-	import (
-		"github.com/macinnir/dvc/core/lib/utils"
-	)
-	
-	const (
-	`
-	for k := range permissions {
-		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		permissionsFile += "\t// " + permTitle + " Permission is the `" + permissions[k] + "` permission\n"
-		permissionsFile += "\t" + permTitle + " utils.Permission = \"" + permissions[k] + "\"\n"
-	}
-
-	permissionsFile += `)
-	
-	// Permissions returns a slice of permissions 
-	func Permissions() map[utils.Permission]string {
-		return map[utils.Permission]string {
-	`
-
-	for k := range permissions {
-		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		permissionsFile += "\t\t" + permTitle + ": \"" + permissionMap[permissions[k]] + "\",\n"
-	}
-
-	permissionsFile += `	}
-	}	
-	
-	`
-	permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
-	fmt.Println("Writing the permissions file to path ", permissionsFilePath)
-	var permissionsFileBytes []byte
-	permissionsFileBytes, e = lib.FormatCode(permissionsFile)
-	if e != nil {
-		panic(e)
-	}
-	ioutil.WriteFile(permissionsFilePath, []byte(permissionsFileBytes), 0777)
-}
-
-// BuildTypescriptPermissions returns a formatted typescript file of permission constants
-func (g *Gen) BuildTypescriptPermissions() string {
-
-	permissionMap := map[string]string{}
-	fileBytes, e := ioutil.ReadFile("meta/permissions.json")
-	if e != nil {
-		panic(e)
-	}
-	json.Unmarshal(fileBytes, &permissionMap)
-
-	permissions := make([]string, 0, len(permissionMap))
-	for k := range permissionMap {
-		permissions = append(permissions, k)
-	}
-
-	sort.Strings(permissions)
-
-	permissionsFile := "// Generated Code; DO NOT EDIT.\n\n"
-	for k := range permissions {
-		permission := strings.TrimSpace(permissions[k])
-		permTitle := string(unicode.ToUpper(rune(permission[0]))) + permission[1:]
-		permissionsFile += "// " + permTitle + " -- " + permissionMap[permission] + "\n"
-		permissionsFile += "export const " + permTitle + "Permission = \"" + permission + "\";\n"
-	}
-
-	return permissionsFile
-}
-
 // BuildRoutesCodeFromController builds controller code based on a route
-func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string, perms []string) {
+func BuildRoutesCodeFromController(permissionMap map[string]string, controller *Controller) (out string, perms []string, e error) {
 
 	permsGate := map[string]bool{}
 	perms = []string{}
@@ -621,6 +531,11 @@ func (g *Gen) BuildRoutesCodeFromController(controller *Controller) (out string,
 				// fmt.Println("adding permission " + route.Permission)
 				permsGate[route.Permission] = true
 				perms = append(perms, route.Permission)
+			}
+
+			if _, ok := permissionMap[permission]; !ok {
+				e = errors.New("Permission " + permission + " does not exist")
+				return
 			}
 
 			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permission+") {")

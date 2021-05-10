@@ -320,40 +320,41 @@ func (ss *Sqlite) FetchTableColumns(server *schema.Server, databaseName string, 
 
 // CreateChangeSQL generates sql statements based off of comparing two database objects
 // localSchema is authority, remoteSchema will be upgraded to match localSchema
-func (ss *Sqlite) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) (sql string, e error) {
+func (ss *Sqlite) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) *schema.SchemaComparison {
 
-	query := ""
+	return &schema.SchemaComparison{}
+	// query := ""
 
-	// What tables are in local that aren't in remote?
-	for tableName, table := range localSchema.Tables {
+	// // What tables are in local that aren't in remote?
+	// for tableName, table := range localSchema.Tables {
 
-		// Table does not exist on remote schema
-		if _, ok := remoteSchema.Tables[tableName]; !ok {
+	// 	// Table does not exist on remote schema
+	// 	if _, ok := remoteSchema.Tables[tableName]; !ok {
 
-			// fmt.Printf("Local table %s is not in remote\n", table.Name)
-			query, e = ss.createTable(table)
-			// fmt.Printf("Running Query: %s\n", query)
-			sql += query + "\n"
-		} else {
-			remoteTable := remoteSchema.Tables[tableName]
-			query, e = ss.createTableChangeSQL(table, remoteTable)
-			if len(query) > 0 {
-				sql += query + "\n"
-			}
-		}
-	}
+	// 		// fmt.Printf("Local table %s is not in remote\n", table.Name)
+	// 		query, e = ss.createTable(table)
+	// 		// fmt.Printf("Running Query: %s\n", query)
+	// 		sql += query + "\n"
+	// 	} else {
+	// 		remoteTable := remoteSchema.Tables[tableName]
+	// 		query, e = ss.createTableChangeSQL(table, remoteTable)
+	// 		if len(query) > 0 {
+	// 			sql += query + "\n"
+	// 		}
+	// 	}
+	// }
 
-	// What tables are in remote that aren't in local?
-	for _, table := range remoteSchema.Tables {
+	// // What tables are in remote that aren't in local?
+	// for _, table := range remoteSchema.Tables {
 
-		// Table does not exist on local schema
-		if _, ok := localSchema.Tables[table.Name]; !ok {
-			query, e = ss.dropTable(table)
-			sql += query + "\n"
-		}
-	}
+	// 	// Table does not exist on local schema
+	// 	if _, ok := localSchema.Tables[table.Name]; !ok {
+	// 		query, e = ss.dropTable(table)
+	// 		sql += query + "\n"
+	// 	}
+	// }
 
-	return
+	// return
 }
 
 // createTableChangeSQL returns a set of statements that alter a table's structure if and only if there is a difference between

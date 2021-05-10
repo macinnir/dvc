@@ -194,26 +194,25 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 
 // CreateChangeSQL generates sql statements based off of comparing two database objects
 // localSchema is authority, remoteSchema will be upgraded to match localSchema
-func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) (sql string, e error) {
+func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) *schema.SchemaComparison {
 
-	query := ""
+	comparison := &schema.SchemaComparison{
+		Database: "",
+		Changes:  []*schema.SchemaChange{},
+	}
 
-	dropTableStatements := map[string]string{}
-	createTableStatements := map[string]string{}
+	createTableStatements := map[string][]*schema.SchemaChange{}
+	dropTableStatements := map[string][]*schema.SchemaChange{}
 
 	// What tables are in local that aren't in remote?
 	for tableName, table := range localSchema.Tables {
 
 		// Table does not exist on remote schema
 		if _, ok := remoteSchema.Tables[tableName]; !ok {
-			query, e = createTable(table)
-			createTableStatements[tableName] = query
+			createTableStatements[tableName] = createTable(table)
 		} else {
 			remoteTable := remoteSchema.Tables[tableName]
-			query, e = createTableChangeSQL(table, remoteTable)
-			if len(query) > 0 {
-				sql += query + "\n"
-			}
+			createTableChangeSQL(comparison, table, remoteTable)
 		}
 	}
 
@@ -222,8 +221,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 
 		// Table does not exist on local schema
 		if _, ok := localSchema.Tables[table.Name]; !ok {
-			query, e = dropTable(table)
-			dropTableStatements[table.Name] = query
+			dropTableStatements[table.Name] = dropTable(table)
 		}
 	}
 
@@ -252,9 +250,13 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 					}
 
 					if same {
+						comparison.Changes = append(comparison.Changes, &schema.SchemaChange{
+							Type: schema.RenameTable,
+							SQL:  fmt.Sprintf("RENAME TABLE `%s` TO `%s`;\n", dropTableName, createTableName),
+						})
+
 						delete(dropTableStatements, dropTableName)
 						delete(createTableStatements, createTableName)
-						sql += fmt.Sprintf("RENAME TABLE `%s` TO `%s`;\n", dropTableName, createTableName)
 						break
 					}
 				}
@@ -263,21 +265,32 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 	}
 
 	if len(dropTableStatements) > 0 {
-		for _, s := range dropTableStatements {
-			sql += s + "\n"
+		for k := range dropTableStatements {
+			for l := range dropTableStatements[k] {
+				comparison.Deletions++
+				comparison.Changes = append(comparison.Changes, dropTableStatements[k][l])
+			}
 		}
 	}
 
 	if len(createTableStatements) > 0 {
-		for _, s := range createTableStatements {
-			sql += s + "\n"
+		for k := range createTableStatements {
+			for l := range createTableStatements[k] {
+				comparison.Additions++
+				comparison.Changes = append(comparison.Changes, createTableStatements[k][l])
+			}
 		}
 	}
-	return
+
+	return comparison
 }
 
 // CompareEnums returns a set of sql statements based on the difference between local (authority) and remote
-func (ss *MySQL) CompareEnums(remoteSchema *schema.Schema, localSchema *schema.Schema, tableName string) (sql string) {
+func (ss *MySQL) CompareEnums(
+	remoteSchema *schema.Schema,
+	localSchema *schema.Schema,
+	tableName string,
+) (sql string) {
 
 	sql += ""
 
@@ -482,39 +495,23 @@ func (ss *MySQL) FetchEnum(server *schema.Server, tableName string) (objects []m
 // createTableChangeSQL returns a set of statements that alter a table's structure if and only if there is a difference between
 // the local and remote tables
 // If no change is found, an empty string is returned.
-func createTableChangeSQL(localTable *schema.Table, remoteTable *schema.Table) (sql string, e error) {
+func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schema.Table, remoteTable *schema.Table) {
 
-	var query string
-
-	createColumnStatements := map[string]string{}
-	dropColumnStatements := map[string]string{}
+	createColumnStatements := map[string]*schema.SchemaChange{}
+	dropColumnStatements := map[string]*schema.SchemaChange{}
 
 	for _, column := range localTable.Columns {
 
 		// Column does not exist remotely
 		if _, ok := remoteTable.Columns[column.Name]; !ok {
-			query, e = alterTableCreateColumn(localTable, column)
-			if e != nil {
-				return
-			}
 
-			if len(query) > 0 {
-				createColumnStatements[column.Name] += query
-			}
+			createColumnStatements[column.Name] = alterTableCreateColumn(localTable, column)
 
 		} else {
 
 			remoteColumn := remoteTable.Columns[column.Name]
+			changeColumn(comparison, localTable, column, remoteColumn)
 
-			query, e = changeColumn(localTable, column, remoteColumn)
-
-			if e != nil {
-				return
-			}
-
-			if len(query) > 0 {
-				sql += query + "\n"
-			}
 		}
 	}
 
@@ -522,12 +519,8 @@ func createTableChangeSQL(localTable *schema.Table, remoteTable *schema.Table) (
 
 		// Column does not exist locally
 		if _, ok := localTable.Columns[column.Name]; !ok {
-			query, e = alterTableDropColumn(localTable, column)
-			if e != nil {
-				return
-			}
-
-			dropColumnStatements[column.Name] = query
+			dropColumn := alterTableDropColumn(localTable, column)
+			dropColumnStatements[column.Name] = dropColumn
 		}
 	}
 
@@ -539,7 +532,8 @@ func createTableChangeSQL(localTable *schema.Table, remoteTable *schema.Table) (
 
 				// The dataTypes are the same, possibly a renamed column. Simply rename the column
 				if remoteTable.Columns[dropColumnName].DataType == localTable.Columns[createColumnName].DataType {
-					sql += alterTableChangeColumn(localTable, localTable.Columns[createColumnName], dropColumnName) + "\n"
+					comparison.Changes = append(comparison.Changes, alterTableChangeColumn(localTable, localTable.Columns[createColumnName], dropColumnName))
+					comparison.Alterations++
 					delete(dropColumnStatements, dropColumnName)
 					delete(createColumnStatements, createColumnName)
 					break
@@ -551,14 +545,16 @@ func createTableChangeSQL(localTable *schema.Table, remoteTable *schema.Table) (
 	}
 
 	if len(dropColumnStatements) > 0 {
-		for _, s := range dropColumnStatements {
-			sql += s + "\n"
+		for k := range dropColumnStatements {
+			comparison.Changes = append(comparison.Changes, dropColumnStatements[k])
+			comparison.Deletions++
 		}
 	}
 
 	if len(createColumnStatements) > 0 {
-		for _, s := range createColumnStatements {
-			sql += s + "\n"
+		for k := range createColumnStatements {
+			comparison.Changes = append(comparison.Changes, createColumnStatements[k])
+			comparison.Additions++
 		}
 	}
 
@@ -566,7 +562,9 @@ func createTableChangeSQL(localTable *schema.Table, remoteTable *schema.Table) (
 }
 
 // createTable returns a create table sql statement
-func createTable(table *schema.Table) (sql string, e error) {
+func createTable(table *schema.Table) []*schema.SchemaChange {
+
+	changes := []*schema.SchemaChange{}
 
 	// colLen := len(table.Columns)
 	idx := 1
@@ -593,7 +591,7 @@ func createTable(table *schema.Table) (sql string, e error) {
 	for _, column := range sortedColumns {
 
 		colQuery := ""
-		colQuery, e = createColumnSegment(column)
+		colQuery = createColumnSegment(column)
 		col := colQuery
 
 		idx++
@@ -613,31 +611,44 @@ func createTable(table *schema.Table) (sql string, e error) {
 		cols = append(cols, fmt.Sprintf("PRIMARY KEY(`%s`)", primaryKey))
 	}
 
-	sql = fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n) ENGINE = %s;", table.Name, strings.Join(cols, ",\n\t"), table.Engine)
+	sql := fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n)", table.Name, strings.Join(cols, ",\n\t"))
+
+	if len(table.Engine) > 0 {
+		sql += fmt.Sprintf(" ENGINE = %s", table.Engine)
+	}
+
+	sql += ";"
+
+	// Create table
+	changes = append(changes, &schema.SchemaChange{
+		Type: schema.CreateTable,
+		SQL:  sql,
+	})
 
 	if len(uniqueKeyColumns) > 0 {
-		sql += "\n"
-		for _, uniqueKeyColumn := range uniqueKeyColumns {
-			t, _ := addUniqueIndex(table, uniqueKeyColumn)
-			sql += t + "\n"
+		for k := range uniqueKeyColumns {
+			changes = append(changes, addUniqueIndex(table, uniqueKeyColumns[k]))
 		}
 	}
 
 	if len(multiKeyColumns) > 0 {
-		sql += "\n"
-		for _, multiKeyColumn := range multiKeyColumns {
-			t, _ := addIndex(table, multiKeyColumn)
-			sql += t + "\n"
+		for k := range multiKeyColumns {
+			changes = append(changes, addIndex(table, multiKeyColumns[k]))
 		}
 	}
 
-	return
+	return changes
 }
 
 // dropTable returns a drop table sql statement
-func dropTable(table *schema.Table) (sql string, e error) {
-	sql = fmt.Sprintf("DROP TABLE `%s`;", table.Name)
-	return
+func dropTable(table *schema.Table) []*schema.SchemaChange {
+	return []*schema.SchemaChange{
+		{
+			Type:          schema.DropTable,
+			SQL:           fmt.Sprintf("DROP TABLE `%s`;", table.Name),
+			IsDestructive: true,
+		},
+	}
 }
 
 // changeColumn returns an alter table sql statement that adds or removes an index from a column
@@ -654,10 +665,7 @@ func dropTable(table *schema.Table) (sql string, e error) {
 // 7. 	none	| 	none	| 	Do nothing
 // 8. 	MUL		| 	MUL		| 	Do nothing
 // 9. 	UNI		|   UNI		| 	Do nothing
-func changeColumn(table *schema.Table, localColumn *schema.Column, remoteColumn *schema.Column) (sql string, e error) {
-
-	t := ""
-	query := ""
+func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, localColumn *schema.Column, remoteColumn *schema.Column) {
 
 	// 7,8,9
 	// if localColumn.ColumnKey == remoteColumn.ColumnKey {
@@ -673,12 +681,12 @@ func changeColumn(table *schema.Table, localColumn *schema.Column, remoteColumn 
 			switch remoteColumn.ColumnKey {
 			// 1
 			case KeyMUL:
-				t, _ = dropIndex(table, localColumn)
-				query += t + "\n"
+				comparison.Changes = append(comparison.Changes, dropIndex(table, localColumn))
+				comparison.Deletions++
 			// 2
 			case KeyUNI:
-				t, _ = dropUniqueIndex(table, localColumn)
-				query += t + "\n"
+				comparison.Changes = append(comparison.Changes, dropUniqueIndex(table, localColumn))
+				comparison.Deletions++
 			}
 		}
 
@@ -687,161 +695,96 @@ func changeColumn(table *schema.Table, localColumn *schema.Column, remoteColumn 
 			switch localColumn.ColumnKey {
 			// 3
 			case KeyMUL:
-				t, _ = addIndex(table, localColumn)
-				query += t + "\n"
+				comparison.Changes = append(comparison.Changes, addIndex(table, localColumn))
+				comparison.Additions++
 			// 4
 			case KeyUNI:
-				t, _ = addUniqueIndex(table, localColumn)
-				query += t + "\n"
+				comparison.Changes = append(comparison.Changes, addUniqueIndex(table, localColumn))
+				comparison.Additions++
 			}
 		}
 
 		// 5
 		if remoteColumn.ColumnKey == KeyMUL && localColumn.ColumnKey == KeyUNI {
-			t, _ = dropIndex(table, localColumn)
-			query += t + "\n"
-			t, _ = addUniqueIndex(table, localColumn)
-			query += t + "\n"
+			comparison.Changes = append(comparison.Changes, dropIndex(table, localColumn))
+			comparison.Deletions++
+
+			comparison.Changes = append(comparison.Changes, addUniqueIndex(table, localColumn))
+			comparison.Additions++
 		}
 
 		// 6
 		if remoteColumn.ColumnKey == KeyUNI && localColumn.ColumnKey == KeyMUL {
-			t, _ = dropUniqueIndex(table, localColumn)
-			query += t + "\n"
-			t, _ = addIndex(table, localColumn)
-			query += t + "\n"
+			comparison.Changes = append(comparison.Changes, dropUniqueIndex(table, localColumn))
+			comparison.Deletions++
+
+			comparison.Changes = append(comparison.Changes, addIndex(table, localColumn))
+			comparison.Additions++
 		}
 	}
 
 	if localColumn.DataType != remoteColumn.DataType {
-		query += alterTableChangeColumn(table, localColumn, localColumn.Name)
+		comparison.Changes = append(comparison.Changes, alterTableChangeColumn(table, localColumn, localColumn.Name))
+		comparison.Alterations++
 	}
-	sql = query
-	return
-
 }
 
-// createColumnSegment returns a table column sql segment
-// Data Types
-// INT SIGNED 	11 columns
-func createColumnSegment(column *schema.Column) (sql string, e error) {
-
-	if isInt(column.DataType) {
-
-		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
-
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s ", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s ", SignedSigned)
-		}
-
-	} else if isFixedPointType(column.DataType) {
-
-		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
-
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s ", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s ", SignedSigned)
-		}
-	} else if isFloatingPointType(column.DataType) {
-		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s ", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s ", SignedSigned)
-		}
-	} else if isString(column.DataType) {
-		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
-		if strings.ToLower(column.DataType) == ColTypeEnum {
-			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
-		} else if stringHasLength(column.DataType) {
-			sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
-		} else {
-			sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
-		}
-
-	} else {
-		sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+func alterTableChangeColumn(table *schema.Table, newColumn *schema.Column, oldColumnName string) *schema.SchemaChange {
+	query := createColumnSegment(newColumn)
+	return &schema.SchemaChange{
+		Type: schema.ChangeColumn,
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s;", table.Name, oldColumnName, query),
 	}
-
-	if !column.IsNullable {
-		sql += " NOT"
-	}
-	sql += " NULL"
-
-	// Add single quotes to string default
-	if hasDefaultString(column.DataType) {
-
-		defaultString := ""
-		// Just use the NULL default (instead of a null string) if the field is nullable and the default is NULL
-		// Sometimes default strings include their own single quotes
-		if column.IsNullable && column.Default == "NULL" {
-			// Don't add quotes
-			defaultString = column.Default
-		} else if len(column.Default) > 0 && column.Default[0:1] == "'" {
-			// Don't add quotes
-			defaultString = column.Default
-		} else {
-			defaultString = "'" + column.Default + "'"
-		}
-		// fmt.Println("string datatype: ", column.DataType, defaultString)
-		sql += fmt.Sprintf(" DEFAULT %s", defaultString)
-	} else if len(column.Default) > 0 {
-		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
-	}
-
-	if len(column.Extra) > 0 {
-		sql += " " + column.Extra
-	}
-
-	return
-
-}
-
-func alterTableChangeColumn(table *schema.Table, newColumn *schema.Column, oldColumnName string) (sql string) {
-	query, _ := createColumnSegment(newColumn)
-	sql = fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s;", table.Name, oldColumnName, query)
-	return
 }
 
 // alterTableCreateColumn returns an alter table sql statement that adds a column
-func alterTableCreateColumn(table *schema.Table, column *schema.Column) (sql string, e error) {
-	query := ""
-	query, e = createColumnSegment(column)
-	sql = fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query)
-	return
+func alterTableCreateColumn(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	query := createColumnSegment(column)
+	return &schema.SchemaChange{
+		Type: schema.AddColumn,
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query),
+	}
 }
 
 // alterTableDropColumn returns an alter table sql statement that drops a column
-func alterTableDropColumn(table *schema.Table, column *schema.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name)
-	return
+func alterTableDropColumn(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type:          schema.DropColumn,
+		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name),
+		IsDestructive: true,
+	}
 }
 
-// addIndex returns an alter table sql statement that adds an index to a table
-func addIndex(table *schema.Table, column *schema.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`);", table.Name, column.Name, column.Name)
-	return
+func addIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type: schema.AddIndex,
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`);", table.Name, column.Name, column.Name),
+	}
 }
 
-// addUniqueIndex returns an alter table sql statement that adds a unique index to a table
-func addUniqueIndex(table *schema.Table, column *schema.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`);", table.Name, column.Name, column.Name)
-	return
+func addUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type: schema.AddIndex,
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`);", table.Name, column.Name, column.Name),
+	}
 }
 
 // dropIndex returns an alter table sql statement that drops an index
-func dropIndex(table *schema.Table, column *schema.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s_%s`;", table.Name, table.Name, column.Name)
-	return
+func dropIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type:          schema.DropIndex,
+		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s_%s`;", table.Name, table.Name, column.Name),
+		IsDestructive: true,
+	}
 }
 
 // dropUniqueIndex returns an alter table sql statement that drops a unique index
-func dropUniqueIndex(table *schema.Table, column *schema.Column) (sql string, e error) {
-	sql = fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s_%s`;", table.Name, table.Name, column.Name)
-	return
+func dropUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type:          schema.DropIndex,
+		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s_%s`;", table.Name, table.Name, column.Name),
+		IsDestructive: true,
+	}
 }
 
 // stringHasLength
@@ -942,4 +885,83 @@ func intColLength(dataType string, isUnsigned bool) int {
 	}
 
 	return 0
+}
+
+// createColumnSegment returns a table column sql segment
+// Data Types
+// INT SIGNED 	11 columns
+func createColumnSegment(column *schema.Column) (sql string) {
+
+	if isInt(column.DataType) {
+
+		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
+
+		if column.IsUnsigned {
+			sql += fmt.Sprintf(" %s", SignedUnsigned)
+		} else {
+			sql += fmt.Sprintf(" %s", SignedSigned)
+		}
+
+	} else if isFixedPointType(column.DataType) {
+
+		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
+
+		if column.IsUnsigned {
+			sql += fmt.Sprintf(" %s", SignedUnsigned)
+		} else {
+			sql += fmt.Sprintf(" %s", SignedSigned)
+		}
+	} else if isFloatingPointType(column.DataType) {
+		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
+		if column.IsUnsigned {
+			sql += fmt.Sprintf(" %s", SignedUnsigned)
+		} else {
+			sql += fmt.Sprintf(" %s", SignedSigned)
+		}
+	} else if isString(column.DataType) {
+		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
+		if strings.ToLower(column.DataType) == ColTypeEnum {
+			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
+		} else if stringHasLength(column.DataType) {
+			sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
+		} else {
+			sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+		}
+
+	} else {
+		sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+	}
+
+	if !column.IsNullable {
+		sql += " NOT"
+	}
+	sql += " NULL"
+
+	// Add single quotes to string default
+	if hasDefaultString(column.DataType) {
+
+		defaultString := ""
+		// Just use the NULL default (instead of a null string) if the field is nullable and the default is NULL
+		// Sometimes default strings include their own single quotes
+		if column.IsNullable && column.Default == "NULL" {
+			// Don't add quotes
+			defaultString = column.Default
+		} else if len(column.Default) > 0 && column.Default[0:1] == "'" {
+			// Don't add quotes
+			defaultString = column.Default
+		} else {
+			defaultString = "'" + column.Default + "'"
+		}
+		// fmt.Println("string datatype: ", column.DataType, defaultString)
+		sql += fmt.Sprintf(" DEFAULT %s", defaultString)
+	} else if len(column.Default) > 0 {
+		sql += fmt.Sprintf(" DEFAULT %s", column.Default)
+	}
+
+	if len(column.Extra) > 0 {
+		sql += " " + column.Extra
+	}
+
+	return
+
 }

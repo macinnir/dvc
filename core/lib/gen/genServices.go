@@ -44,7 +44,7 @@ func (g *Gen) GenerateServiceInterfaces(definitionsDir string, servicesDir strin
 	var serviceNames []string
 
 	var e error
-	serviceNames, e = g.getServiceNames(servicesDir)
+	serviceNames, e = getServiceNames(servicesDir)
 	if e != nil {
 		return e
 	}
@@ -116,13 +116,14 @@ type I{{$serviceName}}Service interface {
 	return nil
 }
 
+// @deprecated
 func (g *Gen) GenerateServiceBootstrapFile(servicesDir string) (e error) {
 
 	t := template.New("service-bootstrap")
 
 	var serviceNames []string
 
-	serviceNames, e = g.getServiceNames(servicesDir)
+	serviceNames, e = getServiceNames(servicesDir)
 	if e != nil {
 		return
 	}
@@ -168,7 +169,7 @@ func Bootstrap(config *models.Config, repos *definitions.Repos, store utils.ISto
 }
 
 // GetServiceNames gets a list of services in the services directory
-func (g *Gen) getServiceNames(dir string) (serviceNames []string, e error) {
+func getServiceNames(dir string) (serviceNames []string, e error) {
 
 	serviceNames = []string{}
 	dirFileNames := []string{}

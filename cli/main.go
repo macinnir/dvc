@@ -7,9 +7,19 @@ import (
 	"github.com/macinnir/dvc/core/commands"
 )
 
+var (
+	Version = "v0.0.0"
+)
+
 func main() {
 
 	cmd := &commands.Cmd{}
+
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
+
 	e := cmd.Run(os.Args)
 
 	if e != nil {

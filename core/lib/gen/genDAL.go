@@ -12,8 +12,10 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/cache"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
@@ -51,7 +53,7 @@ func (g *Gen) GetOrphanedDals(dir string, database *schema.Schema) []string {
 }
 
 // CleanGoDALs removes any repo files that aren't in the database.Tables map
-func (g *Gen) CleanGoDALs(dir string, database *schema.Schema) (e error) {
+func CleanGoDALs(dir string, database *schema.Schema) (e error) {
 
 	// EXT
 	dirHandle, err := os.Open(dir)
@@ -112,12 +114,91 @@ func toArgName(field string) string {
 	return strings.ToLower(field[:1]) + field[1:]
 }
 
+func GenDALs(dalsDir string, config *lib.Config, force, clean bool) error {
+
+	start := time.Now()
+	var schemaList *schema.SchemaList
+	var e error
+
+	schemaList, e = schema.LoadLocalSchemas()
+
+	if e != nil {
+		return e
+	}
+
+	fmt.Println("Generating models...")
+
+	if clean {
+		for k := range schemaList.Schemas {
+			CleanGoDALs(dalsDir, schemaList.Schemas[k])
+		}
+	}
+
+	var tablesCache cache.TablesCache
+	tablesCache, e = cache.LoadTableCache()
+
+	if e != nil {
+		return e
+	}
+
+	generatedDALCount := 0
+
+	for k := range schemaList.Schemas {
+
+		schemaName := schemaList.Schemas[k].Name
+
+		for l := range schemaList.Schemas[k].Tables {
+
+			table := schemaList.Schemas[k].Tables[l]
+			tableKey := schemaName + "_" + table.Name
+
+			var tableHash string
+			tableHash, e = cache.HashTable(table)
+
+			// If the model has been hashed before...
+			if _, ok := tablesCache.Models[tableKey]; ok {
+
+				// And the hash hasn't changed, skip...
+				if tableHash == tablesCache.Models[tableKey] && !force {
+					// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
+					continue
+				}
+			}
+
+			generatedDALCount++
+
+			// Update the dals cache
+			if e = GenerateGoDAL(config, table, dalsDir); e != nil {
+				return e
+			}
+
+			tablesCache.Models[tableKey] = tableHash
+		}
+	}
+
+	cache.SaveTableCache(tablesCache)
+
+	fmt.Println("Generating bootstrap file...")
+	if e = GenerateDALsBootstrapFile(config, dalsDir, schemaList); e != nil {
+		return e
+	}
+
+	fmt.Printf("Generated %d dals in %f seconds.\n", generatedDALCount, time.Since(start).Seconds())
+
+	return nil
+
+}
+
+var dalTPL *template.Template
+
 // GenerateGoDAL returns a string for a repo in golang
-func (g *Gen) GenerateGoDAL(table *schema.Table, dir string) (e error) {
+func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error) {
+
+	start := time.Now()
+	fmt.Printf("Generating DAL `%s`...", table.Name)
+	lib.EnsureDir(dir)
 
 	imports := []string{}
-
-	lib.EnsureDir(dir)
 
 	p := path.Join(dir, table.Name+"DAL.go")
 
@@ -223,8 +304,8 @@ func (g *Gen) GenerateGoDAL(table *schema.Table, dir string) (e error) {
 	}
 
 	defaultImports := []string{
-		fmt.Sprintf("%s/%s/models", g.Config.BasePackage, g.Config.Dirs.Definitions),
-		fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
+		fmt.Sprintf("%s/%s", config.BasePackage, lib.ModelsDir),
+		fmt.Sprintf("%s/%s", config.BasePackage, lib.IntegrationsDir),
 		"github.com/macinnir/dvc/core/lib/utils/errors",
 		"database/sql",
 		"context",
@@ -843,19 +924,23 @@ func (r *{{.Table.Name}}DAL) Count(shard int64) (count int64, e error) {
 	return
 }`
 
-	t := template.New("dal-" + table.Name)
-	t.Funcs(template.FuncMap{
-		"insertFields":           fetchTableInsertFieldsString,
-		"insertValues":           fetchTableInsertValuesString,
-		"updateFields":           fetchTableUpdateFieldsString,
-		"dataTypeToGoTypeString": schema.DataTypeToGoTypeString,
-		"dataTypeToFormatString": schema.DataTypeToFormatString,
-		"toArgName":              toArgName,
-	})
+	if dalTPL == nil {
 
-	t, e = t.Parse(tpl)
-	if e != nil {
-		panic(e)
+		dalTPL = template.New("dal")
+
+		dalTPL.Funcs(template.FuncMap{
+			"insertFields":           fetchTableInsertFieldsString,
+			"insertValues":           fetchTableInsertValuesString,
+			"updateFields":           fetchTableUpdateFieldsString,
+			"dataTypeToGoTypeString": schema.DataTypeToGoTypeString,
+			"dataTypeToFormatString": schema.DataTypeToFormatString,
+			"toArgName":              toArgName,
+		})
+
+		dalTPL, e = dalTPL.Parse(tpl)
+		if e != nil {
+			panic(e)
+		}
 	}
 
 	f, err := os.Create(p)
@@ -864,7 +949,7 @@ func (r *{{.Table.Name}}DAL) Count(shard int64) (count int64, e error) {
 		return
 	}
 
-	err = t.Execute(f, data)
+	err = dalTPL.Execute(f, data)
 	if err != nil {
 		fmt.Println("Execute Error: ", err.Error())
 		return
@@ -872,10 +957,12 @@ func (r *{{.Table.Name}}DAL) Count(shard int64) (count int64, e error) {
 
 	f.Close()
 
-	if e = lib.FmtGoCode(p); e != nil {
-		return e
-		// lib.Warn(e.Error(), g.Options)
-	}
+	// if e = lib.FmtGoCode(p); e != nil {
+	// 	return e
+	// 	// lib.Warn(e.Error(), g.Options)
+	// }
+
+	fmt.Printf("%f seconds\n", time.Since(start).Seconds())
 
 	return
 }
@@ -1129,9 +1216,17 @@ func fetchTableUpdateFieldsString(columns schema.SortedColumns) string {
 }
 
 // GenerateDALsBootstrapFile generates a dal bootstrap file in golang
-func (g *Gen) GenerateDALsBootstrapFile(dir string, database *schema.Schema) (e error) {
+func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schema.SchemaList) (e error) {
 
-	// Make the repos dir if it does not exist.
+	tables := map[string]*schema.Table{}
+
+	for k := range schemaList.Schemas {
+		for l := range schemaList.Schemas[k].Tables {
+			tables[l] = schemaList.Schemas[k].Tables[l]
+		}
+	}
+
+	// Make the dir if it does not exist.
 	lib.EnsureDir(dir)
 
 	data := struct {
@@ -1139,9 +1234,9 @@ func (g *Gen) GenerateDALsBootstrapFile(dir string, database *schema.Schema) (e 
 		BasePackage         string
 		IntegrationsPackage string
 	}{
-		BasePackage:         g.Config.BasePackage,
-		Tables:              database.Tables,
-		IntegrationsPackage: fmt.Sprintf("%s/%s/integrations", g.Config.BasePackage, g.Config.Dirs.Definitions),
+		BasePackage:         config.BasePackage,
+		Tables:              tables,
+		IntegrationsPackage: fmt.Sprintf("%s/%s", config.BasePackage, lib.IntegrationsDir),
 	}
 
 	tpl := `

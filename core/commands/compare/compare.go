@@ -2,9 +2,12 @@ package compare
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/macinnir/dvc/core/connectors"
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/compare"
+	"github.com/macinnir/dvc/core/lib/executor"
 	"github.com/macinnir/dvc/core/lib/importer"
 	"github.com/macinnir/dvc/core/lib/schema"
 	"go.uber.org/zap"
@@ -15,6 +18,21 @@ const CommandName = "compare"
 // Compare handles the `compare` command
 func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
+	summarize := false
+	apply := false
+	safeMode := false
+
+	for k := range args {
+		switch args[k] {
+		case "-u", "--summarize":
+			summarize = true
+		case "-a", "--apply":
+			apply = true
+		case "-s", "--safe-mode":
+			safeMode = true
+		}
+	}
+
 	var e error
 	var remoteSchemas map[string]*schema.Schema
 	remoteSchemas, e = importer.FetchAllSchemas(config)
@@ -24,12 +42,55 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	}
 
 	var localSchemaList *schema.SchemaList
-	localSchemaList, e = schema.LoadLocalSchemas()
+	localSchemaList, _ = schema.LoadLocalSchemas()
 
-	sql := ""
-	sql, e = compare.CompareSchemas(config, localSchemaList, remoteSchemas)
+	comparisons := compare.CompareSchemas(config, localSchemaList, remoteSchemas)
 
-	fmt.Println(sql)
+	if summarize {
+		compare.PrintComparisonSummary(comparisons)
+	} else {
+		compare.PrintComparisons(comparisons)
+	}
+
+	if apply {
+
+		configs := map[string]*lib.ConfigDatabase{}
+		for k := range config.Databases {
+			configs[config.Databases[k].Key] = config.Databases[k]
+		}
+
+		for k := range comparisons {
+
+			config := configs[comparisons[k].DatabaseKey]
+			connector, e := connectors.DBConnectorFactory(config)
+			if e != nil {
+				panic(e)
+			}
+			server := executor.NewExecutor(
+				config,
+				connector,
+			).Connect()
+
+			changes := comparisons[k].Changes
+
+			for l := range changes {
+
+				if safeMode && changes[l].IsDestructive {
+					fmt.Println("IS_DESTRUCTIVE!!!!")
+				}
+
+				change := strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(changes[l].SQL), "\n", ""), "\t", "")
+				if len(change) > 40 {
+					change = change[0:40] + "..."
+				}
+				fmt.Printf("Applying query %s...%s\n", changes[l].Type, change)
+				_, e = server.Connection.Exec(changes[l].SQL)
+				if e != nil {
+					panic(e)
+				}
+			}
+		}
+	}
 
 	return nil
 	// cmd := "print"

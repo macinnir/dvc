@@ -33,6 +33,6 @@ type IConnector interface {
 	UseDatabase(server *schema.Server, databaseName string) (e error)
 	FetchDatabaseTables(server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error)
 	FetchTableColumns(server *schema.Server, databaseName string, tableName string) (columns map[string]*schema.Column, e error)
-	CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) (sql string, e error)
-	CompareEnums(remoteSchema *schema.Schema, localSchema *schema.Schema, tableName string) (sql string)
+	CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) (s *schema.SchemaComparison)
+	// CompareEnums(remoteSchema *schema.Schema, localSchema *schema.Schema, tableName string) (sql string)
 }

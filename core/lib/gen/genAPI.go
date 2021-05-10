@@ -27,10 +27,10 @@ func (routes *Routes) init() {`
 	file += "\n\n"
 	// Find the directory where the api exists
 	if _, e := os.Stat(apiDir); os.IsNotExist(e) {
-		panic(fmt.Errorf("Can't generate API routes: No API directory exists at path %s", apiDir))
+		panic(fmt.Errorf("can't generate API routes: No API directory exists at path %s", apiDir))
 	}
 
-	apiFiles, _ := g.getServiceNames(apiDir)
+	apiFiles, _ := getServiceNames(apiDir)
 	routes := []apiPart{}
 
 	currentRoute := ""

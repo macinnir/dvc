@@ -6,13 +6,87 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"time"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/cache"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
+// GenModels generates models
+func GenModels(modelsDir string, force bool, clean bool) error {
+
+	start := time.Now()
+	var schemaList *schema.SchemaList
+	var e error
+
+	schemaList, e = schema.LoadLocalSchemas()
+
+	if e != nil {
+		return e
+	}
+
+	fmt.Println("Generating models...")
+
+	if clean {
+		for k := range schemaList.Schemas {
+			CleanGoModels(modelsDir, schemaList.Schemas[k])
+		}
+	}
+
+	var tablesCache cache.TablesCache
+	tablesCache, e = cache.LoadTableCache()
+
+	if e != nil {
+		return e
+	}
+
+	generatedModelCount := 0
+
+	for k := range schemaList.Schemas {
+
+		schemaName := schemaList.Schemas[k].Name
+
+		for l := range schemaList.Schemas[k].Tables {
+
+			table := schemaList.Schemas[k].Tables[l]
+			tableKey := schemaName + "_" + table.Name
+
+			var tableHash string
+			tableHash, e = cache.HashTable(table)
+
+			// If the model has been hashed before...
+			if _, ok := tablesCache.Models[tableKey]; ok {
+
+				// And the hash hasn't changed, skip...
+				if tableHash == tablesCache.Models[tableKey] && !force {
+					// fmt.Printf("Table `%s` hasn't changed! Skipping...\n", table.Name)
+					continue
+				}
+			}
+
+			generatedModelCount++
+
+			// Update the models cache
+			tablesCache.Models[tableKey] = tableHash
+
+			fmt.Printf("Generating model `%s`\n", table.Name)
+			e = GenerateGoModel(modelsDir, table)
+			if e != nil {
+				return e
+			}
+		}
+	}
+
+	cache.SaveTableCache(tablesCache)
+
+	fmt.Printf("Generated %d models in %f seconds.\n", generatedModelCount, time.Since(start).Seconds())
+
+	return nil
+}
+
 // GenerateGoModel returns a string for a model in golang
-func (g *Gen) GenerateGoModel(dir string, table *schema.Table) (e error) {
+func GenerateGoModel(dir string, table *schema.Table) (e error) {
 
 	lib.EnsureDir(dir)
 
@@ -25,7 +99,7 @@ func (g *Gen) GenerateGoModel(dir string, table *schema.Table) (e error) {
 	// }
 
 	// lib.Infof("Creating `%s`", g.Options, table.Name)s
-	e = g.buildGoModel(p, table)
+	e = buildGoModel(p, table)
 	return
 }
 
@@ -70,7 +144,7 @@ func InspectFile(filePath string) (s *lib.GoStruct, e error) {
 // 	return
 // }
 
-func (g *Gen) buildGoModel(p string, table *schema.Table) (e error) {
+func buildGoModel(p string, table *schema.Table) (e error) {
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
@@ -181,7 +255,7 @@ func (g *Gen) buildGoModel(p string, table *schema.Table) (e error) {
 // }
 
 // CleanGoModels removes model files that are not found in the database.Tables map
-func (g *Gen) CleanGoModels(dir string, database *schema.Schema) (e error) {
+func CleanGoModels(dir string, database *schema.Schema) (e error) {
 
 	lib.EnsureDir(dir)
 

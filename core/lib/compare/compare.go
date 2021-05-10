@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 
 	"github.com/macinnir/dvc/core/connectors"
 	"github.com/macinnir/dvc/core/lib"
@@ -147,9 +148,9 @@ func CompareSchemas(
 	config *lib.Config,
 	localSchemaList *schema.SchemaList,
 	remoteSchemas map[string]*schema.Schema,
-) (string, error) {
+) []*schema.SchemaComparison {
 
-	var e error
+	comparisons := []*schema.SchemaComparison{}
 
 	// var same bool
 	// if same, e = objectsAreSame(localSchemaList, remoteSchemaList); e != nil || same {
@@ -161,33 +162,26 @@ func CompareSchemas(
 		configMap[config.Databases[k].Key] = config.Databases[k]
 	}
 
-	sql := ""
-
 	localSchemaMap := map[string]int{}
 	for k := range localSchemaList.Schemas {
 		localSchemaMap[localSchemaList.Schemas[k].Name] = k
 	}
 
 	for key := range remoteSchemas {
+
 		remoteSchema := remoteSchemas[key]
+
 		rootName := lib.ExtractRootNameFromKey(key)
 
 		var connector connectors.IConnector
-		connector, e = connectors.DBConnectorFactory(configMap[key])
-
+		connector, _ = connectors.DBConnectorFactory(configMap[key])
 		localSchema := localSchemaList.Schemas[localSchemaMap[rootName]]
-		sql += "\n\n"
-		sql += "-- \n"
-		sql += "-- Change for " + key + " (" + configMap[key].Host + "/" + configMap[key].Name + ")\n"
-		sql += "-- \n\n"
-		changeSQL := ""
-		changeSQL, e = connector.CreateChangeSQL(localSchema, remoteSchema)
-		if e != nil {
-			return "", e
-		}
 
-		sql += changeSQL
-		sql += "-- End for " + key + "\n"
+		var comparison *schema.SchemaComparison
+		comparison = connector.CreateChangeSQL(localSchema, remoteSchema)
+		comparison.Database = configMap[key].Host + "/" + configMap[key].Name
+		comparison.DatabaseKey = key
+		comparisons = append(comparisons, comparison)
 	}
 
 	// if len(localSchema.Enums) > 0 {
@@ -203,5 +197,50 @@ func CompareSchemas(
 	// 	fmt.Printf("The schema objects were not the same, but no change sql was generated.\n\n Something strange is afoot...\n")
 	// }
 
-	return sql, nil
+	return comparisons
+}
+
+func PrintComparisons(comparisons []*schema.SchemaComparison) {
+
+	sql := ""
+
+	for k := range comparisons {
+
+		c := comparisons[k]
+
+		sql += "\n\n"
+		sql += "-- \n"
+		sql += "-- Changes for " + c.DatabaseKey + " (" + c.Database + ")\n"
+		sql += fmt.Sprintf("-- %d additions, %d alterations, %d deletions\n", c.Additions, c.Alterations, c.Deletions)
+		sql += "-- \n\n"
+
+		for l := range c.Changes {
+			sql += "-- " + c.Changes[l].Type + "\n"
+			sql += c.Changes[l].SQL
+			sql += "\n"
+		}
+
+		sql += "-- End for " + c.DatabaseKey + "\n"
+
+	}
+
+	fmt.Println(sql)
+
+}
+
+func PrintComparisonSummary(comparisons []*schema.SchemaComparison) {
+
+	t := lib.NewCLITable([]string{"Key", "Connection", "Additions", "Alterations", "Deletions"})
+
+	for k := range comparisons {
+		t.Row()
+		t.Col(comparisons[k].DatabaseKey)
+		t.Col(comparisons[k].Database)
+		t.Colf("%d", comparisons[k].Additions)
+		t.Colf("%d", comparisons[k].Alterations)
+		t.Colf("%d", comparisons[k].Deletions)
+	}
+
+	fmt.Println(t.String())
+
 }

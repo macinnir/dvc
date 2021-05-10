@@ -44,15 +44,18 @@ type Config struct {
 	} `json:"packages"`
 
 	Dirs struct {
-		Dal         string `json:"dal"`
-		Repos       string `json:"repos"`
-		Cache       string `json:"cache"`
-		Models      string `json:"models"`
-		Schema      string `json:"schema"`
-		Typescript  string `json:"typescript"`
-		Services    string `json:"services"`
-		Definitions string `json:"definitions"`
-		API         string `json:"api"`
+		Dals              string `json:"dals"`
+		DalInterfaces     string `json:"dalInterfaces"`
+		Repos             string `json:"repos"`
+		Cache             string `json:"cache"`
+		Models            string `json:"models"`
+		Schema            string `json:"schema"`
+		Typescript        string `json:"typescript"`
+		Services          string `json:"services"`
+		ServiceInterfaces string `json:"serviceInterfaces"`
+		Controllers       string `json:"controllers"`
+		API               string `json:"api"`
+		Permissions       string `json:"permissions"`
 	} `json:"dirs"`
 }
 

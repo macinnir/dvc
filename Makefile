@@ -1,12 +1,12 @@
 
-version = 0.0.0
+version = `git describe --tags`
 
 
 .PHONY: build 
 
 # Build the application 
+# rm -rf .build/*
 build:
-	rm -rf .build/*
 	mkdir -p .build/
 	go build -ldflags "-X main.Version=${version}" -o .build/dvc cli/main.go
 

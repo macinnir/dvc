@@ -157,3 +157,18 @@ func IsString(column *Column) bool {
 	}
 
 }
+
+type SchemaComparison struct {
+	Database    string
+	DatabaseKey string
+	Additions   int
+	Alterations int
+	Deletions   int
+	Changes     []*SchemaChange
+}
+
+type SchemaChange struct {
+	Type          string
+	SQL           string
+	IsDestructive bool
+}
