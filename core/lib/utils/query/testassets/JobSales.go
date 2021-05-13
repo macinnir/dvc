@@ -81,3 +81,11 @@ func (c *JobSales) String() string {
 	b, _ := json.Marshal(c)
 	return string(b)
 }
+
+func (c *JobSales) Destroy() string {
+	return ""
+}
+
+func (c *JobSales) Save() string {
+	return ""
+}

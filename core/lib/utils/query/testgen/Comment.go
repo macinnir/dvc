@@ -148,26 +148,30 @@ func (c *Comment) String() string {
 	return string(bytes)
 }
 
-func (c *Comment) Save() *query.Q {
+func (c *Comment) Save() string {
 
+	var sql string
 	if c.CommentID > 0 {
-		return query.Update(c).
+		sql, _ = query.Update(c).
 			Set("Content", c.Content.String).
 			Set("ObjectType", c.ObjectType).
 			Set("ObjectID", c.ObjectID).
-			Where(query.EQ("CommentID", c.CommentID))
+			Where(query.EQ("CommentID", c.CommentID)).String()
+		return sql
 	} else {
-		return query.Insert(c).
+		sql, _ = query.Insert(c).
 			Set("DateCreated", c.DateCreated).
 			Set("Content", c.Content.String).
 			Set("ObjectType", c.ObjectID).
-			Set("ObjectID", c.ObjectID)
+			Set("ObjectID", c.ObjectID).String()
 	}
+	return sql
 }
 
-func (c *Comment) Destroy() *query.Q {
-	return query.Delete(c).
+func (c *Comment) Destroy() string {
+	sql, _ := query.Delete(c).
 		Where(
 			query.EQ("CommentID", c.CommentID),
-		)
+		).String()
+	return sql
 }

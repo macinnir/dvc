@@ -332,10 +332,13 @@ func (c *` + modelNode.Name + `) String() string {
 	return string(bytes)
 }
 
-func (c *` + modelNode.Name + `) Save() *query.Q {
+func (c *` + modelNode.Name + `) Save() string {
+
+	var sql string 
 
 	if c.` + primaryKey + ` > 0 {
-		return query.Update(c).
+		
+		sql, _ = query.Update(c).
 `)
 	for k := range updateColumns {
 		col := updateColumns[k]
@@ -349,8 +352,11 @@ func (c *` + modelNode.Name + `) Save() *query.Q {
 
 		b.WriteString("\t\t\tSet(\"" + col.Name + "\", " + value + ").\n")
 	}
-	b.WriteString("\t\tWhere(query.EQ(\"" + primaryKey + "\", c." + primaryKey + "))\n")
-	b.WriteString("\t\t} else {\n\t\treturn query.Insert(c).\n")
+	b.WriteString(`
+		Where(query.EQ("` + primaryKey + `", c.` + primaryKey + `)).String()
+	} else { 
+		sql, _ = query.Insert(c).
+	`)
 
 	for k := range insertColumns {
 		col := insertColumns[k]
@@ -367,18 +373,22 @@ func (c *` + modelNode.Name + `) Save() *query.Q {
 		if k < len(insertColumns)-1 {
 			b.WriteString(".\n")
 		} else {
-			b.WriteString("\n")
+			b.WriteString(".String()\n")
 		}
 	}
-
-	b.WriteString("\t}\n}")
+	b.WriteString(`
+	}
+	return sql
+} 
+	`)
 	b.WriteString(`
 
-func (c *` + modelNode.Name + `) Destroy() *query.Q {
-	return query.Delete(c).
+func (c *` + modelNode.Name + `) Destroy() string {
+	sql, _ := query.Delete(c).
 		Where(
 			query.EQ("` + primaryKey + `", c.` + primaryKey + `),
-		)
+		).String()
+	return sql 
 }
 `)
 

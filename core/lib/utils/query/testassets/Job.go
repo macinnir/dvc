@@ -229,3 +229,11 @@ func (c *Job) String() string {
 	str, _ := json.Marshal(c)
 	return string(str)
 }
+
+func (c *Job) Destroy() string {
+	return ""
+}
+
+func (c *Job) Save() string {
+	return ""
+}

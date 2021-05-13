@@ -77,3 +77,11 @@ func (c *Comment) String() string {
 	str, _ := json.Marshal(c)
 	return string(str)
 }
+
+func (c *Comment) Save() string {
+	return ""
+}
+
+func (c *Comment) Destroy() string {
+	return ""
+}

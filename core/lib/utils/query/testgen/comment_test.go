@@ -8,23 +8,21 @@ import (
 )
 
 func TestQuerySave_Insert(t *testing.T) {
-	sql, e := (&Comment{
+	sql := (&Comment{
 		DateCreated: 1620919850194,
 		Content:     null.StringFrom("here is some test content"),
-	}).Save().String()
-	assert.Nil(t, e)
+	}).Save()
 	assert.Equal(t, "INSERT INTO `Comment` ( `DateCreated`, `Content`, `ObjectType`, `ObjectID` ) VALUES ( 1620919850194, 'here is some test content', 0, 0 )", sql)
 }
 
 func TestQuerySave_Update(t *testing.T) {
-	sql, e := (&Comment{
+	sql := (&Comment{
 		DateCreated: 1620919850194,
 		CommentID:   123,
 		ObjectType:  1,
 		ObjectID:    2,
 		Content:     null.StringFrom("here is some test content"),
-	}).Save().String()
-	assert.Nil(t, e)
+	}).Save()
 	assert.Equal(t, "UPDATE `Comment` SET `Content` = 'here is some test content', `ObjectType` = 1, `ObjectID` = 2 WHERE `CommentID` = 123", sql)
 }
 
@@ -53,7 +51,7 @@ func BenchmarkQuerySave_Insert(b *testing.B) {
 			Content:     null.StringFrom("here is some test content"),
 			ObjectType:  1,
 			ObjectID:    2,
-		}).Save().String()
+		}).Save()
 	}
 	// assert.Nil(t, e)
 	// assert.Equal(t, "INSERT INTO `Comment` ( `DateCreated`, `Content`, `ObjectType`, `ObjectID` ) VALUES ( 0, 'here is some test content', 0, 0 )", sql)
@@ -73,6 +71,6 @@ func BenchmarkQuerySave_Update(b *testing.B) {
 			ObjectType:  1,
 			ObjectID:    2,
 			Content:     null.StringFrom("here is some test content"),
-		}).Save().String()
+		}).Save()
 	}
 }

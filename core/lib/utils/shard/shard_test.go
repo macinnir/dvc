@@ -18,10 +18,20 @@ func TestSharder_NewRoundRobin(t *testing.T) {
 
 	for k := 0; k < 20; k++ {
 		shard := sharder.NewRoundRobin()
-		t.Logf("#%d: %d -> Shard: %d", shard.Sequence(), int64(k)%sharder.NumberOfShards(), shard.Shard())
+		t.Logf("#%d: %d -> Shard: %d ===> %d (@ %d)", shard.Sequence(), int64(k)%sharder.NumberOfShards(), shard.Shard(), shard.ID(), shard.Timestamp())
 		assert.Equal(t, int64(k), shard.Sequence())
 		assert.Equal(t, int64(k)%sharder.NumberOfShards(), shard.Shard())
 	}
+}
+
+func TestSharder_NewShardIDFromID(t *testing.T) {
+	id := int64(361468114661024787)
+
+	shard := NewShardIDFromID(id)
+
+	assert.Equal(t, int64(19), shard.Sequence())
+	assert.Equal(t, int64(9), shard.Shard())
+	assert.Equal(t, int64(43090357144), shard.Timestamp())
 }
 
 func TestSharder_buildShardFromString(t *testing.T) {
