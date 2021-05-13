@@ -276,7 +276,7 @@ func buildFileFromModelNode(table *schema.Table, modelNode *lib.GoStruct) (file 
 
 	// Primary Key
 	b.WriteString("\t// " + modelNode.Name + "_PrimaryKey is the name of the table's primary key\n")
-	b.WriteString("\t" + modelNode.Name + "_PrimaryKey = \"" + primaryKey + "\"\n")
+	b.WriteString("\t" + modelNode.Name + "_PrimaryKey = \"" + primaryKey + "\"\n)")
 
 	// Model
 	if len(modelNode.Comments) > 0 {
@@ -286,7 +286,7 @@ func buildFileFromModelNode(table *schema.Table, modelNode *lib.GoStruct) (file 
 	for _, f := range *modelNode.Fields {
 		b.WriteString("\t" + f.ToString())
 	}
-	b.WriteString("}\n)")
+	b.WriteString("}\n")
 
 	b.WriteString(`
 
