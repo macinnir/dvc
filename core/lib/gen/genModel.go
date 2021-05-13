@@ -176,6 +176,7 @@ func buildModelNodeFromTable(table *schema.Table) (modelNode *lib.GoStruct, e er
 	modelNode.Name = table.Name
 	modelNode.Comments = fmt.Sprintf("%s is a `%s` data model\n", table.Name, table.Name)
 	modelNode.Imports.Append("\"github.com/macinnir/dvc/core/lib/utils/query\"")
+	modelNode.Imports.Append("\"encoding/json\"")
 
 	hasNull := false
 
@@ -333,7 +334,7 @@ func (c *` + modelNode.Name + `) String() string {
 
 func (c *` + modelNode.Name + `) Save() *query.Q {
 
-	if c.CommentID > 0 {
+	if c.` + primaryKey + ` > 0 {
 		return query.Update(c).
 `)
 	for k := range updateColumns {
