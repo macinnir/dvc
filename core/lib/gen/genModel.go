@@ -75,7 +75,7 @@ func GenModels(modelsDir string, force bool, clean bool) error {
 			tablesCache.Models[tableKey] = tableHash
 
 			fmt.Printf("Generating model `%s`\n", table.Name)
-			e = GenerateGoModel(modelsDir, table)
+			e = GenerateGoModel(modelsDir, schemaName, table)
 			if e != nil {
 				return e
 			}
@@ -90,7 +90,7 @@ func GenModels(modelsDir string, force bool, clean bool) error {
 }
 
 // GenerateGoModel returns a string for a model in golang
-func GenerateGoModel(dir string, table *schema.Table) (e error) {
+func GenerateGoModel(dir string, schemaName string, table *schema.Table) (e error) {
 
 	lib.EnsureDir(dir)
 
@@ -103,7 +103,7 @@ func GenerateGoModel(dir string, table *schema.Table) (e error) {
 	// }
 
 	// lib.Infof("Creating `%s`", g.Options, table.Name)s
-	e = buildGoModel(p, table)
+	e = buildGoModel(p, schemaName, table)
 	return
 }
 
@@ -148,7 +148,7 @@ func InspectFile(filePath string) (s *lib.GoStruct, e error) {
 // 	return
 // }
 
-func buildGoModel(p string, table *schema.Table) (e error) {
+func buildGoModel(p string, schemaName string, table *schema.Table) (e error) {
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
@@ -159,7 +159,7 @@ func buildGoModel(p string, table *schema.Table) (e error) {
 		return
 	}
 
-	outFile, e = buildFileFromModelNode(table, modelNode)
+	outFile, e = buildFileFromModelNode(schemaName, table, modelNode)
 	if e != nil {
 		return
 	}
@@ -211,7 +211,7 @@ func buildModelNodeFromTable(table *schema.Table) (modelNode *lib.GoStruct, e er
 	return
 }
 
-func buildFileFromModelNode(table *schema.Table, modelNode *lib.GoStruct) (file []byte, e error) {
+func buildFileFromModelNode(schemaName string, table *schema.Table, modelNode *lib.GoStruct) (file []byte, e error) {
 
 	insertColumns := fetchInsertColumns(table.ToSortedColumns())
 	updateColumns := fetchUpdateColumns(table.ToSortedColumns())
@@ -223,8 +223,13 @@ func buildFileFromModelNode(table *schema.Table, modelNode *lib.GoStruct) (file 
 		b.WriteString(modelNode.Imports.ToString() + "\n")
 	}
 
-	// All Columns
 	b.WriteString("var (\n")
+
+	// SchemaName
+	b.WriteString("\t// " + modelNode.Name + "_SchemaName is the name of the schema group this model is in")
+	b.WriteString("\t" + modelNode.Name + "_SchemaName = \"" + schemaName + "\"\n")
+
+	// All Columns
 	b.WriteString("\t// " + modelNode.Name + "_TableName is the name of the table \n")
 	b.WriteString("\t" + modelNode.Name + "_TableName = \"" + modelNode.Name + "\"\n")
 
@@ -321,6 +326,11 @@ func (c *` + modelNode.Name + `) Table_InsertColumns() []string {
 // ` + modelNode.Name + `_UpdateColumns is a list of all update columns for this model
 func (c *` + modelNode.Name + `) Table_UpdateColumns() []string {
 	return ` + modelNode.Name + `_UpdateColumns
+}
+
+// ` + modelNode.Name + `_SchemaName is the name of this table's schema
+func (c *` + modelNode.Name + `) Table_SchemaName() string {
+	return ` + modelNode.Name + `_SchemaName
 }
 
 func (c *` + modelNode.Name + `) Select() *query.Q {
