@@ -280,7 +280,7 @@ func buildFileFromModelNode(table *schema.Table, modelNode *lib.GoStruct) (file 
 
 	// Model
 	if len(modelNode.Comments) > 0 {
-		b.WriteString("// " + modelNode.Comments)
+		b.WriteString("\n// " + modelNode.Comments)
 	}
 	b.WriteString("type " + modelNode.Name + " struct {\n")
 	for _, f := range *modelNode.Fields {
@@ -361,7 +361,13 @@ func (c *` + modelNode.Name + `) Save() *query.Q {
 			value = "c." + col.Name
 		}
 
-		b.WriteString("\t\t\tSet(\"" + col.Name + "\", " + value + ").\n")
+		b.WriteString("\t\t\tSet(\"" + col.Name + "\", " + value + ")")
+
+		if k < len(insertColumns)-1 {
+			b.WriteString(".\n")
+		} else {
+			b.WriteString("\n")
+		}
 	}
 
 	b.WriteString("\t}\n}")
