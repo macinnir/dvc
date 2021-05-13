@@ -175,7 +175,7 @@ func buildModelNodeFromTable(table *schema.Table) (modelNode *lib.GoStruct, e er
 	modelNode.Package = "models"
 	modelNode.Name = table.Name
 	modelNode.Comments = fmt.Sprintf("%s is a `%s` data model\n", table.Name, table.Name)
-	modelNode.Imports.Append("github.com/macinnir/dvc/core/lib/utils/query")
+	modelNode.Imports.Append("\"github.com/macinnir/dvc/core/lib/utils/query\"")
 
 	hasNull := false
 
