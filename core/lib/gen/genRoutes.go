@@ -167,10 +167,6 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 		}
 	}
 
-	if e = lib.EnsureDir("meta"); e != nil {
-		return
-	}
-
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
 	fmt.Println("Writing Routes JSON to to path", lib.RoutesFilePath)
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)

@@ -137,6 +137,7 @@ func RunCommand(name string, args ...string) (stdout string, stderr string, exit
 // EnsureDir creates a new dir if the dir is not found
 func EnsureDir(dir string) (e error) {
 
+	// fmt.Println("Ensuring directory: ", dir)
 	// lib.Debugf("Ensuring directory: %s", g.Options, dir)
 
 	if _, e = os.Stat(dir); os.IsNotExist(e) {
