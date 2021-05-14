@@ -12,7 +12,7 @@ build:
 
 # Build and install the application 
 install: 
-	cd cli/dvc; go install -ldflags "-X main.Version=${version}"
+	cd cmd/dvc; go install -ldflags "-X main.Version=${version}"
 
 ## Vet the code 
 vet: 
