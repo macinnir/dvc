@@ -2,3 +2,7 @@ dbTest.schema.json
 .idea/*
 .build
 .DS_Store
+cpu.prof
+cpu.svg
+testgen.test
+trace.out
