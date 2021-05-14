@@ -223,31 +223,31 @@ func buildFileFromModelNode(schemaName string, table *schema.Table, modelNode *l
 		b.WriteString(modelNode.Imports.ToString() + "\n")
 	}
 
-	b.WriteString("var (\n")
+	b.WriteString(`
+var (
 
-	// SchemaName
-	b.WriteString("\t// " + modelNode.Name + "_SchemaName is the name of the schema group this model is in")
-	b.WriteString("\t" + modelNode.Name + "_SchemaName = \"" + schemaName + "\"\n")
+	// ` + modelNode.Name + `_SchemaName is the name of the schema group this model is in
+	` + modelNode.Name + `_SchemaName = "` + schemaName + `"
+	
+	// ` + modelNode.Name + `_TableName is the name of the table 
+	` + modelNode.Name + `_TableName = "` + modelNode.Name + `"
 
-	// All Columns
-	b.WriteString("\t// " + modelNode.Name + "_TableName is the name of the table \n")
-	b.WriteString("\t" + modelNode.Name + "_TableName = \"" + modelNode.Name + "\"\n")
+	// ` + modelNode.Name + `_Columns is a list of all the columns
+	` + modelNode.Name + `_Columns = []string{
+`)
 
-	// Columns
-	b.WriteString("\t// " + modelNode.Name + "_Columns is a list of all the columns\n")
-	b.WriteString("\t" + modelNode.Name + "_Columns = []string{")
 	for k, f := range *modelNode.Fields {
 		b.WriteString("\"" + f.Name + "\"")
 		if k < len(*modelNode.Fields)-1 {
 			b.WriteByte(',')
 		}
 	}
-	b.WriteString("}")
-	b.WriteByte('\n')
+	b.WriteString(`	}
 
+	// ` + modelNode.Name + `_Column_Types maps columns to their string types
+	` + modelNode.Name + `_Column_Types = map[string]string{
+`)
 	// Column Types
-	b.WriteString("\t// " + modelNode.Name + "_Column_Types maps columns to their string types\n")
-	b.WriteString("\t" + modelNode.Name + "_Column_Types = map[string]string{")
 	for k, f := range *modelNode.Fields {
 		b.WriteString("\"" + f.Name + "\": \"" + schema.GoTypeFormatString(f.DataType) + "\"")
 		if k < len(*modelNode.Fields)-1 {
