@@ -368,7 +368,11 @@ func (c *` + modelNode.Name + `) Update() string {
 func (c *` + modelNode.Name + `) Create() string { 
 
 	var sql string 
-	sql, _ = query.Insert(c).
+	q := query.Insert(c)
+
+	if c.` + primaryKey + ` > 0 { 
+		q.Set("` + primaryKey + `", c.` + primaryKey + `)
+	}
 	`)
 
 	for k := range insertColumns {
@@ -381,17 +385,12 @@ func (c *` + modelNode.Name + `) Create() string {
 			value = "c." + col.Name
 		}
 
-		b.WriteString("\t\tSet(\"" + col.Name + "\", " + value + ")")
-
-		if k < len(insertColumns)-1 {
-			b.WriteString(".\n")
-		} else {
-			b.WriteString(".String()\n")
-		}
+		b.WriteString("\tq.Set(\"" + col.Name + "\", " + value + ")\n")
 	}
 	b.WriteString(`
-	
-	return sql
+
+	sql, _ = q.String() 
+	return sql 
 } 
 	`)
 	b.WriteString(`
