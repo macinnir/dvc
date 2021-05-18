@@ -9,10 +9,11 @@ import (
 
 func TestQuerySave_Insert(t *testing.T) {
 	sql := (&Comment{
+		CommentID:   12345,
 		DateCreated: 1620919850194,
 		Content:     null.StringFrom("here is some test content"),
-	}).Save()
-	assert.Equal(t, "INSERT INTO `Comment` ( `DateCreated`, `Content`, `ObjectType`, `ObjectID` ) VALUES ( 1620919850194, 'here is some test content', 0, 0 )", sql)
+	}).Create()
+	assert.Equal(t, "INSERT INTO `Comment` ( `CommentID`, `DateCreated`, `Content`, `ObjectType`, `ObjectID` ) VALUES ( 12345, 1620919850194, 'here is some test content', 0, 0 )", sql)
 }
 
 func TestQuerySave_Update(t *testing.T) {
@@ -22,7 +23,7 @@ func TestQuerySave_Update(t *testing.T) {
 		ObjectType:  1,
 		ObjectID:    2,
 		Content:     null.StringFrom("here is some test content"),
-	}).Save()
+	}).Update()
 	assert.Equal(t, "UPDATE `Comment` SET `Content` = 'here is some test content', `ObjectType` = 1, `ObjectID` = 2 WHERE `CommentID` = 123", sql)
 }
 
@@ -43,7 +44,8 @@ func TestComment_ToString(t *testing.T) {
 // 2261 ns/op
 // 2017 ns/op  		1472 B/op 		26 allocs/op
 // 1959 ns/op 		1456 B/op 		26 allocs/op
-func BenchmarkQuerySave_Insert(b *testing.B) {
+// 1795 ns/op 		1512 B/op 		25 allocs/op
+func BenchmarkQuerySave_Create(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		b.ReportAllocs()
 		(&Comment{
@@ -51,7 +53,7 @@ func BenchmarkQuerySave_Insert(b *testing.B) {
 			Content:     null.StringFrom("here is some test content"),
 			ObjectType:  1,
 			ObjectID:    2,
-		}).Save()
+		}).Create()
 	}
 	// assert.Nil(t, e)
 	// assert.Equal(t, "INSERT INTO `Comment` ( `DateCreated`, `Content`, `ObjectType`, `ObjectID` ) VALUES ( 0, 'here is some test content', 0, 0 )", sql)
@@ -71,6 +73,6 @@ func BenchmarkQuerySave_Update(b *testing.B) {
 			ObjectType:  1,
 			ObjectID:    2,
 			Content:     null.StringFrom("here is some test content"),
-		}).Save()
+		}).Update()
 	}
 }
