@@ -15,6 +15,18 @@ var (
 		Extra:      "auto_increment",
 	}
 
+	columnFooIDBigIntNoAI = &schema.Column{
+		Name:       "FooID",
+		IsNullable: false,
+		IsUnsigned: true,
+		DataType:   "bigint",
+		MaxLength:  0,
+		Precision:  10,
+		Type:       "bigint(20) unsigned",
+		ColumnKey:  "PRI",
+		Extra:      "",
+	}
+
 	columnDateCreated = &schema.Column{
 		Name:         "DateCreated",
 		Position:     5,
@@ -65,6 +77,44 @@ var (
 		CharSet:      "",
 		Type:         "varchar(200)",
 		ColumnKey:    "",
+		NumericScale: 0,
+		Extra:        "",
+		FmtType:      "%s",
+		GoType:       "string",
+		IsString:     true,
+	}
+
+	columnNameWithUniqueIndex = &schema.Column{
+		Name:         "Name",
+		Position:     4,
+		Default:      "",
+		IsNullable:   false,
+		IsUnsigned:   false,
+		DataType:     "varchar",
+		MaxLength:    200,
+		Precision:    3,
+		CharSet:      "",
+		Type:         "varchar(200)",
+		ColumnKey:    "UNI",
+		NumericScale: 0,
+		Extra:        "",
+		FmtType:      "%s",
+		GoType:       "string",
+		IsString:     true,
+	}
+
+	columnNameWithIndex = &schema.Column{
+		Name:         "Name",
+		Position:     4,
+		Default:      "",
+		IsNullable:   false,
+		IsUnsigned:   false,
+		DataType:     "varchar",
+		MaxLength:    200,
+		Precision:    3,
+		CharSet:      "",
+		Type:         "varchar(200)",
+		ColumnKey:    "MUL",
 		NumericScale: 0,
 		Extra:        "",
 		FmtType:      "%s",

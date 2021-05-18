@@ -91,6 +91,97 @@ func TablesAddColumn() []*schema.Schema {
 	}
 }
 
+func TablesAddColumnWithUniqueIndex() []*schema.Schema {
+	return []*schema.Schema{
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"Name":        columnNameWithUniqueIndex,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+	}
+}
+
+func TablesAddColumnWithIndex() []*schema.Schema {
+	return []*schema.Schema{
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"Name":        columnNameWithIndex,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+	}
+}
+
+func TablesDropAutoIncrement() []*schema.Schema {
+	return []*schema.Schema{
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooIDBigIntNoAI,
+						"Name":        columnName,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"Name":        columnName,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+	}
+}
+
 func TablesAddTable() []*schema.Schema {
 	return []*schema.Schema{
 		{
