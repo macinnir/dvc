@@ -176,6 +176,7 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 		); e != nil {
 			return
 		}
+
 		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
 		column.FmtType = schema.DataTypeToFormatString(&column)
 		column.GoType = schema.DataTypeToGoTypeString(&column)
@@ -499,6 +500,8 @@ func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schem
 
 	createColumnStatements := map[string]*schema.SchemaChange{}
 	dropColumnStatements := map[string]*schema.SchemaChange{}
+	addIndexStatements := map[string]*schema.SchemaChange{}
+	dropIndexStatements := map[string]*schema.SchemaChange{}
 
 	for _, column := range localTable.Columns {
 
@@ -506,6 +509,15 @@ func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schem
 		if _, ok := remoteTable.Columns[column.Name]; !ok {
 
 			createColumnStatements[column.Name] = alterTableCreateColumn(localTable, column)
+
+			// If a unique index is added to this column, include it
+
+			if column.ColumnKey == KeyUNI {
+				addIndexStatements[column.Name] = addUniqueIndex(localTable, column)
+			}
+			if column.ColumnKey == KeyMUL {
+				addIndexStatements[column.Name] = addIndex(localTable, column)
+			}
 
 		} else {
 
@@ -521,6 +533,15 @@ func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schem
 		if _, ok := localTable.Columns[column.Name]; !ok {
 			dropColumn := alterTableDropColumn(localTable, column)
 			dropColumnStatements[column.Name] = dropColumn
+
+			// If this column had a unique index, make sure it's dropped
+			if column.ColumnKey == KeyUNI {
+				dropIndexStatements[column.Name] = dropUniqueIndex(remoteTable, column)
+			}
+
+			if column.ColumnKey == KeyMUL {
+				dropIndexStatements[column.Name] = dropIndex(remoteTable, column)
+			}
 		}
 	}
 
@@ -546,15 +567,30 @@ func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schem
 
 	if len(dropColumnStatements) > 0 {
 		for k := range dropColumnStatements {
+
+			// Include the index change if it exists
+			if _, ok := dropIndexStatements[k]; ok {
+				comparison.Changes = append(comparison.Changes, dropIndexStatements[k])
+				comparison.Deletions++
+			}
+
 			comparison.Changes = append(comparison.Changes, dropColumnStatements[k])
 			comparison.Deletions++
 		}
 	}
 
 	if len(createColumnStatements) > 0 {
+
 		for k := range createColumnStatements {
+
 			comparison.Changes = append(comparison.Changes, createColumnStatements[k])
 			comparison.Additions++
+
+			// Include the index change if it exists
+			if _, ok := addIndexStatements[k]; ok {
+				comparison.Changes = append(comparison.Changes, addIndexStatements[k])
+				comparison.Additions++
+			}
 		}
 	}
 
@@ -758,14 +794,14 @@ func alterTableDropColumn(table *schema.Table, column *schema.Column) *schema.Sc
 func addIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.AddIndex,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s` (`%s`);", table.Name, column.Name, column.Name),
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s_%s` (`%s`);", table.Name, table.Name, column.Name, column.Name),
 	}
 }
 
 func addUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.AddIndex,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s` (`%s`);", table.Name, column.Name, column.Name),
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s_%s` (`%s`);", table.Name, table.Name, column.Name, column.Name),
 	}
 }
 

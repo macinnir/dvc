@@ -141,6 +141,99 @@ func TestCreateChangeSQL_AddColumn(t *testing.T) {
 	assert.Equal(t, "ALTER TABLE `Foo` ADD COLUMN `Name` varchar(200) NOT NULL DEFAULT '';", comparison.Changes[0].SQL)
 }
 
+func TestCreateChangeSQL_AddColumnWithUniqueIndex(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesAddColumnWithUniqueIndex()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+
+	assert.Equal(t, 2, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 2, len(comparison.Changes))
+
+	assert.Equal(t, schema.AddColumn, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` ADD COLUMN `Name` varchar(200) NOT NULL DEFAULT '';", comparison.Changes[0].SQL)
+	assert.Equal(t, schema.AddIndex, comparison.Changes[1].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` ADD UNIQUE INDEX `ui_Foo_Name` (`Name`);", comparison.Changes[1].SQL)
+}
+
+func TestCreateChangeSQL_DropColumnWithUniqueIndex(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesAddColumnWithUniqueIndex()
+
+	comparison := s.CreateChangeSQL(tables[1], tables[0])
+
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 2, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 2, len(comparison.Changes))
+
+	assert.Equal(t, schema.DropIndex, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` DROP INDEX `ui_Foo_Name`;", comparison.Changes[0].SQL)
+	assert.Equal(t, schema.DropColumn, comparison.Changes[1].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` DROP COLUMN `Name`;", comparison.Changes[1].SQL)
+}
+
+func TestCreateChangeSQL_AddColumnWithIndex(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesAddColumnWithIndex()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+
+	assert.Equal(t, 2, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 2, len(comparison.Changes))
+
+	assert.Equal(t, schema.AddColumn, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` ADD COLUMN `Name` varchar(200) NOT NULL DEFAULT '';", comparison.Changes[0].SQL)
+	assert.Equal(t, schema.AddIndex, comparison.Changes[1].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` ADD INDEX `i_Foo_Name` (`Name`);", comparison.Changes[1].SQL)
+}
+
+func TestCreateChangeSQL_DropColumnWithIndex(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesAddColumnWithIndex()
+
+	comparison := s.CreateChangeSQL(tables[1], tables[0])
+
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 2, comparison.Deletions)
+	assert.Equal(t, 0, comparison.Alterations)
+	require.Equal(t, 2, len(comparison.Changes))
+
+	assert.Equal(t, schema.DropIndex, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` DROP INDEX `i_Foo_Name`;", comparison.Changes[0].SQL)
+	assert.Equal(t, schema.DropColumn, comparison.Changes[1].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` DROP COLUMN `Name`;", comparison.Changes[1].SQL)
+}
+
+func TestCreateChangeSQL_DropAutoIncrement(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesDropAutoIncrement()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1])
+
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 1, comparison.Alterations)
+	require.Equal(t, 1, len(comparison.Changes))
+
+	assert.Equal(t, schema.ChangeColumn, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` CHANGE `FooID` `FooID` bigint(20) UNSIGNED NOT NULL;", comparison.Changes[0].SQL)
+}
+
 func TestCreateTable(t *testing.T) {
 
 	s := NewMySQL(&lib.ConfigDatabase{})
@@ -156,9 +249,9 @@ func TestCreateTable(t *testing.T) {
 	assert.Equal(t, schema.CreateTable, comparison.Changes[0].Type)
 	assert.Equal(t, "CREATE TABLE `Foo` (\n\t`FooID` int(10) UNSIGNED NOT NULL auto_increment,\n\t`IsDeleted` tinyint(4) SIGNED NOT NULL DEFAULT 0,\n\t`DateCreated` bigint(20) UNSIGNED NOT NULL DEFAULT 0,\n\tPRIMARY KEY(`FooID`)\n);", comparison.Changes[0].SQL)
 
-	for k := range comparison.Changes {
-		t.Log(comparison.Changes[k].SQL)
-	}
+	// for k := range comparison.Changes {
+	// 	t.Log(comparison.Changes[k].SQL)
+	// }
 
 }
 
