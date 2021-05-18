@@ -234,6 +234,10 @@ func (c *Job) Destroy() string {
 	return ""
 }
 
-func (c *Job) Save() string {
+func (c *Job) Create() string {
+	return ""
+}
+
+func (c *Job) Update() string {
 	return ""
 }

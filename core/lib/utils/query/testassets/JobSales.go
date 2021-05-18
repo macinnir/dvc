@@ -86,6 +86,10 @@ func (c *JobSales) Destroy() string {
 	return ""
 }
 
-func (c *JobSales) Save() string {
+func (c *JobSales) Update() string {
+	return ""
+}
+
+func (c *JobSales) Create() string {
 	return ""
 }

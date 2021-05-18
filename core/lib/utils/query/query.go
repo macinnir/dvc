@@ -125,14 +125,14 @@ func (q *Q) Sum(name, as string) *Q {
 }
 
 // Where().Equals("a", "b")
-func (q *Q) Where(args ...interface{}) *Q {
+func (q *Q) Where(args ...WherePart) *Q {
 	q.where = &Where{
 		query:      q,
 		WhereParts: []WherePart{},
 	}
 
 	for k := range args {
-		q.where.WhereParts = append(q.where.WhereParts, args[k].(WherePart))
+		q.where.WhereParts = append(q.where.WhereParts, args[k])
 	}
 	return q
 }

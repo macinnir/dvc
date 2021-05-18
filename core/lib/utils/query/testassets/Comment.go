@@ -78,7 +78,11 @@ func (c *Comment) String() string {
 	return string(str)
 }
 
-func (c *Comment) Save() string {
+func (c *Comment) Create() string {
+	return ""
+}
+
+func (c *Comment) Update() string {
 	return ""
 }
 
