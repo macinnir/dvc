@@ -15,7 +15,8 @@ type IModel interface {
 	Table_UpdateColumns() []string
 	Table_Column_Types() map[string]string
 	String() string
-	Save() string
+	Update() string
+	Create() string
 	Destroy() string
 
 	// Table_Column_Values() map[string]interface{}

@@ -342,13 +342,10 @@ func (c *` + modelNode.Name + `) String() string {
 	return string(bytes)
 }
 
-func (c *` + modelNode.Name + `) Save() string {
+func (c *` + modelNode.Name + `) Update() string {
 
 	var sql string 
-
-	if c.` + primaryKey + ` > 0 {
-		
-		sql, _ = query.Update(c).
+	sql, _ = query.Update(c).
 `)
 	for k := range updateColumns {
 		col := updateColumns[k]
@@ -360,12 +357,18 @@ func (c *` + modelNode.Name + `) Save() string {
 			value = "c." + col.Name
 		}
 
-		b.WriteString("\t\t\tSet(\"" + col.Name + "\", " + value + ").\n")
+		b.WriteString("\t\tSet(\"" + col.Name + "\", " + value + ").\n")
 	}
 	b.WriteString(`
 		Where(query.EQ("` + primaryKey + `", c.` + primaryKey + `)).String()
-	} else { 
-		sql, _ = query.Insert(c).
+
+	return sql 
+}
+
+func (c *` + modelNode.Name + `) Create() string { 
+
+	var sql string 
+	sql, _ = query.Insert(c).
 	`)
 
 	for k := range insertColumns {
@@ -378,7 +381,7 @@ func (c *` + modelNode.Name + `) Save() string {
 			value = "c." + col.Name
 		}
 
-		b.WriteString("\t\t\tSet(\"" + col.Name + "\", " + value + ")")
+		b.WriteString("\t\tSet(\"" + col.Name + "\", " + value + ")")
 
 		if k < len(insertColumns)-1 {
 			b.WriteString(".\n")
@@ -387,7 +390,7 @@ func (c *` + modelNode.Name + `) Save() string {
 		}
 	}
 	b.WriteString(`
-	}
+	
 	return sql
 } 
 	`)
