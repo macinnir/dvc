@@ -241,3 +241,7 @@ func (c *Job) Create() string {
 func (c *Job) Update() string {
 	return ""
 }
+
+func (c *Job) FromID() string {
+	return ""
+}

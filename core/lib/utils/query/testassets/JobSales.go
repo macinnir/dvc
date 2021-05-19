@@ -93,3 +93,7 @@ func (c *JobSales) Update() string {
 func (c *JobSales) Create() string {
 	return ""
 }
+
+func (c *JobSales) FromID() string {
+	return ""
+}

@@ -179,3 +179,7 @@ func (c *Comment) Destroy() string {
 		).String()
 	return sql
 }
+
+func (c *Comment) FromID() string {
+	return ""
+}

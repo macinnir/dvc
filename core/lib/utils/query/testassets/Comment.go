@@ -89,3 +89,7 @@ func (c *Comment) Update() string {
 func (c *Comment) Destroy() string {
 	return ""
 }
+
+func (c *Comment) FromID() string {
+	return ""
+}
