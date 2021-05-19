@@ -66,7 +66,6 @@ func TestSharder_buildShardFromString(t *testing.T) {
 		assert.Equal(t, tests[k].shard, shardID.shard)
 		t.Logf("String: %s == Shard: %d", tests[k].value, shardID.shard)
 	}
-
 }
 
 func TestSharder_NewFromSubID(t *testing.T) {
@@ -89,5 +88,40 @@ func TestSharder_NewFromSubID(t *testing.T) {
 	for k := range userIDs {
 		shard := sharder.NewFromSubID(userIDs[k].userID)
 		assert.Equal(t, userIDs[k].shardID, shard.Shard())
+	}
+}
+
+func BenchmarkSharder_NewRoundRobin(b *testing.B) {
+	var shardCount int64 = 10
+
+	sharder := NewSharder(shardCount)
+
+	for n := 0; n < b.N; n++ {
+		sharder.NewRoundRobin()
+	}
+}
+
+func BenchmarkSharder_NewShardIDFromID(b *testing.B) {
+	id := int64(361468114661024787)
+
+	for n := 0; n < b.N; n++ {
+		NewShardIDFromID(id)
+	}
+}
+
+func BenchmarkSharder_buildShardFromString(b *testing.B) {
+
+	var shardCount int64 = 10
+	s := NewSharder(shardCount)
+	for n := 0; n < b.N; n++ {
+		s.NewFromString("abcdefg")
+	}
+}
+
+func BenchmarkSharder_NewFromSubID(b *testing.B) {
+	var shardCount int64 = 10
+	sharder := NewSharder(shardCount)
+	for n := 0; n < b.N; n++ {
+		sharder.NewFromSubID(123456)
 	}
 }
