@@ -60,6 +60,11 @@ func (s *Sharder) NewFromSubID(subID int64) *ShardID {
 	return shard
 }
 
+// GetShardFromSubID returns the shard number without incrementing the internal sequence
+func (s *Sharder) GetShardFromSubID(subID int64) int64 {
+	return subID % s.numberOfShards
+}
+
 func buildShardFromString(numberOfShards int64, str string) (shard int64, e error) {
 	h := fnv.New32a()
 

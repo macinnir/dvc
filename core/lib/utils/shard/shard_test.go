@@ -91,6 +91,23 @@ func TestSharder_NewFromSubID(t *testing.T) {
 	}
 }
 
+func TestSharder_GetShardFromSubID(t *testing.T) {
+	s := NewSharder(10)
+
+	tests := [][]int64{
+		{1, 1},
+		{5, 5},
+		{11, 1},
+		{12, 2},
+		{100, 0},
+	}
+
+	for k := range tests {
+		result := s.GetShardFromSubID(tests[k][0])
+		assert.Equal(t, tests[k][1], result)
+	}
+}
+
 func BenchmarkSharder_NewRoundRobin(b *testing.B) {
 	var shardCount int64 = 10
 
