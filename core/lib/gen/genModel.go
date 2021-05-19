@@ -224,7 +224,7 @@ func buildFileFromModelNode(schemaName string, table *schema.Table, modelNode *l
 	}
 
 	b.WriteString(`
-var (
+const (
 
 	// ` + modelNode.Name + `_SchemaName is the name of the schema group this model is in
 	` + modelNode.Name + `_SchemaName = "` + schemaName + `"
@@ -232,12 +232,22 @@ var (
 	// ` + modelNode.Name + `_TableName is the name of the table 
 	` + modelNode.Name + `_TableName = "` + modelNode.Name + `"
 
+	// Columns 
+`)
+	for _, f := range *modelNode.Fields {
+		b.WriteString("\t" + modelNode.Name + "_Column_" + f.Name + " = \"" + f.Name + "\"\n")
+	}
+
+	b.WriteString(`
+)
+
+var (
 	// ` + modelNode.Name + `_Columns is a list of all the columns
 	` + modelNode.Name + `_Columns = []string{
 `)
 
 	for k, f := range *modelNode.Fields {
-		b.WriteString("\"" + f.Name + "\"")
+		b.WriteString(modelNode.Name + "_Column_" + f.Name)
 		if k < len(*modelNode.Fields)-1 {
 			b.WriteByte(',')
 		}
@@ -247,9 +257,10 @@ var (
 	// ` + modelNode.Name + `_Column_Types maps columns to their string types
 	` + modelNode.Name + `_Column_Types = map[string]string{
 `)
+
 	// Column Types
 	for k, f := range *modelNode.Fields {
-		b.WriteString("\"" + f.Name + "\": \"" + schema.GoTypeFormatString(f.DataType) + "\"")
+		b.WriteString(modelNode.Name + "_Column_" + f.Name + ": \"" + schema.GoTypeFormatString(f.DataType) + "\"")
 		if k < len(*modelNode.Fields)-1 {
 			b.WriteByte(',')
 		}
@@ -261,7 +272,7 @@ var (
 	b.WriteString("\t" + modelNode.Name + "_UpdateColumns = []string{")
 	for k := range updateColumns {
 		col := updateColumns[k]
-		b.WriteString("\"" + col.Name + "\"")
+		b.WriteString(modelNode.Name + "_Column_" + col.Name)
 		if k < len(updateColumns)-1 {
 			b.WriteByte(',')
 		}
@@ -273,7 +284,7 @@ var (
 	b.WriteString("\t" + modelNode.Name + "_InsertColumns = []string{")
 	for k := range insertColumns {
 		col := insertColumns[k]
-		b.WriteString("\"" + col.Name + "\"")
+		b.WriteString(modelNode.Name + "_Column_" + col.Name)
 		if k < len(insertColumns)-1 {
 			b.WriteByte(',')
 		}
@@ -305,25 +316,27 @@ func (c *` + modelNode.Name + `) Table_Columns() []string {
 	return ` + modelNode.Name + `_Columns
 }
 
+// Table_ColumnTypes returns a map of tableColumn names with their fmt string types
 func (c *` + modelNode.Name + `) Table_Column_Types() map[string]string {
 	return ` + modelNode.Name + `_Column_Types
 }
 
+// Table_PrimaryKey returns the name of this table's primary key 
 func (c *` + modelNode.Name + `) Table_PrimaryKey() string {
 	return ` + modelNode.Name + `_PrimaryKey
 }
 
-// ` + modelNode.Name + `_PrimaryKey is the name of the table's primary key
+// Table_PrimaryKey_Value returns the value of this table's primary key
 func (c *` + modelNode.Name + `) Table_PrimaryKey_Value() int64 {
 	return c.` + primaryKey + `
 }
 
-// ` + modelNode.Name + `_InsertColumns is a list of all insert columns for this model
+// Table_InsertColumns is a list of all insert columns for this model
 func (c *` + modelNode.Name + `) Table_InsertColumns() []string {
 	return ` + modelNode.Name + `_InsertColumns
 }
 
-// ` + modelNode.Name + `_UpdateColumns is a list of all update columns for this model
+// Table_UpdateColumns is a list of all update columns for this model
 func (c *` + modelNode.Name + `) Table_UpdateColumns() []string {
 	return ` + modelNode.Name + `_UpdateColumns
 }
@@ -333,15 +346,24 @@ func (c *` + modelNode.Name + `) Table_SchemaName() string {
 	return ` + modelNode.Name + `_SchemaName
 }
 
+// Select starts a select statement
 func (c *` + modelNode.Name + `) Select() *query.Q {
 	return query.Select(c)
 }
 
+// Select starts a select statement
+func (c *` + modelNode.Name + `) FromID(id int64) string {
+	q, _ := query.Select(c).Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, id)).String()
+	return q
+}
+
+// String returns a json marshalled string of the object 
 func (c *` + modelNode.Name + `) String() string {
 	bytes, _ := json.Marshal(c)
 	return string(bytes)
 }
 
+// Update updates a ` + modelNode.Name + ` record
 func (c *` + modelNode.Name + `) Update() string {
 
 	var sql string 
@@ -357,23 +379,25 @@ func (c *` + modelNode.Name + `) Update() string {
 			value = "c." + col.Name
 		}
 
-		b.WriteString("\t\tSet(\"" + col.Name + "\", " + value + ").\n")
+		b.WriteString("\t\tSet(" + modelNode.Name + "_Column_" + col.Name + ", " + value + ").\n")
 	}
 	b.WriteString(`
-		Where(query.EQ("` + primaryKey + `", c.` + primaryKey + `)).String()
+		Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, c.` + primaryKey + `)).
+	String()
 
 	return sql 
 }
 
+// Create inserts a ` + modelNode.Name + ` record
 func (c *` + modelNode.Name + `) Create() string { 
 
 	var sql string 
 	q := query.Insert(c)
 
 	if c.` + primaryKey + ` > 0 { 
-		q.Set("` + primaryKey + `", c.` + primaryKey + `)
+		q.Set(` + modelNode.Name + "_Column_" + primaryKey + `, c.` + primaryKey + `)
 	}
-	`)
+`)
 
 	for k := range insertColumns {
 		col := insertColumns[k]
@@ -385,7 +409,7 @@ func (c *` + modelNode.Name + `) Create() string {
 			value = "c." + col.Name
 		}
 
-		b.WriteString("\tq.Set(\"" + col.Name + "\", " + value + ")\n")
+		b.WriteString("\tq.Set(" + modelNode.Name + "_Column_" + col.Name + ", " + value + ")\n")
 	}
 	b.WriteString(`
 
@@ -395,10 +419,11 @@ func (c *` + modelNode.Name + `) Create() string {
 	`)
 	b.WriteString(`
 
+// Destroy deletes a ` + modelNode.Name + ` record
 func (c *` + modelNode.Name + `) Destroy() string {
 	sql, _ := query.Delete(c).
 		Where(
-			query.EQ("` + primaryKey + `", c.` + primaryKey + `),
+			query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, c.` + primaryKey + `),
 		).String()
 	return sql 
 }
