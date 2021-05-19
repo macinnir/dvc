@@ -242,6 +242,6 @@ func (c *Job) Update() string {
 	return ""
 }
 
-func (c *Job) FromID() string {
+func (c *Job) FromID(id int64) string {
 	return ""
 }

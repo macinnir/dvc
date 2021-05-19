@@ -180,6 +180,6 @@ func (c *Comment) Destroy() string {
 	return sql
 }
 
-func (c *Comment) FromID() string {
+func (c *Comment) FromID(id int64) string {
 	return ""
 }

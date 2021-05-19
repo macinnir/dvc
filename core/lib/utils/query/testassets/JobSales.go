@@ -94,6 +94,6 @@ func (c *JobSales) Create() string {
 	return ""
 }
 
-func (c *JobSales) FromID() string {
+func (c *JobSales) FromID(id int64) string {
 	return ""
 }

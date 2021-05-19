@@ -18,7 +18,7 @@ type IModel interface {
 	Update() string
 	Create() string
 	Destroy() string
-	FromID() string
+	FromID(id int64) string
 
 	// Table_Column_Values() map[string]interface{}
 }

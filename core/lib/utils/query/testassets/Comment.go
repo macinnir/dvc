@@ -90,6 +90,6 @@ func (c *Comment) Destroy() string {
 	return ""
 }
 
-func (c *Comment) FromID() string {
+func (c *Comment) FromID(id int64) string {
 	return ""
 }
