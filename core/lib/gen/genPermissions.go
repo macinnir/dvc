@@ -85,7 +85,7 @@ func GenPermissionsGoFile() {
 }
 
 // BuildTypescriptPermissions returns a formatted typescript file of permission constants
-func (g *Gen) BuildTypescriptPermissions() string {
+func BuildTypescriptPermissions() string {
 
 	permissionMap := map[string]string{}
 	fileBytes, e := ioutil.ReadFile(lib.PermissionsFile)

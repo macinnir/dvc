@@ -2,6 +2,7 @@ package gen
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/gen"
@@ -44,6 +45,9 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 		gen.GenPermissionsGoFile()
+	case "tsperms":
+		str := gen.BuildTypescriptPermissions()
+		fmt.Println(str)
 
 	default:
 		return errors.New("unknown gen type")
