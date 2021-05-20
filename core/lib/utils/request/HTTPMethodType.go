@@ -53,6 +53,29 @@ func HTTPMethodTypeFromString(method string) HTTPMethodType {
 	}
 }
 
+func HTTPMethodTypeToString(t HTTPMethodType) string {
+	switch t {
+	case HTTPMethodGet:
+		return "GET"
+	case HTTPMethodPost:
+		return "POST"
+	case HTTPMethodPut:
+		return "PUT"
+	case HTTPMethodDelete:
+		return "DELETE"
+	case HTTPMethodOptions:
+		return "OPTIONS"
+	case HTTPMethodHead:
+		return "HEAD"
+	case HTTPMethodTrace:
+		return "TRACE"
+	case HTTPMethodPatch:
+		return "PATCH"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // Int64 returns the int64 representation of the HTTPMethodType value
 func (h HTTPMethodType) Int64() int64 {
 	return int64(h)
