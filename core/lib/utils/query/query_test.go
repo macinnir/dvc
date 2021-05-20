@@ -250,6 +250,18 @@ func TestSelectExists(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestWhereTypeAll(t *testing.T) {
+	q, e := Select(&testassets.Job{}).Where(WhereAll()).String()
+	require.Nil(t, e)
+	expected := "SELECT `t`.* FROM `Job` `t` WHERE 1=1"
+	assert.Equal(t, expected, q)
+
+	q, e = Select(&testassets.Job{}).Where(WhereAll(), And(), EQ("IsDeleted", 0)).String()
+	require.Nil(t, e)
+	expected = "SELECT `t`.* FROM `Job` `t` WHERE 1=1 AND `t`.`IsDeleted` = 0"
+	assert.Equal(t, expected, q)
+}
+
 // func TestQuerySave_Insert(t *testing.T) {
 // 	sql, e := (&testassets.Comment{
 // 		Content: null.StringFrom("here is some test content"),

@@ -369,6 +369,8 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 			sb.WriteString(" )")
 		case WhereTypeParenthesisStart:
 			sb.WriteString("( ")
+		case WhereTypeAll:
+			sb.WriteString("1=1")
 		}
 
 		column := columnTypes[w.fieldName]
@@ -440,6 +442,12 @@ const (
 	WhereTypeOr
 	WhereTypeParenthesisEnd
 	WhereTypeParenthesisStart
+	// WhereTypeAll is a WHERE clause of `1=1` used for convenience
+	// when conditionally adding WHERE clauses starting with a conjunction (AND/OR,etc)
+	// separating them.
+	// e.g. SELECT * FROM `Foo` WHERE 1=1
+	//      SELECT * FROM `Foo` WHERE 1=1 AND FooID = 123;
+	WhereTypeAll
 )
 
 type WherePart struct {
@@ -585,6 +593,14 @@ func PS() WherePart {
 func PE() WherePart {
 	return NewWherePart(
 		WhereTypeParenthesisEnd,
+		"",
+		[]interface{}{},
+	)
+}
+
+func WhereAll() WherePart {
+	return NewWherePart(
+		WhereTypeAll,
 		"",
 		[]interface{}{},
 	)
