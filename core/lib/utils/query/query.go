@@ -46,6 +46,7 @@ type Q struct {
 	sets        map[string]interface{}
 	columnTypes map[string]string
 	errors      []string
+	inst        int64
 }
 
 func Query(model IModel) *Q {
@@ -58,6 +59,7 @@ func Query(model IModel) *Q {
 		columnTypes: model.Table_Column_Types(),
 		alias:       "t",
 		errors:      []string{},
+		inst:        0,
 	}
 }
 
@@ -127,9 +129,12 @@ func (q *Q) Sum(name, as string) *Q {
 
 // Where().Equals("a", "b")
 func (q *Q) Where(args ...WherePart) *Q {
-	q.where = &Where{
-		query:      q,
-		WhereParts: []WherePart{},
+	// allow for multiple where calls in single query
+	if q.where == nil {
+		q.where = &Where{
+			query:      q,
+			WhereParts: []WherePart{},
+		}
 	}
 
 	for k := range args {
@@ -321,9 +326,22 @@ func (q *Q) col(colName string) string {
 	// return fmt.Sprintf("`%s`", colName)
 }
 
+func isConjunction(whereType WhereType) bool {
+
+	switch whereType {
+	case WhereTypeAnd, WhereTypeOr:
+		return true
+	default:
+		return false
+	}
+
+}
+
 func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePart) string {
 
 	sb := strings.Builder{}
+
+	// prevWasConjunction := false
 
 	for k := range whereParts {
 
@@ -333,7 +351,10 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 			q.error(w.e.Error())
 		}
 
-		if !(w.whereType == WhereTypeAnd || w.whereType == WhereTypeOr || len(w.fieldName) == 0) {
+		isConj := isConjunction(w.whereType)
+
+		// If this is is not a conjunction AND fieldName is not empty
+		if !isConj && len(w.fieldName) > 0 {
 
 			sb.WriteString(q.col(w.fieldName))
 
@@ -375,10 +396,7 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 
 		column := columnTypes[w.fieldName]
 
-		if !(w.whereType == WhereTypeExists ||
-			w.whereType == WhereTypeAnd ||
-			w.whereType == WhereTypeOr ||
-			len(w.values) == 0) {
+		if w.whereType != WhereTypeExists && !isConj && len(w.values) > 0 {
 
 			switch w.whereType {
 			case WhereTypeEqualsField:

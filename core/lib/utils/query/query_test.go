@@ -23,9 +23,11 @@ func TestQuerySelect(t *testing.T) {
 			GT("DateCreated", 2),
 			Or(),
 			EQ("Content", "foo"),
+			Or(),
+			EQ("Name", "bar"),
 		).String()
 	require.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` = 1 AND `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo'", sql)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` = 1 AND `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' OR `t`.`Name` = 'bar'", sql)
 
 	sql, e = Select(&testassets.Comment{}).
 		Where(
@@ -260,6 +262,17 @@ func TestWhereTypeAll(t *testing.T) {
 	require.Nil(t, e)
 	expected = "SELECT `t`.* FROM `Job` `t` WHERE 1=1 AND `t`.`IsDeleted` = 0"
 	assert.Equal(t, expected, q)
+}
+
+func TestWhere_MultiWheres(t *testing.T) {
+	q := Select(&testassets.Job{}).Where(WhereAll())
+	q.Where(And(), EQ("IsDeleted", 0))
+	r, e := q.String()
+
+	expected := "SELECT `t`.* FROM `Job` `t` WHERE 1=1 AND `t`.`IsDeleted` = 0"
+
+	assert.Nil(t, e)
+	assert.Equal(t, expected, r)
 }
 
 // func TestQuerySave_Insert(t *testing.T) {

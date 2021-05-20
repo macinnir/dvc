@@ -14,6 +14,7 @@ type Comment struct {
 	Content     null.String `db:"Content" json:"Content"`
 	ObjectType  int64       `db:"ObjectType" json:"ObjectType"`
 	ObjectID    int64       `db:"ObjectID" json:"ObjectID"`
+	Name        string      `db:"Name" json:"Name"`
 }
 
 // Comment_TableName is the name of the table
@@ -29,6 +30,7 @@ func (c *Comment) Table_Columns() []string {
 		"Content",
 		"ObjectType",
 		"ObjectID",
+		"Name",
 	}
 }
 
@@ -40,6 +42,7 @@ func (c *Comment) Table_Column_Types() map[string]string {
 		"Content":     "%s",
 		"ObjectType":  "%d",
 		"ObjectID":    "%d",
+		"Name":        "%s",
 	}
 }
 
@@ -51,6 +54,7 @@ func (c *Comment) Table_Column_Values() map[string]interface{} {
 		"Content":     c.Content.String,
 		"ObjectType":  c.ObjectType,
 		"ObjectID":    c.ObjectID,
+		"Name":        c.Name,
 	}
 }
 
@@ -65,12 +69,12 @@ func (c *Comment) Table_PrimaryKey_Value() int64 {
 
 // Comment_InsertColumns is a list of all insert columns for this model
 func (c *Comment) Table_InsertColumns() []string {
-	return []string{"DateCreated", "Content", "ObjectType", "ObjectID"}
+	return []string{"DateCreated", "Content", "ObjectType", "ObjectID", "Name"}
 }
 
 // Comment_UpdateColumns is a list of all update columns for this model
 func (c *Comment) Table_UpdateColumns() []string {
-	return []string{"Content", "ObjectType", "ObjectID"}
+	return []string{"Content", "ObjectType", "ObjectID", "Name"}
 }
 
 func (c *Comment) String() string {
