@@ -39,7 +39,7 @@ func (g *Gen) GetOrphanedDals(dir string, database *schema.Schema) []string {
 	for _, name := range dirFileNames {
 
 		// Skip tests
-		if (len(name) > 8 && name[len(name)-8:len(name)] == "_test.go") || name == "repos.go" {
+		if (len(name) > 8 && name[len(name)-8:] == "_test.go") || name == "repos.go" {
 			continue
 		}
 
