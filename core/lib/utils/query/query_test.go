@@ -18,8 +18,6 @@ func TestQuerySelect(t *testing.T) {
 
 	sql, e = Select(&testassets.Comment{}).
 		Where(
-			CommentID(1),
-			And(),
 			GT("DateCreated", 2),
 			Or(),
 			EQ("Content", "foo"),
@@ -27,12 +25,10 @@ func TestQuerySelect(t *testing.T) {
 			EQ("Name", "bar"),
 		).String()
 	require.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` = 1 AND `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' OR `t`.`Name` = 'bar'", sql)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' OR `t`.`Name` = 'bar'", sql)
 
 	sql, e = Select(&testassets.Comment{}).
 		Where(
-			CommentID(1, 2),
-			And(),
 			GT("DateCreated", 2),
 			Or(),
 			EQ("Content", "foo"),
@@ -46,11 +42,11 @@ func TestQuerySelect(t *testing.T) {
 		).
 		String()
 	require.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` IN ( 1, 2 ) AND `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' AND ( `t`.`DateCreated` >= 1 OR `t`.`DateCreated` <= 2 OR `t`.`DateCreated` < 3 )", sql)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' AND ( `t`.`DateCreated` >= 1 OR `t`.`DateCreated` <= 2 OR `t`.`DateCreated` < 3 )", sql)
 
 	sql, e = Select(&testassets.Comment{}).
 		Where(
-			CommentID(1, 2),
+			WhereAll(),
 			And(
 				GT("DateCreated", 2),
 				Or(),
@@ -58,11 +54,11 @@ func TestQuerySelect(t *testing.T) {
 			),
 		).String()
 	require.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` IN ( 1, 2 ) AND ( `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' )", sql)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 AND ( `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' )", sql)
 
 	sql, e = Select(&testassets.Comment{}).
 		Where(
-			CommentID(1, 2),
+			WhereAll(),
 			Or(
 				GT("DateCreated", 2),
 				And(),
@@ -81,7 +77,54 @@ func TestQuerySelect(t *testing.T) {
 		OrderBy("Content", "asc").
 		Limit(1, 2).String()
 	require.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` IN ( 1, 2 ) OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
+}
+
+func TestQuerySelect_InvalidFieldName(t *testing.T) {
+
+	sql, e := Select(&testassets.Comment{}).
+		Where(
+			EQ("Foo", "Bar"),
+		).String()
+
+	require.NotNil(t, e)
+	assert.Equal(t, "WHERE(): INVALID COLUMN: `Comment`.`Foo`", e.Error())
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Foo` = Bar", sql)
+
+}
+
+func TestQuery_INString(t *testing.T) {
+
+	args := []string{"foo", "bar", "baz"}
+
+	sql, e := Select(&testassets.Comment{}).
+		Where(
+			INString(
+				"Content",
+				args,
+			),
+		).String()
+
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Content` IN ( 'foo', 'bar', 'baz' )", sql)
+
+}
+
+func TestQuery_INInt64(t *testing.T) {
+
+	args := []int64{1, 2, 3}
+
+	sql, e := Select(&testassets.Comment{}).
+		Where(
+			INInt64(
+				"CommentID",
+				args,
+			),
+		).String()
+
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` IN ( 1, 2, 3 )", sql)
+
 }
 
 func TestQuerySelect_EmptyWhereClause(t *testing.T) {
@@ -90,6 +133,7 @@ func TestQuerySelect_EmptyWhereClause(t *testing.T) {
 	// TODO extra where clause
 	sql, e := q.Where().String()
 	require.NotNil(t, e)
+	assert.Equal(t, "EMPTY_WHERE_CLAUSE: `Comment`", e.Error())
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE ", sql)
 
 	q = Select(&testassets.Comment{})
@@ -105,7 +149,7 @@ func TestQuerySelect_InvalidField(t *testing.T) {
 
 	assert.Equal(t, "SELECT `t`.`Foo` FROM `Comment` `t`", sql)
 	require.NotNil(t, e)
-	assert.Equal(t, "SQL ERROR: Table `Comment`: Unknown column `Foo`", e.Error())
+	assert.Equal(t, "SELECT: INVALID COLUMN: `Comment`.`Foo`", e.Error())
 }
 
 func TestUnion(t *testing.T) {
@@ -154,6 +198,17 @@ func TestInsert(t *testing.T) {
 	assert.Equal(t, "INSERT INTO `Comment` ( `DateCreated`, `Content`, `ObjectType`, `ObjectID` ) VALUES ( 1, 'foo', 2, 3 )", sql)
 }
 
+func TestInsert_InvalidFieldName(t *testing.T) {
+
+	sql, e := Insert(&testassets.Comment{}).
+		Set("Foo", "Bar").String()
+
+	require.NotNil(t, e)
+	assert.Equal(t, "INSERT(): INVALID COLUMN: `Comment`.`Foo`", e.Error())
+	assert.Equal(t, "INSERT INTO `Comment` ( `Foo` ) VALUES ( Bar )", sql)
+
+}
+
 func TestSelectFields(t *testing.T) {
 	sql, e := Select(&testassets.Job{}).
 		Count("JobID", "ProjectsQuoted").
@@ -169,6 +224,14 @@ func TestSelectFields(t *testing.T) {
 		String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT COUNT(`t`.`JobID`) AS `ProjectsQuoted`, COALESCE(SUM(`t`.`TotalPrice`), 0) AS `SalesVolume`, COALESCE(SUM(`t`.`GrossProfit`), 0) AS `GM` FROM `Job` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`AwardDate` BETWEEN 1 AND 2", sql)
+}
+
+func TestSum_InvalidField(t *testing.T) {
+	_, e := Select(&testassets.Job{}).
+		Sum("Foo", "Foo").String()
+	require.NotNil(t, e)
+	assert.Equal(t, "Sum(): INVALID COLUMN: `Job`.`Foo`", e.Error())
+	// assert.Equal(t, "SELECT SUM(`t`.`Foo`) AS `Foo` FROM `Job` `t`", sql)
 }
 
 func TestSelectFields2(t *testing.T) {

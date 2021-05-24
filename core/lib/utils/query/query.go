@@ -87,7 +87,7 @@ func (q *Q) Fields(fields ...string) *Q {
 func (q *Q) Field(name string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.error("Unknown column `" + name + "`")
+		q.errorInvalidColumn("SELECT", name)
 	}
 
 	q.fields = append(q.fields, "`"+q.alias+"`.`"+name+"`")
@@ -110,7 +110,7 @@ func (q *Q) FieldRaw(fieldStr, as string) *Q {
 func (q *Q) Count(name, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errors = append(q.errors, fmt.Sprintf("COUNT(): Invalid column `%s`", name))
+		q.errorInvalidColumn("COUNT()", name)
 		return q
 	}
 
@@ -120,7 +120,7 @@ func (q *Q) Count(name, as string) *Q {
 func (q *Q) Sum(name, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errors = append(q.errors, fmt.Sprintf("SUM(): Invalid column `%s`", name))
+		q.errorInvalidColumn("Sum()", name)
 		return q
 	}
 
@@ -141,10 +141,6 @@ func (q *Q) Where(args ...WherePart) *Q {
 		q.where.WhereParts = append(q.where.WhereParts, args[k])
 	}
 	return q
-}
-
-func (q *Q) error(err string) {
-	q.errors = append(q.errors, fmt.Sprintf("SQL ERROR: Table `%s`: %s", q.model.Table_Name(), err))
 }
 
 // func Save(model IModel) *Q {
@@ -237,7 +233,7 @@ func (q *Q) String() (string, error) {
 			val := fmt.Sprint(q.sets[colName])
 
 			if _, ok := q.columnTypes[colName]; !ok {
-				q.error(fmt.Sprintf("UPDATE(): Invalid column `%s`", colName))
+				q.errorInvalidColumn("UPDATE()", colName)
 				val = "'" + val + "'"
 			} else {
 				if q.columnTypes[colName] == "%s" {
@@ -262,7 +258,7 @@ func (q *Q) String() (string, error) {
 			colName := q.setSorter[k]
 
 			if _, ok := q.columnTypes[colName]; !ok {
-				q.error(fmt.Sprintf("INSERT(): Invalid column `%s`", colName))
+				q.errorInvalidColumn("INSERT()", colName)
 			}
 
 			val := fmt.Sprint(q.sets[colName])
@@ -284,7 +280,7 @@ func (q *Q) String() (string, error) {
 		whereClause := q.printWhereClause(q.columnTypes, q.where.WhereParts)
 		if len(whereClause) == 0 {
 			fmt.Println(q.where.WhereParts, q.queryType)
-			q.error(fmt.Sprintf("Empty where clause: %s", whereClause))
+			q.error(fmt.Sprintf("EMPTY_WHERE_CLAUSE: `%s`", q.model.Table_Name()))
 		}
 
 		sb.WriteString(whereClause)
@@ -359,7 +355,7 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 			sb.WriteString(q.col(w.fieldName))
 
 			if _, ok := columnTypes[w.fieldName]; !ok {
-				q.error("Invalid field name `" + w.fieldName + "`")
+				q.errorInvalidColumn("WHERE()", w.fieldName)
 			}
 		}
 
@@ -441,6 +437,14 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 	}
 
 	return sb.String()
+}
+
+func (q *Q) error(err string) {
+	q.errors = append(q.errors, err)
+}
+
+func (q *Q) errorInvalidColumn(errType string, name string) {
+	q.error(fmt.Sprintf("%s: INVALID COLUMN: `%s`.`%s`", errType, q.model.Table_Name(), name))
 }
 
 type WhereType int
@@ -548,12 +552,37 @@ func GTOE(fieldName string, value interface{}) WherePart {
 	)
 }
 
+// IN is an IN clause
 func IN(fieldName string, values ...interface{}) WherePart {
 	return NewWherePart(
 		WhereTypeIN,
 		fieldName,
 		values,
 	)
+}
+
+// INString is a helper function for converting a slice of string arguments into
+// a slice of interface arguments, passed into an IN clause and returned
+func INString(fieldName string, values []string) WherePart {
+	interfaces := make([]interface{}, len(values))
+
+	for k := range values {
+		interfaces[k] = values[k]
+	}
+
+	return IN(fieldName, interfaces...)
+}
+
+// INInt64 is a helper function for converting a slice of string arguments into
+// a slice of interface arguments, passed into an IN clause and returned
+func INInt64(fieldName string, values []int64) WherePart {
+	interfaces := make([]interface{}, len(values))
+
+	for k := range values {
+		interfaces[k] = values[k]
+	}
+
+	return IN(fieldName, interfaces...)
 }
 
 func Between(fieldName string, from, to interface{}) WherePart {
@@ -636,14 +665,6 @@ func Exists(clause *Q) WherePart {
 		w.e = e
 	}
 	return w
-}
-
-func CommentID(args ...interface{}) WherePart {
-	if len(args) > 1 {
-		return IN("CommentID", args...)
-	} else {
-		return EQ("CommentID", args[0])
-	}
 }
 
 func Union(queries ...*Q) (string, error) {
