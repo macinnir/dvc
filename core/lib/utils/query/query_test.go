@@ -152,6 +152,30 @@ func TestQuerySelect_InvalidField(t *testing.T) {
 	assert.Equal(t, "SELECT: INVALID COLUMN: `Comment`.`Foo`", e.Error())
 }
 
+func TestWhereLike(t *testing.T) {
+	sql, e := Select(&testassets.Comment{}).Where(Like("Name", "Foo%")).String()
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Name` LIKE 'Foo%'", sql)
+}
+
+func TestWhereLike_InvalidValue(t *testing.T) {
+	_, e := Select(&testassets.Comment{}).Where(Like("CommentID", "Foo%")).String()
+	require.NotNil(t, e)
+	assert.Equal(t, "LIKE: INVALID VALUE: `Comment`.`%d` => Foo%", e.Error())
+}
+
+func TestWhereNotLike(t *testing.T) {
+	sql, e := Select(&testassets.Comment{}).Where(NotLike("Name", "Foo%")).String()
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Name` NOT LIKE 'Foo%'", sql)
+}
+
+func TestWhereNotLike_InvalidValue(t *testing.T) {
+	_, e := Select(&testassets.Comment{}).Where(NotLike("CommentID", "Foo%")).String()
+	require.NotNil(t, e)
+	assert.Equal(t, "NOT LIKE: INVALID VALUE: `Comment`.`%d` => Foo%", e.Error())
+}
+
 func TestUnion(t *testing.T) {
 	var e error
 	sql, e := Union(

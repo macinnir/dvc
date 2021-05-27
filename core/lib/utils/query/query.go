@@ -359,6 +359,8 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 			}
 		}
 
+		column := columnTypes[w.fieldName]
+
 		switch w.whereType {
 		case WhereTypeEquals, WhereTypeEqualsField:
 			sb.WriteString(" = ")
@@ -388,9 +390,19 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 			sb.WriteString("( ")
 		case WhereTypeAll:
 			sb.WriteString("1=1")
-		}
 
-		column := columnTypes[w.fieldName]
+		case WhereTypeLike:
+			if column != "%s" {
+				q.errorInvalidValue("LIKE", column, w.values[0])
+			}
+			sb.WriteString(" LIKE ")
+
+		case WhereTypeNotLike:
+			if column != "%s" {
+				q.errorInvalidValue("NOT LIKE", column, w.values[0])
+			}
+			sb.WriteString(" NOT LIKE ")
+		}
 
 		if w.whereType != WhereTypeExists && !isConj && len(w.values) > 0 {
 
@@ -447,6 +459,10 @@ func (q *Q) errorInvalidColumn(errType string, name string) {
 	q.error(fmt.Sprintf("%s: INVALID COLUMN: `%s`.`%s`", errType, q.model.Table_Name(), name))
 }
 
+func (q *Q) errorInvalidValue(errType, name string, value interface{}) {
+	q.error(fmt.Sprintf("%s: INVALID VALUE: `%s`.`%s` => %v", errType, q.model.Table_Name(), name, value))
+}
+
 type WhereType int
 
 const (
@@ -458,6 +474,8 @@ const (
 	WhereTypeGreaterThanOrEqualTo
 	WhereTypeLessThanOrEqualTo
 	WhereTypeBetween
+	WhereTypeLike
+	WhereTypeNotLike
 	WhereTypeIN
 	WhereTypeExists
 	WhereTypeAnd
@@ -590,6 +608,22 @@ func Between(fieldName string, from, to interface{}) WherePart {
 		WhereTypeBetween,
 		fieldName,
 		[]interface{}{from, to},
+	)
+}
+
+func Like(fieldName string, value string) WherePart {
+	return NewWherePart(
+		WhereTypeLike,
+		fieldName,
+		[]interface{}{value},
+	)
+}
+
+func NotLike(fieldName string, value string) WherePart {
+	return NewWherePart(
+		WhereTypeNotLike,
+		fieldName,
+		[]interface{}{value},
 	)
 }
 
