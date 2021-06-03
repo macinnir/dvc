@@ -2,7 +2,6 @@ package gen
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/gen"
@@ -41,13 +40,17 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		gen.GenInterfaces(config.Dirs.Dals, config.Dirs.DalInterfaces)
 		gen.GenInterfaces(config.Dirs.Services, config.Dirs.ServiceInterfaces)
 	case "routes":
-		if e := gen.GenRoutes(config); e != nil {
+		if e := gen.GenRoutesAndPermissions(config); e != nil {
 			return e
 		}
-		gen.GenPermissionsGoFile()
 	case "tsperms":
-		str := gen.BuildTypescriptPermissions()
-		fmt.Println(str)
+		if e := gen.GenTSPerms(config); e != nil {
+			return e
+		}
+	case "goperms":
+		if e := gen.GenGoPerms(config); e != nil {
+			return e
+		}
 
 	default:
 		return errors.New("unknown gen type")

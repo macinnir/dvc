@@ -12,7 +12,7 @@ import (
 	"github.com/macinnir/dvc/core/lib"
 )
 
-func loadPermissions() map[string]string {
+func loadPermissionsFromJSON() map[string]string {
 	permissionMap := map[string]string{}
 	fileBytes, e := ioutil.ReadFile(lib.PermissionsFile)
 	if e != nil {
@@ -22,11 +22,38 @@ func loadPermissions() map[string]string {
 	return permissionMap
 }
 
-func GenPermissionsGoFile() {
+func GenTSPerms(config *lib.Config) (e error) {
+	var permissionMap map[string]string
+	permissionMap, e = fetchAllPermissions(config.Dirs.Controllers)
+	if e != nil {
+		return
+	}
+	str := BuildTypescriptPermissions(permissionMap)
+	fmt.Println(str)
+	return
+}
 
-	permissionMap := loadPermissions()
+func GenGoPerms(config *lib.Config) (e error) {
+
+	var permissionMap map[string]string
+	permissionMap, e = fetchAllPermissions(config.Dirs.Controllers)
+	if e != nil {
+		return
+	}
+
+	BuildPermissionsGoFile(permissionMap)
+	return
+}
+
+func BuildPermissionsGoFile(permissionMap map[string]string) {
+
+	// permissionMap := loadPermissionsFromJSON()
 	permissions := make([]string, 0, len(permissionMap))
+
 	for k := range permissionMap {
+		if len(k) == 0 {
+			continue
+		}
 		permissions = append(permissions, k)
 	}
 
@@ -41,7 +68,9 @@ func GenPermissionsGoFile() {
 
 	// }
 
-	permissionsFile := `// Generated Code; DO NOT EDIT.
+	var b strings.Builder
+
+	b.WriteString(`// Generated Code; DO NOT EDIT.
 
 	package permissions
 
@@ -50,52 +79,52 @@ func GenPermissionsGoFile() {
 	)
 	
 	const (
-	`
+	`)
 	for k := range permissions {
+
+		// fmt.Println("Permission: ", k, permissions[k])
 		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		permissionsFile += "\t// " + permTitle + " Permission is the `" + permissions[k] + "` permission\n"
-		permissionsFile += "\t" + permTitle + " utils.Permission = \"" + permissions[k] + "\"\n"
+		b.WriteString(`	// ` + permTitle + ` permission grants the ability of "` + permissionMap[permissions[k]] + `"
+	` + permTitle + ` utils.Permission = "` + permissions[k] + `"
+`)
 	}
 
-	permissionsFile += `)
+	b.WriteString(`)
 	
 	// Permissions returns a slice of permissions 
 	func Permissions() map[utils.Permission]string {
 		return map[utils.Permission]string {
-	`
+	`)
 
 	for k := range permissions {
 		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		permissionsFile += "\t\t" + permTitle + ": \"" + permissionMap[permissions[k]] + "\",\n"
+		b.WriteString(`		` + permTitle + `: "` + permissionMap[permissions[k]] + `",
+`)
 	}
 
-	permissionsFile += `	}
+	b.WriteString(`	}
 	}	
 	
-	`
+	`)
 	permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
-	fmt.Println("Writing the permissions file to path ", permissionsFilePath)
 	var permissionsFileBytes []byte
+
 	var e error
-	permissionsFileBytes, e = lib.FormatCode(permissionsFile)
+	permissionsFileBytes, e = lib.FormatCode(b.String())
 	if e != nil {
 		panic(e)
 	}
-	ioutil.WriteFile(permissionsFilePath, []byte(permissionsFileBytes), 0777)
+	ioutil.WriteFile(permissionsFilePath, permissionsFileBytes, 0777)
 }
 
 // BuildTypescriptPermissions returns a formatted typescript file of permission constants
-func BuildTypescriptPermissions() string {
-
-	permissionMap := map[string]string{}
-	fileBytes, e := ioutil.ReadFile(lib.PermissionsFile)
-	if e != nil {
-		panic(e)
-	}
-	json.Unmarshal(fileBytes, &permissionMap)
+func BuildTypescriptPermissions(permissionMap map[string]string) string {
 
 	permissions := make([]string, 0, len(permissionMap))
 	for k := range permissionMap {
+		if len(k) == 0 {
+			continue
+		}
 		permissions = append(permissions, k)
 	}
 
