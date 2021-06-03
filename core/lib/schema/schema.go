@@ -80,28 +80,16 @@ func GoTypeFormatString(goType string) (fieldType string) {
 }
 
 // DataTypeToFormatString converts a database type to its equivalent golang datatype
+// TODO move to mysql specific
+// TODO make column types constants in mysql
 func DataTypeToFormatString(column *Column) (fieldType string) {
 
 	fieldType = "%s"
 
 	switch column.DataType {
-	case "int":
+	case "int", "bigint", "tinyint":
 		fieldType = "%d"
-	case "bigint":
-		fieldType = "%d"
-	case "tinyint":
-		fieldType = "%d"
-	case "varchar":
-		fieldType = "%s"
-	case "enum":
-		fieldType = "%s"
-	case "text":
-		fieldType = "%s"
-	case "date":
-		fieldType = "%s"
-	case "datetime":
-		fieldType = "%s"
-	case "char":
+	case "varchar", "enum", "text", "date", "datetime", "char":
 		fieldType = "%s"
 	case "decimal":
 		fieldType = "%f"
@@ -113,22 +101,11 @@ func DataTypeToFormatString(column *Column) (fieldType string) {
 // DataTypeToGoTypeString converts a database type to its equivalent golang datatype
 func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	fieldType = "int64"
+
 	switch column.DataType {
-	case "int":
-		fieldType = "int64"
-	case "tinyint":
+	case "int", "tinyint", "bigint":
 		fieldType = "int"
-	case "varchar":
-		fieldType = "string"
-	case "enum":
-		fieldType = "string"
-	case "text":
-		fieldType = "string"
-	case "date":
-		fieldType = "string"
-	case "datetime":
-		fieldType = "string"
-	case "char":
+	case "tinytext", "text", "longtext", "varchar", "date", "datetime", "char", "enum":
 		fieldType = "string"
 	case "decimal":
 		fieldType = "float64"
@@ -150,25 +127,27 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	return
 }
 
+// TODO move to mysql specific
+// TODO make column types constants in mysql
+func DataTypeToTypescriptString(column *Column) (fieldType string) {
+
+	fieldType = "number"
+
+	switch column.DataType {
+	case "varchar", "enum", "text", "date", "datetime", "char", "longtext":
+		fieldType = "string"
+	}
+
+	return
+}
+
+// TODO move to mysql specific
+// TODO make column types constants in mysql
 func IsString(column *Column) bool {
 
 	switch column.DataType {
-	case "tinyint":
-		return false
-	case "varchar":
+	case "varchar", "enum", "text", "longtext", "tinytext", "date", "datetime", "char":
 		return true
-	case "enum":
-		return true
-	case "text":
-		return true
-	case "date":
-		return true
-	case "datetime":
-		return true
-	case "char":
-		return true
-	case "decimal":
-		return false
 	default:
 		return false
 	}
