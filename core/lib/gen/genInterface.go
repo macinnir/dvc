@@ -15,6 +15,7 @@ import (
 
 // GenInterface takes makes the interface into a byte array
 func GenInterface(comment, pkgName, ifaceName, ifaceComment string, methods []string, imports []string) ([]byte, error) {
+
 	output := []string{"// " + comment, "", "package " + pkgName, "import ("}
 	output = append(output, imports...)
 	output = append(output, ")", "")
@@ -28,30 +29,42 @@ func GenInterface(comment, pkgName, ifaceName, ifaceComment string, methods []st
 	return lib.FormatCode(code)
 }
 
-func GenInterfaces(srcDir, destDir string) error {
+func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
-	start := time.Now()
-
-	lib.EnsureDir(destDir)
-
-	var e error
+	// fmt.Println("Fetching files for dir ", srcDir)
+	filePaths := []string{}
 	var files []os.FileInfo
+	var e error
 
 	// DAL
 	if files, e = ioutil.ReadDir(srcDir); e != nil {
-		return e
+		return filePaths, e
 	}
 
-	generatedInterfaces := 0
+	for k := range files {
 
-	for _, f := range files {
+		f := files[k]
+
+		filePath := path.Join(srcDir, files[k].Name())
+
+		if files[k].IsDir() {
+			var subFiles []string
+			if subFiles, e = fetchSrcFilesForInterfaces(filePath); e != nil {
+				return filePaths, e
+			}
+			filePaths = append(filePaths, subFiles...)
+			continue
+		}
 
 		// Filter out files that don't have upper case first letter names
 		if !unicode.IsUpper([]rune(f.Name())[0]) {
 			continue
 		}
 
-		srcFile := path.Join(srcDir, f.Name())
+		// Verify this is a go file
+		if f.Name()[len(f.Name())-3:] != ".go" {
+			continue
+		}
 
 		// Remove the go extension
 		baseName := f.Name()[0 : len(f.Name())-3]
@@ -66,33 +79,49 @@ func GenInterfaces(srcDir, destDir string) error {
 			continue
 		}
 
-		// srcFile := path.Join(c.Config.Dirs.Dal, baseName + ".go")
-		interfaceName := "I" + baseName
-		destFile := path.Join(destDir, interfaceName+".go")
-		packageName := filepath.Base(destDir)
+		filePaths = append(filePaths, filePath)
+	}
 
+	return filePaths, nil
+
+}
+
+func GenInterfaces(srcDir, destDir string) error {
+
+	start := time.Now()
+
+	lib.EnsureDir(destDir)
+
+	var e error
+	generatedInterfaces := 0
+	var files []string
+	if files, e = fetchSrcFilesForInterfaces(srcDir); e != nil {
+		return e
+	}
+
+	for k := range files {
+
+		srcFile := files[k]
+		baseName := filepath.Base(srcFile)
+		structName := baseName[0 : len(baseName)-3]
+		interfaceName := "I" + structName
+		packageName := filepath.Base(filepath.Dir(srcFile))
+		subDestDir := path.Join(destDir, packageName)
+		destFile := path.Join(subDestDir, interfaceName+".go")
 		srcFiles := []string{srcFile}
-		// var src []byte
-		// if src, e = ioutil.ReadFile(srcFile); e != nil {
-		// 	return
-		// }
+
+		// fmt.Println("Generating interface: " + srcFile + " ==> " + destFile)
 
 		// Check if EXT file exists
 		extFile := srcFile[0:len(srcFile)-3] + "Ext.go"
 		if _, e = os.Stat(extFile); e == nil {
 			srcFiles = append(srcFiles, extFile)
-			// concatenate the contents of the ext file with the contents of the regular file
-			// var extSrc []byte
-			// if extSrc, e = ioutil.ReadFile(extFile); e != nil {
-			// 	return
-			// }
-			// src = append(src, extSrc...)
 		}
 
 		var i []byte
 		i, e = genInterfaces(
 			srcFiles,
-			baseName,
+			structName,
 			"Generated Code; DO NOT EDIT.",
 			packageName,
 			interfaceName,
@@ -102,16 +131,15 @@ func GenInterfaces(srcDir, destDir string) error {
 		)
 
 		if e != nil {
+			fmt.Println("ERROR: " + srcFile + " => " + e.Error())
 			return e
 		}
 
-		// fmt.Println("Generating ", destFile)
-		// fmt.Println("Writing to: ", destFile)
+		lib.EnsureDir(subDestDir)
 
 		ioutil.WriteFile(destFile, i, 0644)
 
 		generatedInterfaces++
-		// fmt.Println("Name: ", baseName, "Path: ", srcFile)
 
 	}
 
@@ -171,7 +199,6 @@ func genInterfaces(
 		ifaceComment += "\n" + typeDoc
 	}
 
-	// fmt.Println(allImports)
 	result, e = GenInterface(comment, pkgName, ifaceName, ifaceComment, allMethods, allImports)
 
 	return
