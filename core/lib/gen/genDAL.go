@@ -1175,9 +1175,9 @@ func isUpdateColumn(column *schema.Column) bool {
 		return false
 	}
 
-	if column.Name == "IsDeleted" {
-		return false
-	}
+	// if column.Name == "IsDeleted" {
+	// 	return false
+	// }
 
 	if column.Name == "DateCreated" {
 		return false
