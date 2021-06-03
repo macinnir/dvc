@@ -2,7 +2,6 @@ package gen
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -17,19 +16,300 @@ import (
 	"github.com/macinnir/dvc/core/lib"
 )
 
-// GenRoutes generates a list of routes from a directory of controller files
-func GenRoutes(config *lib.Config) (e error) {
+func extractControllerNameFromFileName(path string) string {
 
-	permissionMap := loadPermissions()
+	fileName := filepath.Base(path)
+
+	// Must be aleast 14 chars (e.g. AController.go)
+
+	// fmt.Println("Extracting controller name", fileName)
+
+	if
+	// 14 chars
+	len(fileName) < 14 ||
+		// .go extension
+		fileName[len(fileName)-3:] != ".go" ||
+		// Uppercase first letter
+		!unicode.IsUpper([]rune(fileName)[0]) ||
+		// Not a test file
+		fileName[len(fileName)-8:] == "_test.go" {
+		return ""
+	}
+
+	return fileName[:len(fileName)-13]
+}
+
+func fetchAllPermissions(controllersDir string) (map[string]string, error) {
+
+	cf := NewControllerFetcher()
+
+	permissionMap := loadPermissionsFromJSON()
+	controllers, e := cf.Fetch(controllersDir)
+	if e != nil {
+		return nil, e
+	}
+
+	for k := range controllers {
+
+		controller := controllers[k]
+		// Extract the permissions from the controller
+		permissionMap[controller.Name+"_View"] = "View " + controller.Name
+
+		for k := range controller.Routes {
+			permissionMap[controller.Routes[k].Permission] = controller.Routes[k].Description
+		}
+	}
+
+	return permissionMap, nil
+}
+
+type ControllerFetcher struct {
+	routeMap map[string]bool
+}
+
+func NewControllerFetcher() *ControllerFetcher {
+	return &ControllerFetcher{
+		routeMap: map[string]bool{},
+	}
+}
+
+func (cf *ControllerFetcher) Fetch(dir string) (controllers []*Controller, e error) {
+
+	controllers = []*Controller{}
 
 	var files []os.FileInfo
-	files, e = ioutil.ReadDir(config.Dirs.Controllers)
+	files, e = ioutil.ReadDir(dir)
 
 	if e != nil {
-		log.Println("Error with path ", config.Dirs.Controllers, e.Error())
+		log.Println("ERROR: Fetch Controllers - ", dir, e.Error())
 		return
 	}
 
+	for k := range files {
+
+		filePath := path.Join(dir, files[k].Name())
+
+		if files[k].IsDir() {
+			var subControllers []*Controller
+			if subControllers, e = cf.Fetch(filePath); e != nil {
+				return
+			}
+			controllers = append(controllers, subControllers...)
+			continue
+		}
+
+		// Build a controller object from the controller file
+		var controller *Controller
+		if controller, e = cf.BuildControllerObjFromControllerFile(filePath); e != nil {
+			return
+		}
+
+		if controller != nil {
+			controllers = append(controllers, controller)
+		}
+	}
+
+	return
+
+}
+
+// BuildControllerObjFromControllerFile parses a file and extracts all of its @route comments
+func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath string) (controller *Controller, e error) {
+
+	pkgName := filepath.Base(filepath.Dir(filePath))
+
+	controllerName := extractControllerNameFromFileName(filePath)
+
+	if controllerName == "" {
+		return nil, nil
+	}
+
+	var src []byte
+
+	src, e = ioutil.ReadFile(filePath)
+
+	if e != nil {
+		log.Println("Error with ", filePath)
+		return
+	}
+
+	controller = &Controller{
+		Name:    controllerName,
+		Path:    filePath,
+		Routes:  []*ControllerRoute{},
+		Package: pkgName,
+	}
+	controllerFullName := controller.Name + "Controller"
+
+	// Get the controller name
+	var methods []lib.Method
+	methods, _, controller.Description = lib.ParseStruct(src, controllerFullName, true, true, "controllers")
+
+	// Remove the name of the controller from the description
+	controller.Description = strings.TrimPrefix(controller.Description, controller.Name)
+
+	for _, method := range methods {
+
+		route := &ControllerRoute{
+			Queries: []ControllerRouteQuery{},
+			Params:  []ControllerRouteParam{},
+		}
+
+		for line, doc := range method.Documents {
+
+			// This is the title of the method
+			if line == 0 {
+				lineParts := strings.Split(doc, " ")
+				route.Name = lineParts[1]
+				route.Description = strings.Join(lineParts[2:], " ")
+				continue
+			}
+			route.IsAuth = true
+
+			// @anonymous
+			if len(doc) > 12 && doc[0:13] == "// @anonymous" {
+				route.IsAuth = false
+				continue
+			}
+
+			// @body
+			if len(doc) > 9 && doc[0:9] == "// @body " {
+
+				bodyComment := strings.Split(strings.Trim(doc[9:], " "), " ")
+				route.BodyFormat = bodyComment[0]
+
+				if len(bodyComment) > 1 {
+					route.BodyType = bodyComment[1]
+				}
+
+				controller.HasDTOsImport = true
+				controller.HasResponseImport = true
+				route.HasBody = true
+				continue
+			}
+
+			// @response (last line)
+			if len(doc) > 13 && doc[0:13] == "// @response " {
+
+				responseComment := strings.Split(strings.Trim(doc[13:], " "), " ")
+
+				if route.ResponseCode, e = strconv.Atoi(responseComment[0]); e != nil {
+					log.Fatalf("Invalid @response comment: %s at %s.%s", doc, controller.Name, route.Name)
+				}
+
+				if len(responseComment) > 1 {
+					route.ResponseFormat = responseComment[1]
+				}
+
+				if len(responseComment) > 2 {
+					route.ResponseType = responseComment[2]
+				}
+
+				continue
+			}
+
+			// @perm
+			// if len(doc) > 9 && doc[0:9] == "// @perm " {
+			// 	route.Permission = strings.TrimSpace(doc[9:])
+			// 	usesPerms = true
+			// 	continue
+			// }
+
+			// @route
+			if len(doc) > 9 && doc[0:9] == "// @route" {
+
+				lineParts := strings.Split(doc, " ")
+				if len(lineParts) < 4 {
+					log.Fatalf("Invalid route comment `%s` for method `%s.%s`", doc, controller.Name, route.Name)
+				}
+				route.Method = lineParts[2]
+				route.Raw = lineParts[3]
+
+				// Queries
+				if strings.Contains(route.Raw, "?") {
+
+					subParts := strings.Split(route.Raw, "?")
+					route.Path = subParts[0]
+					queries := strings.Split(subParts[1], "&")
+
+					for _, query := range queries {
+						if !strings.Contains(query, "=") {
+							continue
+						}
+
+						queryParts := strings.Split(query, "=")
+
+						o := ControllerRouteQuery{
+							Name:     queryParts[0],
+							ValueRaw: queryParts[1],
+						}
+
+						if strings.Contains(o.ValueRaw, ":") {
+							queryValueParts := strings.Split(o.ValueRaw, ":")
+							// Remove the starting "{"
+							o.VariableName = queryValueParts[0][1:]
+
+							// Remove the ending "}"
+							o.Pattern = strings.Join(queryValueParts[1:], ":")
+							o.Pattern = o.Pattern[0 : len(o.Pattern)-1]
+
+							// Check if the value isn't a constant value
+							if o.Pattern == "[0-9]" || o.Pattern == "[0-9]+" {
+								o.Type = "int64"
+							} else {
+								o.Type = "string"
+							}
+						} else {
+							// Try to parse the value as an int64
+							// e.g. param=123
+
+							o.VariableName = o.Name
+
+							if _, e := strconv.ParseInt(o.ValueRaw, 10, 64); e != nil {
+								o.Type = "string"
+							} else {
+								o.Type = "int64"
+							}
+						}
+
+						route.Queries = append(route.Queries, o)
+					}
+
+				} else {
+					route.Path = route.Raw
+				}
+
+				params, _ := extractParamsFromRoutePath(route.Path)
+
+				route.Params = append(route.Params, params...)
+
+			} else {
+				route.Description += " " + doc[3:]
+			}
+
+		}
+
+		if route.IsAuth {
+			controller.PermCount++
+			route.Permission = controller.Name + "_" + route.Name
+		}
+
+		routeSignature := route.Method + " " + route.Path
+		if _, ok := cf.routeMap[routeSignature]; ok {
+			e = fmt.Errorf("Duplicate route signature `%s` for method `%s`.`%s`", routeSignature, controller.Name, route.Name)
+			return
+		}
+
+		controller.Routes = append(controller.Routes, route)
+	}
+
+	return
+}
+
+// GenRoutes generates a list of routes from a directory of controller files
+func GenRoutesAndPermissions(config *lib.Config) error {
+
+	// permissionMap := loadPermissionsFromJSON()
 	imports := []string{
 		path.Join(config.BasePackage, config.Dirs.Controllers),
 		path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
@@ -43,81 +323,54 @@ func GenRoutes(config *lib.Config) (e error) {
 	code := ""
 
 	rest := ""
-	controllerCalls := []string{}
+	// controllerCalls := []string{}
 
 	hasBodyImports := false
-	usesPermissions := false
+	packageUsesPermission := false
 
-	allPerms := []string{}
+	cf := NewControllerFetcher()
+	controllers, e := cf.Fetch(config.Dirs.Controllers)
 
-	controllers := []*Controller{}
+	if e != nil {
+		return e
+	}
 
-	for _, filePath := range files {
+	for k := range controllers {
 
-		fileName := filePath.Name()
-		// Filter out files that don't have upper case first letter names
-		if !unicode.IsUpper([]rune(fileName)[0]) {
-			continue
-		}
+		controller := controllers[k]
+		// fmt.Println("ControllerName:", controllerName)
 
-		// Skip non-go files
-		if len(fileName) > 3 && fileName[len(fileName)-3:] != ".go" {
-			continue
-		}
-
-		// Skip tests
-		if len(fileName) > 8 && fileName[len(fileName)-8:] == "_test.go" {
-			continue
-		}
-
-		var src []byte
-
-		// log.Println(path.Join(dir, filePath.Name()))
-		src, e = ioutil.ReadFile(path.Join(config.Dirs.Controllers, filePath.Name()))
-
-		if e != nil {
-			log.Println("Error with ", path.Join(config.Dirs.Controllers, filePath.Name()))
-			return
-		}
-
-		// Build a controller object from the controller file
-		controller, usesPerms, _ := BuildControllerObjFromControllerFile(path.Join(config.Dirs.Controllers, filePath.Name()), src)
-
-		if usesPerms == true {
-			usesPermissions = true
+		if controller.PermCount > 0 {
+			packageUsesPermission = true
 		}
 
 		// Documentation routes
 		controllers = append(controllers, controller)
 
 		// Include imports for dtos and response if necessary for JSON http body
-		if controller.HasDTOsImport == true {
+		if controller.HasDTOsImport {
 			hasBodyImports = true
 		}
 
 		var routesString string
-		var perms []string
 
-		routesString, perms, e = BuildRoutesCodeFromController(permissionMap, controller)
+		routesString, e = BuildRoutesCodeFromController(controller)
 
 		if e != nil {
-			return
+			return e
 		}
-
-		allPerms = append(allPerms, perms...)
-		// allPerms = append(allPerms, "Manage"+controller.Name[0:len(controller.Name)-len("Controller")])
 
 		rest += "\n" + routesString + "\n"
 
-		controllerCalls = append(
-			controllerCalls,
-			"map"+extractNameFromFile(filePath.Name())+"Routes(res, r, auth, c, log)",
-		)
+		// controllerCalls = append(
+		// 	controllerCalls,
+		// 	"map"+strings.Title(controller.Package)+controller.Name+"Routes(res, r, auth, c, log)",
+		// )
 	}
 
-	code += strings.Join(controllerCalls, "\n\t")
-	code += "\n\n}\n"
+	// code += strings.Join(controllerCalls, "\n\t")
 	code += rest
+	code += "\n\n}\n"
 
 	if hasBodyImports {
 		// imports = append(imports, g.Config.BasePackage+"/core/utils/response")
@@ -126,7 +379,7 @@ func GenRoutes(config *lib.Config) (e error) {
 
 	imports = append(imports, "github.com/macinnir/dvc/core/lib/utils/request")
 
-	if usesPermissions {
+	if packageUsesPermission {
 		imports = append(imports, "github.com/macinnir/dvc/core/lib/utils")
 		imports = append(imports, path.Join(config.BasePackage, config.Dirs.Permissions))
 	}
@@ -168,10 +421,10 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 	}
 
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
-	fmt.Println("Writing Routes JSON to to path", lib.RoutesFilePath)
+	// fmt.Println("Writing Routes JSON to path", lib.RoutesFilePath)
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
 
-	return
+	return nil
 }
 
 // RoutesJSONContainer is a container for JSON Routes
@@ -191,6 +444,8 @@ type Controller struct {
 	Routes            []*ControllerRoute `json:"Routes"`
 	HasDTOsImport     bool               `json:"-"`
 	HasResponseImport bool               `json:"-"`
+	PermCount         int                `json:"-"`
+	Package           string             `json:"Package"`
 }
 
 // ControllerRoute represents a route inside a REST controller
@@ -269,170 +524,6 @@ type DocRouteQuery struct {
 	Type    string
 }
 
-// BuildControllerObjFromControllerFile parses a file and extracts all of its @route comments
-func BuildControllerObjFromControllerFile(filePath string, src []byte) (controller *Controller, usesPerms bool, e error) {
-
-	controller = &Controller{
-		Name:   extractNameFromFile(filePath),
-		Path:   filePath,
-		Routes: []*ControllerRoute{},
-	}
-
-	// Get the controller name
-	controllerName := extractNameFromFile(filePath)
-	var methods []lib.Method
-	methods, _, controller.Description = lib.ParseStruct(src, controllerName, true, true, "controllers")
-
-	// Remove the name of the controller from the description
-	controller.Description = strings.TrimPrefix(controller.Description, controller.Name)
-
-	for _, method := range methods {
-
-		route := &ControllerRoute{
-			Queries: []ControllerRouteQuery{},
-			Params:  []ControllerRouteParam{},
-		}
-
-		for line, doc := range method.Documents {
-
-			// This is the title of the method
-			if line == 0 {
-				lineParts := strings.Split(doc, " ")
-				route.Name = lineParts[1]
-				route.Description = strings.Join(lineParts[2:], " ")
-				continue
-			}
-			route.IsAuth = true
-
-			// @anonymous
-			if len(doc) > 12 && doc[0:13] == "// @anonymous" {
-				route.IsAuth = false
-				continue
-			}
-
-			// @body
-			if len(doc) > 9 && doc[0:9] == "// @body " {
-
-				bodyComment := strings.Split(strings.Trim(doc[9:], " "), " ")
-				route.BodyFormat = bodyComment[0]
-
-				if len(bodyComment) > 1 {
-					route.BodyType = bodyComment[1]
-				}
-
-				controller.HasDTOsImport = true
-				controller.HasResponseImport = true
-				route.HasBody = true
-				continue
-			}
-
-			// @response
-			if len(doc) > 13 && doc[0:13] == "// @response " {
-
-				responseComment := strings.Split(strings.Trim(doc[13:], " "), " ")
-
-				if route.ResponseCode, e = strconv.Atoi(responseComment[0]); e != nil {
-					log.Fatalf("Invalid @response comment: %s at %s.%s", doc, controllerName, route.Name)
-				}
-
-				if len(responseComment) > 1 {
-					route.ResponseFormat = responseComment[1]
-				}
-
-				if len(responseComment) > 2 {
-					route.ResponseType = responseComment[2]
-				}
-
-				continue
-			}
-
-			// @perm
-			if len(doc) > 9 && doc[0:9] == "// @perm " {
-				route.Permission = strings.TrimSpace(doc[9:])
-				usesPerms = true
-				continue
-			}
-
-			// @route
-			if len(doc) > 9 && doc[0:9] == "// @route" {
-
-				lineParts := strings.Split(doc, " ")
-				if len(lineParts) < 4 {
-					log.Fatalf("Invalid route comment `%s` for method `%s.%s`", doc, controllerName, route.Name)
-				}
-				route.Method = lineParts[2]
-				route.Raw = lineParts[3]
-
-				// Queries
-				if strings.Contains(route.Raw, "?") {
-
-					subParts := strings.Split(route.Raw, "?")
-					route.Path = subParts[0]
-					queries := strings.Split(subParts[1], "&")
-
-					for _, query := range queries {
-						if !strings.Contains(query, "=") {
-							continue
-						}
-
-						queryParts := strings.Split(query, "=")
-
-						o := ControllerRouteQuery{
-							Name:     queryParts[0],
-							ValueRaw: queryParts[1],
-						}
-
-						if strings.Contains(o.ValueRaw, ":") {
-							queryValueParts := strings.Split(o.ValueRaw, ":")
-							// Remove the starting "{"
-							o.VariableName = queryValueParts[0][1:]
-
-							// Remove the ending "}"
-							o.Pattern = strings.Join(queryValueParts[1:], ":")
-							o.Pattern = o.Pattern[0 : len(o.Pattern)-1]
-
-							// Check if the value isn't a constant value
-							if o.Pattern == "[0-9]" || o.Pattern == "[0-9]+" {
-								o.Type = "int64"
-							} else {
-								o.Type = "string"
-							}
-						} else {
-							// Try to parse the value as an int64
-							// e.g. param=123
-
-							o.VariableName = o.Name
-
-							if _, e := strconv.ParseInt(o.ValueRaw, 10, 64); e != nil {
-								o.Type = "string"
-							} else {
-								o.Type = "int64"
-							}
-						}
-
-						route.Queries = append(route.Queries, o)
-					}
-
-				} else {
-					route.Path = route.Raw
-				}
-
-				params, _ := extractParamsFromRoutePath(route.Path)
-
-				route.Params = append(route.Params, params...)
-
-			} else {
-				route.Description += " " + doc[3:]
-			}
-
-		}
-
-		controller.Routes = append(controller.Routes, route)
-	}
-
-	return
-}
-
 func extractParamsFromRoutePath(routePath string) (params []ControllerRouteParam, e error) {
 
 	params = []ControllerRouteParam{}
@@ -483,20 +574,25 @@ func matchPatternToDataType(pattern string) string {
 }
 
 // BuildRoutesCodeFromController builds controller code based on a route
-func BuildRoutesCodeFromController(permissionMap map[string]string, controller *Controller) (out string, perms []string, e error) {
-
-	permsGate := map[string]bool{}
-	perms = []string{}
+func BuildRoutesCodeFromController(controller *Controller) (out string, e error) {
 
 	s := []string{
-		fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
-		fmt.Sprintf("func map%sRoutes(res request.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, log integrations.ILog) {\n", controller.Name),
+		"",
+		"\t////",
+		"\t// " + strings.Title(controller.Package) + "." + controller.Name,
+		"\t////",
+		"",
 	}
+	// 	fmt.Sprintf("// map%sRoutes maps all of the routes for %s", controller.Name, controller.Name),
+	// 	fmt.Sprintf("func map%s%sRoutes(res request.IResponseLogger, r *mux.Router, auth integrations.IAuth, c *controllers.Controllers.%s, log integrations.ILog) {\n", strings.Title(controller.Package), controller.Name, strings.Title(controller.Package)),
+	// }
 
 	for _, route := range controller.Routes {
 
+		// fmt.Println("Route: " + route.Name)
+
 		// Method comments
-		s = append(s, fmt.Sprintf("\t// %s", route.Name))
+		s = append(s, fmt.Sprintf("\t// %s.%s.%s", strings.Title(controller.Package), controller.Name, route.Name))
 		s = append(s, fmt.Sprintf("\t// %s %s", route.Method, route.Raw))
 		if !route.IsAuth {
 			s = append(s, "\t// @anonymous")
@@ -519,25 +615,17 @@ func BuildRoutesCodeFromController(permissionMap map[string]string, controller *
 		s = append(s, fmt.Sprintf("\n\t\tlog.Debug(\"ROUTE: %s %s => %s\")\n\n", route.Method, route.Path, route.Name))
 
 		// Permission
-		if route.IsAuth && len(route.Permission) > 0 {
+		if route.IsAuth {
 
 			// ucFirst
-			permission := string(unicode.ToUpper(rune(route.Permission[0]))) + route.Permission[1:]
-			if _, ok := permsGate[route.Permission]; !ok {
-				// fmt.Println("adding permission " + route.Permission)
-				permsGate[route.Permission] = true
-				perms = append(perms, route.Permission)
-			}
+			// permission := string(unicode.ToUpper(rune(route.Permission[0]))) + route.Permission[1:]
 
-			if _, ok := permissionMap[permission]; !ok {
-				e = errors.New("Permission " + permission + " does not exist")
-				return
-			}
+			s = append(s, `		
+		if !utils.HasPerm(req, currentUser, permissions.`+route.Permission+`) {
+			res.Forbidden(req, w)
+			return
+		}`)
 
-			s = append(s, "\t\tif !utils.HasPerm(currentUser, permissions."+permission+") {")
-			s = append(s, "\t\t\tres.Forbidden(req, w)")
-			s = append(s, "\t\t\treturn")
-			s = append(s, "\t\t}\n")
 		}
 
 		if len(route.BodyType) > 0 {
@@ -581,7 +669,7 @@ func BuildRoutesCodeFromController(permissionMap map[string]string, controller *
 			args = append(args, "body")
 		}
 
-		s = append(s, fmt.Sprintf("\t\tc.%s.%s(", controller.Name, route.Name)+strings.Join(args, ", ")+")\n")
+		s = append(s, fmt.Sprintf("\t\tc.%s.%s.%s(", strings.Title(controller.Package), controller.Name, route.Name)+strings.Join(args, ", ")+")\n")
 
 		s = append(s, "\t})).")
 
@@ -598,15 +686,10 @@ func BuildRoutesCodeFromController(permissionMap map[string]string, controller *
 		s = append(s, fmt.Sprintf("\t\tName(\"%s\")\n", route.Name))
 	}
 
-	out = strings.Join(s, "\n") + "\n}"
+	out = strings.Join(s, "\n") // + "\n}"
 
 	return
 
-}
-
-func extractNameFromFile(fileName string) (name string) {
-	baseName := filepath.Base(fileName)
-	return baseName[0 : len(baseName)-3]
 }
 
 func genDTOSMap() map[string]map[string]string {
@@ -637,9 +720,7 @@ func genDTOSMap() map[string]map[string]string {
 			continue
 		}
 
-		// fileNameNoExt := name[0 : len(name)-3]
 		fullPath := path.Join(dtosDir, name)
-		// fmt.Println(fullPath)
 
 		model, e := InspectFile(fullPath)
 		if e != nil {
