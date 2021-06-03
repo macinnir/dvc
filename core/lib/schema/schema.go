@@ -103,7 +103,9 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	fieldType = "int64"
 
 	switch column.DataType {
-	case "int", "tinyint", "bigint":
+	case "int", "bigint":
+		fieldType = "int64"
+	case "tinyint":
 		fieldType = "int"
 	case "tinytext", "text", "longtext", "varchar", "date", "datetime", "char", "enum":
 		fieldType = "string"

@@ -8,6 +8,7 @@ import (
 
 func TestDataTypeToGoTypeString(t *testing.T) {
 	assert.Equal(t, "int", DataTypeToGoTypeString(&Column{DataType: "tinyint"}))
+	assert.Equal(t, "int64", DataTypeToGoTypeString(&Column{DataType: "bigint"}))
 	assert.Equal(t, "int64", DataTypeToGoTypeString(&Column{DataType: "int"}))
 	assert.Equal(t, "string", DataTypeToGoTypeString(&Column{DataType: "varchar"}))
 	assert.Equal(t, "string", DataTypeToGoTypeString(&Column{DataType: "enum"}))
