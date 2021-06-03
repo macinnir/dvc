@@ -1254,11 +1254,11 @@ type DAL struct {
 }
 
 // BootstrapDAL bootstraps all of the DAL methods
-func BootstrapDAL(db []integrations.IDB, log integrations.ILog) *DAL {
+func BootstrapDAL(db map[string][]integrations.IDB, log integrations.ILog) *DAL {
 
 	d := &DAL{}
 	{{range .Tables}}
-	d.{{.Name}} = New{{.Name}}DAL(db, log){{end}}
+	d.{{.Name}} = New{{.Name}}DAL(db[models.{{.Name}}_SchemaName], log){{end}}
 
 	return d
 }`
