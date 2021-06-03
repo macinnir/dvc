@@ -435,12 +435,6 @@ func TestExtractParamsFromRoutePath(t *testing.T) {
 // 	assert.Equal(t, "deletes an assignment", result[5].Description)
 // }
 
-func TestGetControllerName(t *testing.T) {
-
-	result := extractNameFromFile(controllerFilePath)
-	assert.Equal(t, "AssignmentsController", result)
-}
-
 // func TestBuildRoutesCodeFromController(t *testing.T) {
 // 	g := &Gen{}
 
@@ -451,3 +445,19 @@ func TestGetControllerName(t *testing.T) {
 
 // 	assert.Equal(t, routesCode, code)
 // }
+
+func TestExtractControllerNameFromFileName(t *testing.T) {
+	var tests = []struct {
+		path string
+		name string
+	}{
+		{"AController.go", "A"},
+		{"AController_test.go", ""},
+		{"ALongControllerName", ""},
+		{"foo/bar/BazController.go", "Baz"},
+	}
+
+	for k := range tests {
+		assert.Equal(t, tests[k].name, extractControllerNameFromFileName(tests[k].path))
+	}
+}
