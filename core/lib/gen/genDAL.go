@@ -1233,10 +1233,12 @@ func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schem
 		Tables              map[string]*schema.Table
 		BasePackage         string
 		IntegrationsPackage string
+		ModelsPackage       string
 	}{
 		BasePackage:         config.BasePackage,
 		Tables:              tables,
 		IntegrationsPackage: fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.IntegrationInterfaces),
+		ModelsPackage:       fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.Models),
 	}
 
 	tpl := `
@@ -1245,6 +1247,7 @@ package dal
 
 import (
 	"{{ .IntegrationsPackage }}"
+	"{{ .ModelsPackage }}"
 )
 
 // DAL is a container for all dal structs
