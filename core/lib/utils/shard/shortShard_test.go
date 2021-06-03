@@ -24,12 +24,22 @@ func TestShortSharder_NewRoundRobin(t *testing.T) {
 }
 
 func TestShortSharder_NewShardIDFromID(t *testing.T) {
+
 	id := int64(448282655093009)
 
 	shard := NewShortShardIDFromID(id)
 
 	assert.Equal(t, int64(9), shard.Shard())
 	assert.Equal(t, int64(448282655093), shard.Timestamp())
+}
+
+func TestShortSharder_NewShardIDFromID_Default(t *testing.T) {
+	id := int64(1000000)
+
+	shard := NewShortShardIDFromID(id)
+
+	assert.Equal(t, int64(0), shard.Shard())
+	assert.Equal(t, int64(0), shard.Timestamp())
 }
 
 func TestShortSharder_buildShardFromString(t *testing.T) {

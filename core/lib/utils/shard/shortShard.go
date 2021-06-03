@@ -25,6 +25,8 @@ var (
 	shortAutIncrementCount int64 = 1024
 	// length of string to shard against
 	shortShardStrLength = 3
+	// The minimum a shard id can be
+	minShortShardID = 10000000
 )
 
 type ShortSharder struct {
@@ -119,9 +121,17 @@ type ShortShardID struct {
 }
 
 func NewShortShardIDFromID(id int64) *ShortShardID {
+
 	s := &ShortShardID{
 		id: id,
 	}
+
+	if id < int64(minShortShardID) {
+		s.timestamp = 0
+		s.shard = 0
+		return s
+	}
+
 	s.timestamp = s.Timestamp()
 	s.shard = s.Shard()
 	return s
@@ -138,11 +148,22 @@ func NewShortShardID(shard int64) *ShortShardID {
 }
 
 func (s *ShortShardID) Shard() int64 {
-	return s.ID() % 1000
+
+	id := s.ID()
+
+	if id < int64(minShortShardID) {
+		return 0
+	}
+
+	return id % 1000
 }
 
 func (s *ShortShardID) Timestamp() int64 {
-	return s.ID() / 1000
+	id := s.ID()
+	if id < int64(minShortShardID) {
+		return 0
+	}
+	return id / 1000
 }
 
 // ID returns the id of the shard
