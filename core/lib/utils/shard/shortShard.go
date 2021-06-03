@@ -38,7 +38,6 @@ type ShortSharder struct {
 func (s *ShortSharder) NewRoundRobin() *ShortShardID {
 	shard := NewShortShardID(
 		(s.sequence % s.numberOfShards),
-		s.sequence,
 	)
 	s.sequence++
 	return shard
@@ -53,8 +52,7 @@ func (s *ShortSharder) NewRoundRobin() *ShortShardID {
 // 		blogEntryID2 := s.NewFromSubID(createdByUserID) // Same shard as line above
 func (s *ShortSharder) NewFromSubID(subID int64) *ShortShardID {
 	shard := NewShortShardID(
-		subID%s.numberOfShards,
-		s.sequence,
+		subID % s.numberOfShards,
 	)
 	s.sequence++
 	return shard
@@ -93,7 +91,6 @@ func (s *ShortSharder) NewFromString(str string) (shardID *ShortShardID, e error
 
 	shardID = NewShortShardID(
 		shard,
-		s.sequence,
 	)
 
 	s.sequence++
@@ -119,7 +116,6 @@ type ShortShardID struct {
 	id        int64
 	shard     int64
 	timestamp int64
-	sequence  int64
 }
 
 func NewShortShardIDFromID(id int64) *ShortShardID {
@@ -127,67 +123,33 @@ func NewShortShardIDFromID(id int64) *ShortShardID {
 		id: id,
 	}
 	s.timestamp = s.Timestamp()
-	s.sequence = s.Sequence()
 	s.shard = s.Shard()
 	return s
 }
 
-func NewShortShardID(shard, sequence int64) *ShortShardID {
+func NewShortShardID(shard int64) *ShortShardID {
 
 	nowMillis := time.Now().UnixNano() / 100000
 	timestamp := nowMillis - shortOurEpoch
 	return &ShortShardID{
 		shard:     shard,
 		timestamp: timestamp,
-		sequence:  sequence % shortAutIncrementCount,
 	}
 }
 
 func (s *ShortShardID) Shard() int64 {
 	return s.ID() % 1000
-	// return s.ID() >> (shortIDSize - shortDateSize - shortShardSize) & (int64(math.Pow(2, float64(shortIDSize-shortDateSize-shortShardSize))) - 1)
 }
 
 func (s *ShortShardID) Timestamp() int64 {
 	return s.ID() / 1000
-	// return s.ID() >> (shortIDSize - shortDateSize)
-}
-
-func (s *ShortShardID) Sequence() int64 {
-	return 0
-	// return s.ID() >> (shortIDSize - shortDateSize - shortShardSize - shortAutoIncrementSize) & (int64(math.Pow(2, float64((shortAutoIncrementSize))) - 1))
 }
 
 // ID returns the id of the shard
 func (s *ShortShardID) ID() int64 {
 	if s.id == 0 {
-
-		// tsBefore := (time.Now().UnixNano() / 100000) - shortOurEpoch
-		// fmt.Println("tsBefore", tsBefore)
-		// fmt.Println("shardBefore", s.shard)
 		newIDString := fmt.Sprintf("%d%03d", s.timestamp, s.shard)
 		s.id, _ = strconv.ParseInt(newIDString, 10, 64)
-
-		// ts := newID / 1000
-		// newShard := newID % 1000
-		// fmt.Println("ts", ts)
-		// fmt.Println("newShard", newShard)
-
-		// fmt.Println("ID()", newID)
-		// fmt.Println("ID()", s.shard, s.timestamp, s.sequence)
-		// str := fmt.Sprintf("%04d%d%04d", s.shard, s.timestamp, s.sequence)
-		// fmt.Println(str)
-		// s.id, _ = strconv.ParseInt(str, 10, 64)
-		// Bitwise inclusive OR
-		// datePart * 2, 23 times
-		// 2^23 * datePart
-
-		// id := s.timestamp << (shortIDSize - shortDateSize) // 64 - 41
-
-		// 2^10 * id
-		// id |= s.shard << (shortIDSize - shortDateSize - shortShardSize) // (64 - 41 - 13)
-		// id |= s.sequence
-		// s.id = id
 	}
 
 	return s.id
@@ -203,5 +165,5 @@ func (s *ShortShardID) Hash() uint32 {
 }
 
 func (s *ShortShardID) String() string {
-	return fmt.Sprintf("ID: %d, DatePart: %d, Shard: %d, Sequence: %d, Hash: %d", s.ID(), s.Timestamp(), s.Shard(), s.Sequence(), s.Hash())
+	return fmt.Sprintf("ID: %d, DatePart: %d, Shard: %d, Hash: %d", s.ID(), s.Timestamp(), s.Shard(), s.Hash())
 }
