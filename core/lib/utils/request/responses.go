@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	gerrors "github.com/go-errors/errors"
 	"github.com/macinnir/dvc/core/lib/utils/errors"
 )
 
@@ -34,17 +35,18 @@ func NotImplemented(r *Request, w http.ResponseWriter) {
 	log.Printf(" HTTP %s %s 501 Not Implemented", r.Method, r.Path)
 	w.WriteHeader(http.StatusNotImplemented)
 	w.Header().Set("content-type", "text/plain")
-	return
 }
 
 // InternalServerError returns a 500 server error response
 func InternalServerError(r *Request, w http.ResponseWriter, e error) {
 	r.ResponseCode = 500
 	r.Error = e.Error()
-	log.Printf(" HTTP %s %s 500 INTERNAL SERVER ERROR: %s", r.Method, r.Path, e.Error())
+
+	stackError := gerrors.Wrap(e, 1).ErrorStack()
+	// fmt.Println("stackError", stackError)
+	log.Printf(" HTTP %s %s 500 INTERNAL SERVER ERROR: %s", r.Method, r.Path, stackError)
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Set("content-type", "text/plain")
-	return
 }
 
 // ErrorResponse is the structure of a response that is an error
@@ -60,7 +62,6 @@ func NotFound(r *Request, w http.ResponseWriter) {
 	log.Printf("WAR HTTP %s %s 404 NOT FOUND", r.Method, r.Path)
 	w.WriteHeader(http.StatusNotFound)
 	w.Header().Set("content-type", "text/plain")
-	return
 }
 
 // BadRequest returns a bad request status (400)
@@ -73,7 +74,6 @@ func BadRequest(r *Request, w http.ResponseWriter, e error) {
 	errorResponse.Status = "400"
 	errorResponse.Detail = e.Error()
 	JSON(r, w, errorResponse)
-	return
 }
 
 // Unauthorized returns an unauthorized status (401)
