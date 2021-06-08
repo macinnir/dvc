@@ -29,6 +29,11 @@ var (
 	minShortShardID = 10000000
 )
 
+type IShortSharder interface {
+	NewRoundRobin() *ShortShardID
+	NewFromSubID(subID int64) *ShortShardID
+}
+
 type ShortSharder struct {
 	sequence       int64
 	numberOfShards int64
