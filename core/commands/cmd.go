@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/macinnir/dvc/core/commands/add"
+	"github.com/macinnir/dvc/core/commands/cli"
 	"github.com/macinnir/dvc/core/commands/clone"
 	"github.com/macinnir/dvc/core/commands/compare"
 	"github.com/macinnir/dvc/core/commands/data"
@@ -55,6 +56,7 @@ func makeCommands() {
 		rm.CommandName:        rm.Cmd,
 		selectcmd.CommandName: selectcmd.Cmd,
 		test.CommandName:      test.Cmd,
+		cli.CommandName:       cli.Cmd,
 	}
 }
 
