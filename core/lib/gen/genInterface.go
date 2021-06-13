@@ -106,7 +106,17 @@ func GenInterfaces(srcDir, destDir string) error {
 		structName := baseName[0 : len(baseName)-3]
 		interfaceName := "I" + structName
 		packageName := filepath.Base(filepath.Dir(srcFile))
-		subDestDir := path.Join(destDir, packageName)
+		destDirName := filepath.Base(destDir)
+		// TODO verbose flag?
+		// fmt.Println("DestDir: ", destDirName)
+
+		subDestDir := destDir
+
+		if packageName != destDirName {
+			subDestDir = path.Join(destDir, packageName)
+		}
+
+		// fmt.Println("SubDestDir: ", subDestDir)
 		destFile := path.Join(subDestDir, interfaceName+".go")
 		srcFiles := []string{srcFile}
 
@@ -137,6 +147,8 @@ func GenInterfaces(srcDir, destDir string) error {
 
 		lib.EnsureDir(subDestDir)
 
+		// TODO verbose flag
+		// fmt.Printf("Generating interface %s...\n", destFile)
 		ioutil.WriteFile(destFile, i, 0644)
 
 		generatedInterfaces++

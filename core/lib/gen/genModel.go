@@ -74,7 +74,8 @@ func GenModels(modelsDir string, force bool, clean bool) error {
 			// Update the models cache
 			tablesCache.Models[tableKey] = tableHash
 
-			fmt.Printf("Generating model `%s`\n", table.Name)
+			// TODO verbose flag
+			// fmt.Printf("Generating model `%s`\n", table.Name)
 			e = GenerateGoModel(modelsDir, schemaName, table)
 			if e != nil {
 				return e
@@ -230,12 +231,12 @@ const (
 	` + modelNode.Name + `_SchemaName = "` + schemaName + `"
 	
 	// ` + modelNode.Name + `_TableName is the name of the table 
-	` + modelNode.Name + `_TableName = "` + modelNode.Name + `"
+	` + modelNode.Name + `_TableName query.TableName = "` + modelNode.Name + `"
 
 	// Columns 
 `)
 	for _, f := range *modelNode.Fields {
-		b.WriteString("\t" + modelNode.Name + "_Column_" + f.Name + " = \"" + f.Name + "\"\n")
+		b.WriteString("\t" + modelNode.Name + "_Column_" + f.Name + " query.Column = \"" + f.Name + "\"\n")
 	}
 
 	b.WriteString(`
@@ -243,7 +244,7 @@ const (
 
 var (
 	// ` + modelNode.Name + `_Columns is a list of all the columns
-	` + modelNode.Name + `_Columns = []string{
+	` + modelNode.Name + `_Columns = []query.Column{
 `)
 
 	for k, f := range *modelNode.Fields {
@@ -255,7 +256,7 @@ var (
 	b.WriteString(`	}
 
 	// ` + modelNode.Name + `_Column_Types maps columns to their string types
-	` + modelNode.Name + `_Column_Types = map[string]string{
+	` + modelNode.Name + `_Column_Types = map[query.Column]string{
 `)
 
 	// Column Types
@@ -269,7 +270,7 @@ var (
 
 	// Update columns
 	b.WriteString("\t// " + modelNode.Name + "_UpdateColumns is a list of all update columns for this model\n")
-	b.WriteString("\t" + modelNode.Name + "_UpdateColumns = []string{")
+	b.WriteString("\t" + modelNode.Name + "_UpdateColumns = []query.Column{")
 	for k := range updateColumns {
 		col := updateColumns[k]
 		b.WriteString(modelNode.Name + "_Column_" + col.Name)
@@ -281,7 +282,7 @@ var (
 
 	// Insert columns
 	b.WriteString("\t// " + modelNode.Name + "_InsertColumns is a list of all insert columns for this model\n")
-	b.WriteString("\t" + modelNode.Name + "_InsertColumns = []string{")
+	b.WriteString("\t" + modelNode.Name + "_InsertColumns = []query.Column{")
 	for k := range insertColumns {
 		col := insertColumns[k]
 		b.WriteString(modelNode.Name + "_Column_" + col.Name)
@@ -293,7 +294,7 @@ var (
 
 	// Primary Key
 	b.WriteString("\t// " + modelNode.Name + "_PrimaryKey is the name of the table's primary key\n")
-	b.WriteString("\t" + modelNode.Name + "_PrimaryKey = \"" + primaryKey + "\"\n)")
+	b.WriteString("\t" + modelNode.Name + "_PrimaryKey query.Column = \"" + primaryKey + "\"\n)")
 
 	// Model
 	if len(modelNode.Comments) > 0 {
@@ -308,21 +309,21 @@ var (
 	b.WriteString(`
 
 // ` + modelNode.Name + `_TableName is the name of the table
-func (c *` + modelNode.Name + `) Table_Name() string {
+func (c *` + modelNode.Name + `) Table_Name() query.TableName {
 	return ` + modelNode.Name + `_TableName
 }
 
-func (c *` + modelNode.Name + `) Table_Columns() []string {
+func (c *` + modelNode.Name + `) Table_Columns() []query.Column {
 	return ` + modelNode.Name + `_Columns
 }
 
 // Table_ColumnTypes returns a map of tableColumn names with their fmt string types
-func (c *` + modelNode.Name + `) Table_Column_Types() map[string]string {
+func (c *` + modelNode.Name + `) Table_Column_Types() map[query.Column]string {
 	return ` + modelNode.Name + `_Column_Types
 }
 
 // Table_PrimaryKey returns the name of this table's primary key 
-func (c *` + modelNode.Name + `) Table_PrimaryKey() string {
+func (c *` + modelNode.Name + `) Table_PrimaryKey() query.Column {
 	return ` + modelNode.Name + `_PrimaryKey
 }
 
@@ -332,12 +333,12 @@ func (c *` + modelNode.Name + `) Table_PrimaryKey_Value() int64 {
 }
 
 // Table_InsertColumns is a list of all insert columns for this model
-func (c *` + modelNode.Name + `) Table_InsertColumns() []string {
+func (c *` + modelNode.Name + `) Table_InsertColumns() []query.Column {
 	return ` + modelNode.Name + `_InsertColumns
 }
 
 // Table_UpdateColumns is a list of all update columns for this model
-func (c *` + modelNode.Name + `) Table_UpdateColumns() []string {
+func (c *` + modelNode.Name + `) Table_UpdateColumns() []query.Column {
 	return ` + modelNode.Name + `_UpdateColumns
 }
 

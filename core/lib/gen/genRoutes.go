@@ -73,9 +73,9 @@ func NewControllerFetcher() *ControllerFetcher {
 	}
 }
 
-func (cf *ControllerFetcher) Fetch(dir string) (controllers []*Controller, e error) {
+func (cf *ControllerFetcher) Fetch(dir string) (controllers []*lib.Controller, e error) {
 
-	controllers = []*Controller{}
+	controllers = []*lib.Controller{}
 
 	var files []os.FileInfo
 	files, e = ioutil.ReadDir(dir)
@@ -90,7 +90,7 @@ func (cf *ControllerFetcher) Fetch(dir string) (controllers []*Controller, e err
 		filePath := path.Join(dir, files[k].Name())
 
 		if files[k].IsDir() {
-			var subControllers []*Controller
+			var subControllers []*lib.Controller
 			if subControllers, e = cf.Fetch(filePath); e != nil {
 				return
 			}
@@ -99,7 +99,7 @@ func (cf *ControllerFetcher) Fetch(dir string) (controllers []*Controller, e err
 		}
 
 		// Build a controller object from the controller file
-		var controller *Controller
+		var controller *lib.Controller
 		if controller, e = cf.BuildControllerObjFromControllerFile(filePath); e != nil {
 			return
 		}
@@ -114,7 +114,7 @@ func (cf *ControllerFetcher) Fetch(dir string) (controllers []*Controller, e err
 }
 
 // BuildControllerObjFromControllerFile parses a file and extracts all of its @route comments
-func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath string) (controller *Controller, e error) {
+func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath string) (controller *lib.Controller, e error) {
 
 	pkgName := filepath.Base(filepath.Dir(filePath))
 
@@ -133,10 +133,10 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 		return
 	}
 
-	controller = &Controller{
+	controller = &lib.Controller{
 		Name:    controllerName,
 		Path:    filePath,
-		Routes:  []*ControllerRoute{},
+		Routes:  []*lib.ControllerRoute{},
 		Package: pkgName,
 	}
 	controllerFullName := controller.Name + "Controller"
@@ -150,9 +150,9 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 	for _, method := range methods {
 
-		route := &ControllerRoute{
-			Queries: []ControllerRouteQuery{},
-			Params:  []ControllerRouteParam{},
+		route := &lib.ControllerRoute{
+			Queries: []lib.ControllerRouteQuery{},
+			Params:  []lib.ControllerRouteParam{},
 		}
 
 		for line, doc := range method.Documents {
@@ -239,7 +239,7 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 						queryParts := strings.Split(query, "=")
 
-						o := ControllerRouteQuery{
+						o := lib.ControllerRouteQuery{
 							Name:     queryParts[0],
 							ValueRaw: queryParts[1],
 						}
@@ -405,8 +405,8 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 
 	ioutil.WriteFile("core/api/routes.go", []byte(final), 0777)
 
-	routesContainer := &RoutesJSONContainer{
-		Routes:     map[string]*ControllerRoute{},
+	routesContainer := &lib.RoutesJSONContainer{
+		Routes:     map[string]*lib.ControllerRoute{},
 		DTOs:       genDTOSMap(),
 		Models:     genModelsMap(),
 		Aggregates: genAggregatesMap(),
@@ -427,106 +427,9 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 	return nil
 }
 
-// RoutesJSONContainer is a container for JSON Routes
-type RoutesJSONContainer struct {
-	Routes     map[string]*ControllerRoute  `json:"routes"`
-	DTOs       map[string]map[string]string `json:"dtos"`
-	Models     map[string]map[string]string `json:"models"`
-	Aggregates map[string]map[string]string `json:"aggregates"`
-	Constants  map[string][]string          `json:"constants"`
-}
+func extractParamsFromRoutePath(routePath string) (params []lib.ControllerRouteParam, e error) {
 
-// Controller represents a REST controller
-type Controller struct {
-	Name              string             `json:"Name"`
-	Description       string             `json:"Description"`
-	Path              string             `json:"-"`
-	Routes            []*ControllerRoute `json:"Routes"`
-	HasDTOsImport     bool               `json:"-"`
-	HasResponseImport bool               `json:"-"`
-	PermCount         int                `json:"-"`
-	Package           string             `json:"Package"`
-}
-
-// ControllerRoute represents a route inside a REST controller
-type ControllerRoute struct {
-	Name           string                 `json:"Name"`
-	Description    string                 `json:"Description"`
-	Raw            string                 `json:"Path"`
-	Path           string                 `json:"-"`
-	Method         string                 `json:"Method"`
-	Params         []ControllerRouteParam `json:"Params"`
-	Queries        []ControllerRouteQuery `json:"Queries"`
-	IsAuth         bool                   `json:"IsAuth"`
-	BodyType       string                 `json:"BodyType"`
-	BodyFormat     string                 `json:"BodyFormat"`
-	HasBody        bool                   `json:"HasBody"`
-	ResponseType   string                 `json:"ResponseType"`
-	ResponseFormat string                 `json:"ResponseFormat"`
-	ResponseCode   int                    `json:"ResponseCode"`
-	Permission     string                 `json:"Permission"`
-}
-
-// ControllerRouteParam represents a param inside a controller route
-type ControllerRouteParam struct {
-	Name    string
-	Pattern string
-	Type    string
-}
-
-// ControllerRouteQuery represents a query inside a controller route
-type ControllerRouteQuery struct {
-	Name         string
-	Pattern      string
-	Type         string
-	VariableName string
-	ValueRaw     string
-}
-
-// DocRoute is a route in the documentation
-type DocRoute struct {
-	Name           string
-	Description    string
-	Method         string
-	Path           string
-	HasBody        bool
-	BodyType       string
-	BodyFormat     string
-	ResponseType   string
-	ResponseFormat string
-	ResponseCode   int
-}
-
-func newDocRoute(route ControllerRoute) (docRoute *DocRoute) {
-	docRoute = &DocRoute{
-		Name:        route.Name,
-		Description: route.Description,
-		Method:      route.Method,
-		Path:        route.Path,
-		HasBody:     route.HasBody,
-		BodyType:    route.BodyType,
-	}
-
-	return
-}
-
-// DocRouteParam represents a parameter inside a route for documentation
-type DocRouteParam struct {
-	Name    string
-	Pattern string
-	Type    string
-}
-
-// DocRouteQuery represents a query inside a route for documentation
-type DocRouteQuery struct {
-	Name    string
-	Pattern string
-	Type    string
-}
-
-func extractParamsFromRoutePath(routePath string) (params []ControllerRouteParam, e error) {
-
-	params = []ControllerRouteParam{}
+	params = []lib.ControllerRouteParam{}
 
 	// Params
 	if strings.Contains(routePath, "{") {
@@ -548,7 +451,7 @@ func extractParamsFromRoutePath(routePath string) (params []ControllerRouteParam
 	return
 }
 
-func extractParamFromString(paramString string) (param ControllerRouteParam) {
+func extractParamFromString(paramString string) (param lib.ControllerRouteParam) {
 
 	// Incase there are parts after the param, split on the closing bracket
 	pParts := strings.Split(paramString, "}")
@@ -556,7 +459,7 @@ func extractParamFromString(paramString string) (param ControllerRouteParam) {
 
 	paramParts := strings.Split(paramString, ":")
 
-	param = ControllerRouteParam{
+	param = lib.ControllerRouteParam{
 		Name:    paramParts[0],
 		Pattern: paramParts[1],
 	}
@@ -574,7 +477,7 @@ func matchPatternToDataType(pattern string) string {
 }
 
 // BuildRoutesCodeFromController builds controller code based on a route
-func BuildRoutesCodeFromController(controller *Controller) (out string, e error) {
+func BuildRoutesCodeFromController(controller *lib.Controller) (out string, e error) {
 
 	s := []string{
 		"",

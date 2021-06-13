@@ -17,7 +17,7 @@ func (g *Gen) GenAPITests() (e error) {
 		return
 	}
 
-	c := &RoutesJSONContainer{}
+	c := &lib.RoutesJSONContainer{}
 	if e = json.Unmarshal(fileBytes, c); e != nil {
 		return
 	}

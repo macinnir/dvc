@@ -194,13 +194,14 @@ var dalTPL *template.Template
 // GenerateGoDAL returns a string for a repo in golang
 func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error) {
 
-	start := time.Now()
-	fmt.Printf("Generating DAL `%s`...", table.Name)
+	p := path.Join(dir, table.Name+"DAL.go")
+	// TODO verbose flag
+	// start := time.Now()
+	// TODO verbose flag
+	// fmt.Printf("Generating DAL `%s`...", p)
 	lib.EnsureDir(dir)
 
 	imports := []string{}
-
-	p := path.Join(dir, table.Name+"DAL.go")
 
 	// lib.Debugf("Generating go dal file for table %s at path %s", g.Options, table.Name, p)
 
@@ -962,7 +963,8 @@ func (r *{{.Table.Name}}DAL) Count(shard int64) (count int64, e error) {
 	// 	// lib.Warn(e.Error(), g.Options)
 	// }
 
-	fmt.Printf("%f seconds\n", time.Since(start).Seconds())
+	// TODO verbose flag
+	// fmt.Printf("%f seconds\n", time.Since(start).Seconds())
 
 	return
 }

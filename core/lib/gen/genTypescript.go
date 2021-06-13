@@ -1,83 +1,51 @@
 package gen
 
 import (
-	"fmt"
-	"io/ioutil"
+	"strings"
 
-	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
 // GenerateTypescriptTypes returns a string for a typscript types file
-func (g *Gen) GenerateTypescriptTypes(database *schema.Schema) (goCode string, e error) {
-	goCode = "// #genStart \n\ndeclare namespace Models {\n\n"
-	for _, table := range database.Tables {
+func GenerateTypescriptTypes(database *schema.Schema) (string, error) {
 
-		str := ""
+	var e error
+	var sb strings.Builder
 
-		if str, e = g.GenerateTypescriptType(table); e != nil {
-			return
+	sb.WriteString("// #genStart \n\ndeclare namespace Models {\n\n")
+	for k := range database.Tables {
+
+		table := database.Tables[k]
+
+		var str string
+		if str, e = GenerateTypescriptType(table); e != nil {
+			return "", e
 		}
 
-		goCode += str
+		sb.WriteString(str)
 	}
 
-	goCode += "}\n"
-	goCode += "// #genEnd\n"
+	sb.WriteString("}\n")
+	sb.WriteString("// #genEnd\n")
 
-	return
+	return sb.String(), nil
 }
 
 // GenerateTypescriptType returns a string for a type in typescript
-func (g *Gen) GenerateTypescriptType(table *schema.Table) (goCode string, e error) {
+func GenerateTypescriptType(table *schema.Table) (string, error) {
 
-	goCode += fmt.Sprintf("\t/**\n\t * %s\n\t */\n", table.Name)
-	goCode += fmt.Sprintf("\texport interface %s {\n", table.Name)
+	var sb strings.Builder
+
+	sb.WriteString("\t/**\n\t * " + table.Name + "\n\t */\n")
+	sb.WriteString("\texport interface " + table.Name + "{\n")
 	for _, column := range table.Columns {
 
-		fieldType := "number"
-		switch column.DataType {
-		case "varchar":
-			fieldType = "string"
-		case "enum":
-			fieldType = "string"
-		case "text":
-			fieldType = "string"
-		case "date":
-			fieldType = "string"
-		case "datetime":
-			fieldType = "string"
-		case "char":
-			fieldType = "string"
-		}
-		// decimal
-		//
+		fieldType := schema.DataTypeToTypescriptString(column)
 
-		goCode += fmt.Sprintf("\t\t%s: %s;\n", column.Name, fieldType)
+		sb.WriteString("\t\t" + column.Name + ": " + fieldType + ";\n")
 	}
 
-	goCode += "\t}\n\n"
+	sb.WriteString("\t}\n\n")
 
-	return
-
-}
-
-// GenerateTypescriptTypesFile generates a typescript type file
-func (g *Gen) GenerateTypescriptTypesFile(dir string, database *schema.Schema) (e error) {
-
-	lib.EnsureDir(dir)
-
-	var goCode string
-
-	outFile := fmt.Sprintf("%s/types.d.ts", dir)
-	// lib.Debugf("Generating typescript types file at path %s", g.Options, outFile)
-	goCode, e = g.GenerateTypescriptTypes(database)
-	if e != nil {
-		return
-	}
-
-	ioutil.WriteFile(outFile, []byte(goCode), 0644)
-
-	return
-
+	return sb.String(), nil
 }
