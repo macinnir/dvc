@@ -354,7 +354,7 @@ func TestWhereTypeAll(t *testing.T) {
 
 func TestWhere_MultiWheres(t *testing.T) {
 	q := query.Select(&testassets.Job{}).Where(query.WhereAll())
-	q.Where(query.And(), query.EQ("IsDeleted!", 0))
+	q.Where(query.And(), query.EQ("IsDeleted", 0))
 	r, e := q.String()
 
 	expected := "SELECT `t`.* FROM `Job` `t` WHERE 1=1 AND `t`.`IsDeleted` = 0"

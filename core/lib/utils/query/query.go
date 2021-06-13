@@ -94,8 +94,8 @@ func (q *Q) Limit(limit, offset int64) *Q {
 	return q
 }
 
-func (q *Q) OrderBy(col string, dir QueryOrderBy) *Q {
-	q.orderBy = append(q.orderBy, []string{col, dir.String()})
+func (q *Q) OrderBy(col Column, dir QueryOrderBy) *Q {
+	q.orderBy = append(q.orderBy, []string{string(col), dir.String()})
 	return q
 }
 
