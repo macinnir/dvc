@@ -3,7 +3,10 @@ module github.com/macinnir/dvc
 go 1.15
 
 require (
+	github.com/TylerBrock/colorjson v0.0.0-20200706003622-8a50f05110d2
+	github.com/fatih/color v1.12.0 // indirect
 	github.com/fatih/structtag v1.2.0
+	github.com/go-errors/errors v1.4.0
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
