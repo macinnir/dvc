@@ -89,11 +89,19 @@ func (n *NullString) UnMarshalJSON(data []byte) error {
 }
 
 var (
-	Comment_TableName     = "Comment"
-	Comment_Columns       = []string{"CommentID", "DateCreated", "IsDeleted", "Content", "ObjectType", "ObjectID"}
-	Comment_Column_Types  = map[string]string{"CommentID": "%d", "DateCreated": "%d", "IsDeleted": "%d", "Content": "%s", "ObjectType": "%d", "ObjectID": "%d"}
-	Comment_UpdateColumns = []string{"Content", "ObjectType", "ObjectID"}
-	Comment_InsertColumns = []string{"DateCreated", "Content", "ObjectType", "ObjectID"}
+	Comment_TableName query.QueryTableName = "Comment"
+
+	Comment_Column_CommentID   query.QueryColumn = "CommentID"
+	Comment_Column_DateCreated query.QueryColumn = "DateCreated"
+	Comment_Column_IsDeleted   query.QueryColumn = "IsDeleted"
+	Comment_Column_Content     query.QueryColumn = "Content"
+	Comment_Column_ObjectType  query.QueryColumn = "ObjectType"
+	Comment_Column_ObjectID    query.QueryColumn = "ObjectID"
+
+	Comment_Columns       = []query.QueryColumn{Comment_Column_CommentID, Comment_Column_DateCreated, Comment_Column_IsDeleted, Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
+	Comment_Column_Types  = map[query.QueryColumn]string{"CommentID": "%d", "DateCreated": "%d", "IsDeleted": "%d", "Content": "%s", "ObjectType": "%d", "ObjectID": "%d"}
+	Comment_UpdateColumns = []query.QueryColumn{Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
+	Comment_InsertColumns = []query.QueryColumn{Comment_Column_DateCreated, Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
 	Comment_PrimaryKey    = "CommentID"
 )
 
@@ -108,19 +116,19 @@ type Comment struct {
 }
 
 // Comment_TableName is the name of the table
-func (c *Comment) Table_Name() string {
+func (c *Comment) Table_Name() query.QueryTableName {
 	return Comment_TableName
 }
 
-func (c *Comment) Table_Columns() []string {
+func (c *Comment) Table_Columns() []query.QueryColumn {
 	return Comment_Columns
 }
 
-func (c *Comment) Table_Column_Types() map[string]string {
+func (c *Comment) Table_Column_Types() map[query.QueryColumn]string {
 	return Comment_Column_Types
 }
 
-func (c *Comment) Table_PrimaryKey() string {
+func (c *Comment) Table_PrimaryKey() query.QueryColumn {
 	return Comment_PrimaryKey
 }
 

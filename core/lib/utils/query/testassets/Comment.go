@@ -3,7 +3,26 @@ package testassets
 import (
 	"encoding/json"
 
+	"github.com/macinnir/dvc/core/lib/utils/query"
 	"gopkg.in/guregu/null.v3"
+)
+
+const (
+
+	// ListItem_SchemaName is the name of the schema group this model is in
+	ListItem_SchemaName = "rfq"
+
+	// Comment_TableName
+	Comment_TableName query.TableName = "Comment"
+
+	// Columns
+	Comment_Column_CommentID   query.Column = "CommentID"
+	Comment_Column_DateCreated query.Column = "DateCreated"
+	Comment_Column_IsDeleted   query.Column = "IsDeleted"
+	Comment_Column_Content     query.Column = "Content"
+	Comment_Column_ObjectType  query.Column = "ObjectType"
+	Comment_Column_ObjectID    query.Column = "ObjectID"
+	Comment_Column_Name        query.Column = "Name"
 )
 
 // Comment is a `Comment` data model
@@ -18,24 +37,24 @@ type Comment struct {
 }
 
 // Comment_TableName is the name of the table
-func (c *Comment) Table_Name() string {
-	return "Comment"
+func (c *Comment) Table_Name() query.TableName {
+	return Comment_TableName
 }
 
-func (c *Comment) Table_Columns() []string {
-	return []string{
-		"CommentID",
-		"DateCreated",
-		"IsDeleted",
-		"Content",
-		"ObjectType",
-		"ObjectID",
-		"Name",
+func (c *Comment) Table_Columns() []query.Column {
+	return []query.Column{
+		Comment_Column_CommentID,
+		Comment_Column_DateCreated,
+		Comment_Column_IsDeleted,
+		Comment_Column_Content,
+		Comment_Column_ObjectType,
+		Comment_Column_ObjectID,
+		Comment_Column_Name,
 	}
 }
 
-func (c *Comment) Table_Column_Types() map[string]string {
-	return map[string]string{
+func (c *Comment) Table_Column_Types() map[query.Column]string {
+	return map[query.Column]string{
 		"CommentID":   "%d",
 		"DateCreated": "%d",
 		"IsDeleted":   "%d",
@@ -46,8 +65,8 @@ func (c *Comment) Table_Column_Types() map[string]string {
 	}
 }
 
-func (c *Comment) Table_Column_Values() map[string]interface{} {
-	return map[string]interface{}{
+func (c *Comment) Table_Column_Values() map[query.Column]interface{} {
+	return map[query.Column]interface{}{
 		"CommentID":   c.CommentID,
 		"DateCreated": c.DateCreated,
 		"IsDeleted":   c.IsDeleted,
@@ -59,8 +78,8 @@ func (c *Comment) Table_Column_Values() map[string]interface{} {
 }
 
 // Comment_PrimaryKey is the name of the table's primary key
-func (c *Comment) Table_PrimaryKey() string {
-	return "CommentID"
+func (c *Comment) Table_PrimaryKey() query.Column {
+	return Comment_Column_CommentID
 }
 
 func (c *Comment) Table_PrimaryKey_Value() int64 {
@@ -68,13 +87,24 @@ func (c *Comment) Table_PrimaryKey_Value() int64 {
 }
 
 // Comment_InsertColumns is a list of all insert columns for this model
-func (c *Comment) Table_InsertColumns() []string {
-	return []string{"DateCreated", "Content", "ObjectType", "ObjectID", "Name"}
+func (c *Comment) Table_InsertColumns() []query.Column {
+	return []query.Column{
+		Comment_Column_DateCreated,
+		Comment_Column_Content,
+		Comment_Column_ObjectType,
+		Comment_Column_ObjectID,
+		Comment_Column_Name,
+	}
 }
 
 // Comment_UpdateColumns is a list of all update columns for this model
-func (c *Comment) Table_UpdateColumns() []string {
-	return []string{"Content", "ObjectType", "ObjectID", "Name"}
+func (c *Comment) Table_UpdateColumns() []query.Column {
+	return []query.Column{
+		Comment_Column_Content,
+		Comment_Column_ObjectType,
+		Comment_Column_ObjectID,
+		Comment_Column_Name,
+	}
 }
 
 func (c *Comment) String() string {

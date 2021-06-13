@@ -1,6 +1,23 @@
 package testassets
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/macinnir/dvc/core/lib/utils/query"
+)
+
+const (
+	JobSales_TableName query.TableName = "JobSales"
+
+	JobSales_Column_JobSalesID        query.Column = "JobSalesID"
+	JobSales_Column_JobID             query.Column = "JobID"
+	JobSales_Column_UserID            query.Column = "UserID"
+	JobSales_Column_CommissionPercent query.Column = "CommissionPercent"
+	JobSales_Column_DateCreated       query.Column = "DateCreated"
+	JobSales_Column_IsDeleted         query.Column = "IsDeleted"
+	JobSales_Column_CommissionDollars query.Column = "CommissionDollars"
+	JobSales_Column_IsHouse           query.Column = "IsHouse"
+)
 
 // JobSales is a `JobSales` data model
 type JobSales struct {
@@ -15,25 +32,25 @@ type JobSales struct {
 }
 
 // Comment_TableName is the name of the table
-func (c *JobSales) Table_Name() string {
-	return "JobSales"
+func (c *JobSales) Table_Name() query.TableName {
+	return JobSales_TableName
 }
 
-func (c *JobSales) Table_Columns() []string {
-	return []string{
-		"JobSalesID",
-		"JobID",
-		"UserID",
-		"CommissionPercent",
-		"DateCreated",
-		"IsDeleted",
-		"CommissionDollars",
-		"IsHouse",
+func (c *JobSales) Table_Columns() []query.Column {
+	return []query.Column{
+		JobSales_Column_JobSalesID,
+		JobSales_Column_JobID,
+		JobSales_Column_UserID,
+		JobSales_Column_CommissionPercent,
+		JobSales_Column_DateCreated,
+		JobSales_Column_IsDeleted,
+		JobSales_Column_CommissionDollars,
+		JobSales_Column_IsHouse,
 	}
 }
 
-func (c *JobSales) Table_Column_Types() map[string]string {
-	return map[string]string{
+func (c *JobSales) Table_Column_Types() map[query.Column]string {
+	return map[query.Column]string{
 		"JobSalesID":        "%d",
 		"JobID":             "%d",
 		"UserID":            "%d",
@@ -45,8 +62,8 @@ func (c *JobSales) Table_Column_Types() map[string]string {
 	}
 }
 
-func (c *JobSales) Table_Column_Values() map[string]interface{} {
-	return map[string]interface{}{
+func (c *JobSales) Table_Column_Values() map[query.Column]interface{} {
+	return map[query.Column]interface{}{
 		"JobSalesID":        c.JobSalesID,
 		"JobID":             c.JobID,
 		"UserID":            c.UserID,
@@ -59,7 +76,7 @@ func (c *JobSales) Table_Column_Values() map[string]interface{} {
 }
 
 // Comment_PrimaryKey is the name of the table's primary key
-func (c *JobSales) Table_PrimaryKey() string {
+func (c *JobSales) Table_PrimaryKey() query.Column {
 	return "JobSalesID"
 }
 
@@ -68,13 +85,13 @@ func (c *JobSales) Table_PrimaryKey_Value() int64 {
 }
 
 // Comment_InsertColumns is a list of all insert columns for this model
-func (c *JobSales) Table_InsertColumns() []string {
-	return []string{"DateCreated", "Content", "ObjectType", "ObjectID"}
+func (c *JobSales) Table_InsertColumns() []query.Column {
+	return []query.Column{"DateCreated", "Content", "ObjectType", "ObjectID"}
 }
 
 // Comment_UpdateColumns is a list of all update columns for this model
-func (c *JobSales) Table_UpdateColumns() []string {
-	return []string{"Content", "ObjectType", "ObjectID"}
+func (c *JobSales) Table_UpdateColumns() []query.Column {
+	return []query.Column{"Content", "ObjectType", "ObjectID"}
 }
 
 func (c *JobSales) String() string {

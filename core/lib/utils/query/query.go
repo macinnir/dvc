@@ -6,14 +6,17 @@ import (
 	"strings"
 )
 
+type Column string
+type TableName string
+
 type IModel interface {
-	Table_Name() string
-	Table_Columns() []string
-	Table_PrimaryKey() string
+	Table_Name() TableName
+	Table_Columns() []Column
+	Table_PrimaryKey() Column
 	Table_PrimaryKey_Value() int64
-	Table_InsertColumns() []string
-	Table_UpdateColumns() []string
-	Table_Column_Types() map[string]string
+	Table_InsertColumns() []Column
+	Table_UpdateColumns() []Column
+	Table_Column_Types() map[Column]string
 	String() string
 	Update() string
 	Create() string
@@ -33,18 +36,35 @@ const (
 	QueryTypeInsert
 )
 
+type QueryOrderBy int
+
+const (
+	QueryOrderByASC QueryOrderBy = iota
+	QueryOrderByDESC
+)
+
+func (q QueryOrderBy) String() string {
+	switch q {
+	case QueryOrderByASC:
+		return "ASC"
+	default:
+		// QueryOrderByDESC
+		return "DESC"
+	}
+}
+
 type Q struct {
 	fields      []string
 	alias       string
 	model       IModel
 	queryType   QueryType
-	where       *Where
+	where       *whereClause
 	limit       int64
 	offset      int64
 	orderBy     [][]string
-	setSorter   []string
-	sets        map[string]interface{}
-	columnTypes map[string]string
+	setSorter   []Column
+	sets        map[Column]interface{}
+	columnTypes map[Column]string
 	errors      []string
 	inst        int64
 }
@@ -54,8 +74,8 @@ func Query(model IModel) *Q {
 		fields:      []string{},
 		model:       model,
 		orderBy:     [][]string{},
-		setSorter:   []string{},
-		sets:        map[string]interface{}{},
+		setSorter:   []Column{},
+		sets:        map[Column]interface{}{},
 		columnTypes: model.Table_Column_Types(),
 		alias:       "t",
 		errors:      []string{},
@@ -74,8 +94,8 @@ func (q *Q) Limit(limit, offset int64) *Q {
 	return q
 }
 
-func (q *Q) OrderBy(col, dir string) *Q {
-	q.orderBy = append(q.orderBy, []string{col, dir})
+func (q *Q) OrderBy(col string, dir QueryOrderBy) *Q {
+	q.orderBy = append(q.orderBy, []string{col, dir.String()})
 	return q
 }
 
@@ -84,56 +104,64 @@ func (q *Q) Fields(fields ...string) *Q {
 	return q
 }
 
-func (q *Q) Field(name string) *Q {
+// Field includes a specific field in the columns to be returned by a result set
+func (q *Q) Field(name Column) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("SELECT", name)
+		q.errorInvalidColumn("SELECT", string(name))
 	}
 
-	q.fields = append(q.fields, "`"+q.alias+"`.`"+name+"`")
+	q.fields = append(q.fields, "`"+q.alias+"`.`"+string(name)+"`")
 
 	return q
 }
 
-func (q *Q) FieldAs(name, as string) *Q {
-	q.fields = append(q.fields, "`"+q.alias+"`.`"+name+"` AS `"+as+"`")
+// FieldAs includes a specific field in the columns to be returned by a set aliased by `as`
+func (q *Q) FieldAs(name Column, as string) *Q {
+
+	if _, ok := q.columnTypes[name]; !ok {
+		q.errorInvalidColumn("SELECT", string(name))
+	}
+
+	q.fields = append(q.fields, "`"+q.alias+"`.`"+string(name)+"` AS `"+as+"`")
 
 	return q
 }
 
+// FieldRaw allows for an arbitrary string (e.g. "NOW()") to be included in the select columns
 func (q *Q) FieldRaw(fieldStr, as string) *Q {
 	q.fields = append(q.fields, fieldStr+" AS "+"`"+as+"`")
 
 	return q
 }
 
-func (q *Q) Count(name, as string) *Q {
+func (q *Q) Count(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("COUNT()", name)
+		q.errorInvalidColumn("COUNT()", string(name))
 		return q
 	}
 
-	return q.FieldRaw("COUNT(`"+q.alias+"`.`"+name+"`)", as)
+	return q.FieldRaw("COUNT(`"+q.alias+"`.`"+string(name)+"`)", as)
 }
 
-func (q *Q) Sum(name, as string) *Q {
+func (q *Q) Sum(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("Sum()", name)
+		q.errorInvalidColumn("Sum()", string(name))
 		return q
 	}
 
-	return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+name+"`), 0)", as)
+	return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
 }
 
 // Where().Equals("a", "b")
-func (q *Q) Where(args ...WherePart) *Q {
+func (q *Q) Where(args ...wherePart) *Q {
 	// allow for multiple where calls in single query
 	if q.where == nil {
-		q.where = &Where{
+		q.where = &whereClause{
 			query:      q,
-			WhereParts: []WherePart{},
+			WhereParts: []wherePart{},
 		}
 	}
 
@@ -211,7 +239,7 @@ func (q *Q) String() (string, error) {
 		q.alias = ""
 	}
 
-	sb.WriteString(" `" + q.model.Table_Name() + "`")
+	sb.WriteString(" `" + string(q.model.Table_Name()) + "`")
 	// sql += " `" + q.model.Table_Name() + "`"
 
 	if len(q.alias) > 0 && q.queryType == QueryTypeSelect {
@@ -233,7 +261,7 @@ func (q *Q) String() (string, error) {
 			val := fmt.Sprint(q.sets[colName])
 
 			if _, ok := q.columnTypes[colName]; !ok {
-				q.errorInvalidColumn("UPDATE()", colName)
+				q.errorInvalidColumn("UPDATE()", string(colName))
 				val = "'" + val + "'"
 			} else {
 				if q.columnTypes[colName] == "%s" {
@@ -241,7 +269,7 @@ func (q *Q) String() (string, error) {
 				}
 			}
 
-			setStmts = append(setStmts, q.col(colName)+" = "+val)
+			setStmts = append(setStmts, q.col(string(colName))+" = "+val)
 		}
 
 		sb.WriteString(strings.Join(setStmts, ", "))
@@ -258,7 +286,7 @@ func (q *Q) String() (string, error) {
 			colName := q.setSorter[k]
 
 			if _, ok := q.columnTypes[colName]; !ok {
-				q.errorInvalidColumn("INSERT()", colName)
+				q.errorInvalidColumn("INSERT()", string(colName))
 			}
 
 			val := fmt.Sprint(q.sets[colName])
@@ -267,7 +295,7 @@ func (q *Q) String() (string, error) {
 				val = "'" + val + "'"
 			}
 
-			cols = append(cols, q.col(colName))
+			cols = append(cols, q.col(string(colName)))
 			vals = append(vals, val)
 		}
 
@@ -318,7 +346,7 @@ func (q *Q) col(colName string) string {
 		return "`" + q.alias + "`.`" + colName + "`"
 		// return fmt.Sprintf("`%s`.`%s`", q.alias, colName)
 	}
-	return "`" + colName + "`"
+	return "`" + string(colName) + "`"
 	// return fmt.Sprintf("`%s`", colName)
 }
 
@@ -333,7 +361,7 @@ func isConjunction(whereType WhereType) bool {
 
 }
 
-func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePart) string {
+func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []wherePart) string {
 
 	sb := strings.Builder{}
 
@@ -354,12 +382,12 @@ func (q *Q) printWhereClause(columnTypes map[string]string, whereParts []WherePa
 
 			sb.WriteString(q.col(w.fieldName))
 
-			if _, ok := columnTypes[w.fieldName]; !ok {
+			if _, ok := columnTypes[Column(w.fieldName)]; !ok {
 				q.errorInvalidColumn("WHERE()", w.fieldName)
 			}
 		}
 
-		column := columnTypes[w.fieldName]
+		column := columnTypes[Column(w.fieldName)]
 
 		switch w.whereType {
 		case WhereTypeEquals, WhereTypeEqualsField:
@@ -490,98 +518,103 @@ const (
 	WhereTypeAll
 )
 
-type WherePart struct {
+type wherePart struct {
 	whereType WhereType
 	fieldName string
 	values    []interface{}
-	subParts  []WherePart
+	subParts  []wherePart
 	e         error
 }
 
-func NewWherePart(whereType WhereType, fieldName string, values []interface{}) WherePart {
-	return WherePart{
+func newWhereParent(whereType WhereType, fieldName string, values []interface{}) wherePart {
+	return wherePart{
 		whereType: whereType,
 		fieldName: fieldName,
 		values:    values,
-		subParts:  []WherePart{},
+		subParts:  []wherePart{},
 	}
 }
 
-type Where struct {
+type whereClause struct {
 	query      *Q
-	WhereParts []WherePart
+	WhereParts []wherePart
 }
 
-func EQ(fieldName string, value interface{}) WherePart {
-	return NewWherePart(
+////
+// EXPOSED API
+////
+
+// EQ is an equals statement between a table column and a value
+func EQ(fieldName Column, value interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeEquals,
-		fieldName,
+		string(fieldName),
 		[]interface{}{
 			value,
 		},
 	)
 }
 
-func EQF(fieldName1, fieldName2 string) WherePart {
-	return NewWherePart(
+func EQF(fieldName1, fieldName2 string) wherePart {
+	return newWhereParent(
 		WhereTypeEqualsField,
 		fieldName1,
 		[]interface{}{fieldName2},
 	)
 }
 
-func NE(fieldName string, value interface{}) WherePart {
-	return NewWherePart(
+func NE(fieldName Column, value interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeNotEquals,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
-func LT(fieldName string, value interface{}) WherePart {
-	return NewWherePart(
+func LT(fieldName Column, value interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeLessThan,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
-func GT(fieldName string, value interface{}) WherePart {
-	return NewWherePart(
+func GT(fieldName Column, value interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeGreaterThan,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
-func LTOE(fieldName string, value interface{}) WherePart {
-	return NewWherePart(
+func LTOE(fieldName Column, value interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeLessThanOrEqualTo,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
-func GTOE(fieldName string, value interface{}) WherePart {
-	return NewWherePart(
+func GTOE(fieldName Column, value interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeGreaterThanOrEqualTo,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
 // IN is an IN clause
-func IN(fieldName string, values ...interface{}) WherePart {
-	return NewWherePart(
+func IN(fieldName Column, values ...interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeIN,
-		fieldName,
+		string(fieldName),
 		values,
 	)
 }
 
 // INString is a helper function for converting a slice of string arguments into
 // a slice of interface arguments, passed into an IN clause and returned
-func INString(fieldName string, values []string) WherePart {
+func INString(fieldName Column, values []string) wherePart {
 	interfaces := make([]interface{}, len(values))
 
 	for k := range values {
@@ -593,7 +626,7 @@ func INString(fieldName string, values []string) WherePart {
 
 // INInt64 is a helper function for converting a slice of string arguments into
 // a slice of interface arguments, passed into an IN clause and returned
-func INInt64(fieldName string, values []int64) WherePart {
+func INInt64(fieldName Column, values []int64) wherePart {
 	interfaces := make([]interface{}, len(values))
 
 	for k := range values {
@@ -603,33 +636,33 @@ func INInt64(fieldName string, values []int64) WherePart {
 	return IN(fieldName, interfaces...)
 }
 
-func Between(fieldName string, from, to interface{}) WherePart {
-	return NewWherePart(
+func Between(fieldName Column, from, to interface{}) wherePart {
+	return newWhereParent(
 		WhereTypeBetween,
-		fieldName,
+		string(fieldName),
 		[]interface{}{from, to},
 	)
 }
 
-func Like(fieldName string, value string) WherePart {
-	return NewWherePart(
+func Like(fieldName Column, value string) wherePart {
+	return newWhereParent(
 		WhereTypeLike,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
-func NotLike(fieldName string, value string) WherePart {
-	return NewWherePart(
+func NotLike(fieldName Column, value string) wherePart {
+	return newWhereParent(
 		WhereTypeNotLike,
-		fieldName,
+		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
-func And(args ...WherePart) WherePart {
+func And(args ...wherePart) wherePart {
 
-	and := NewWherePart(WhereTypeAnd, "", []interface{}{})
+	and := newWhereParent(WhereTypeAnd, "", []interface{}{})
 
 	if len(args) > 0 {
 		and.subParts = append(and.subParts, PS())
@@ -644,9 +677,9 @@ func And(args ...WherePart) WherePart {
 	return and
 }
 
-func Or(args ...WherePart) WherePart {
+func Or(args ...wherePart) wherePart {
 
-	or := NewWherePart(WhereTypeOr, "", []interface{}{})
+	or := newWhereParent(WhereTypeOr, "", []interface{}{})
 
 	if len(args) > 0 {
 		or.subParts = append(or.subParts, PS())
@@ -662,8 +695,8 @@ func Or(args ...WherePart) WherePart {
 }
 
 // Parenthesis Start
-func PS() WherePart {
-	return NewWherePart(
+func PS() wherePart {
+	return newWhereParent(
 		WhereTypeParenthesisStart,
 		"",
 		[]interface{}{},
@@ -671,26 +704,26 @@ func PS() WherePart {
 }
 
 // Parenthesis End
-func PE() WherePart {
-	return NewWherePart(
+func PE() wherePart {
+	return newWhereParent(
 		WhereTypeParenthesisEnd,
 		"",
 		[]interface{}{},
 	)
 }
 
-func WhereAll() WherePart {
-	return NewWherePart(
+func WhereAll() wherePart {
+	return newWhereParent(
 		WhereTypeAll,
 		"",
 		[]interface{}{},
 	)
 }
 
-func Exists(clause *Q) WherePart {
+func Exists(clause *Q) wherePart {
 	clauseString, e := clause.String()
 
-	w := NewWherePart(
+	w := newWhereParent(
 		WhereTypeExists,
 		"",
 		[]interface{}{clauseString},
@@ -727,7 +760,7 @@ func Update(model IModel) *Q {
 	return q
 }
 
-func (q *Q) Set(fieldName string, value interface{}) *Q {
+func (q *Q) Set(fieldName Column, value interface{}) *Q {
 	if _, ok := q.sets[fieldName]; !ok {
 		q.sets[fieldName] = value
 		q.setSorter = append(q.setSorter, fieldName)

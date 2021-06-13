@@ -1,80 +1,81 @@
-package query
+package query_test
 
 import (
 	"testing"
 
+	"github.com/macinnir/dvc/core/lib/utils/query"
 	"github.com/macinnir/dvc/core/lib/utils/query/testassets"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestQuerySelect(t *testing.T) {
-	q := Select(&testassets.Comment{})
+	q := query.Select(&testassets.Comment{})
 	var e error
 
 	sql, e := q.String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t`", sql)
 
-	sql, e = Select(&testassets.Comment{}).
+	sql, e = query.Select(&testassets.Comment{}).
 		Where(
-			GT("DateCreated", 2),
-			Or(),
-			EQ("Content", "foo"),
-			Or(),
-			EQ("Name", "bar"),
+			query.GT("DateCreated", 2),
+			query.Or(),
+			query.EQ("Content", "foo"),
+			query.Or(),
+			query.EQ("Name", "bar"),
 		).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' OR `t`.`Name` = 'bar'", sql)
 
-	sql, e = Select(&testassets.Comment{}).
+	sql, e = query.Select(&testassets.Comment{}).
 		Where(
-			GT("DateCreated", 2),
-			Or(),
-			EQ("Content", "foo"),
-			And(
-				GTOE("DateCreated", 1),
-				Or(),
-				LTOE("DateCreated", 2),
-				Or(),
-				LT("DateCreated", 3),
+			query.GT("DateCreated", 2),
+			query.Or(),
+			query.EQ("Content", "foo"),
+			query.And(
+				query.GTOE("DateCreated", 1),
+				query.Or(),
+				query.LTOE("DateCreated", 2),
+				query.Or(),
+				query.LT("DateCreated", 3),
 			),
 		).
 		String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' AND ( `t`.`DateCreated` >= 1 OR `t`.`DateCreated` <= 2 OR `t`.`DateCreated` < 3 )", sql)
 
-	sql, e = Select(&testassets.Comment{}).
+	sql, e = query.Select(&testassets.Comment{}).
 		Where(
-			WhereAll(),
-			And(
-				GT("DateCreated", 2),
-				Or(),
-				EQ("Content", "foo"),
+			query.WhereAll(),
+			query.And(
+				query.GT("DateCreated", 2),
+				query.Or(),
+				query.EQ("Content", "foo"),
 			),
 		).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 AND ( `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' )", sql)
 
-	sql, e = Select(&testassets.Comment{}).
+	sql, e = query.Select(&testassets.Comment{}).
 		Where(
-			WhereAll(),
-			Or(
-				GT("DateCreated", 2),
-				And(),
-				EQ("Content", "foo"),
+			query.WhereAll(),
+			query.Or(
+				query.GT("DateCreated", 2),
+				query.And(),
+				query.EQ("Content", "foo"),
 			),
-			And(
-				Between("ObjectID", 1, 2),
+			query.And(
+				query.Between("ObjectID", 1, 2),
 			),
-			And(),
-			IN("Content", "foo", "bar", "baz"),
-			And(),
-			NE("Content", "quux"),
-			And(),
-			NE("ObjectID", "5"),
+			query.And(),
+			query.IN("Content", "foo", "bar", "baz"),
+			query.And(),
+			query.NE("Content", "quux"),
+			query.And(),
+			query.NE("ObjectID", "5"),
 		).
-		OrderBy("Content", "asc").
+		OrderBy("Content", query.QueryOrderByASC).
 		Limit(1, 2).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
@@ -82,9 +83,9 @@ func TestQuerySelect(t *testing.T) {
 
 func TestQuerySelect_InvalidFieldName(t *testing.T) {
 
-	sql, e := Select(&testassets.Comment{}).
+	sql, e := query.Select(&testassets.Comment{}).
 		Where(
-			EQ("Foo", "Bar"),
+			query.EQ("Foo", "Bar"),
 		).String()
 
 	require.NotNil(t, e)
@@ -97,9 +98,9 @@ func TestQuery_INString(t *testing.T) {
 
 	args := []string{"foo", "bar", "baz"}
 
-	sql, e := Select(&testassets.Comment{}).
+	sql, e := query.Select(&testassets.Comment{}).
 		Where(
-			INString(
+			query.INString(
 				"Content",
 				args,
 			),
@@ -114,9 +115,9 @@ func TestQuery_INInt64(t *testing.T) {
 
 	args := []int64{1, 2, 3}
 
-	sql, e := Select(&testassets.Comment{}).
+	sql, e := query.Select(&testassets.Comment{}).
 		Where(
-			INInt64(
+			query.INInt64(
 				"CommentID",
 				args,
 			),
@@ -129,21 +130,21 @@ func TestQuery_INInt64(t *testing.T) {
 
 func TestQuerySelect_EmptyWhereClause(t *testing.T) {
 
-	q := Select(&testassets.Comment{})
+	q := query.Select(&testassets.Comment{})
 	// TODO extra where clause
 	sql, e := q.Where().String()
 	require.NotNil(t, e)
 	assert.Equal(t, "EMPTY_WHERE_CLAUSE: `Comment`", e.Error())
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE ", sql)
 
-	q = Select(&testassets.Comment{})
-	sql, e = q.Where(EQ("CommentID", 1)).String()
+	q = query.Select(&testassets.Comment{})
+	sql, e = q.Where(query.EQ("CommentID", 1)).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` = 1", sql)
 }
 
 func TestQuerySelect_InvalidField(t *testing.T) {
-	sql, e := Select(&testassets.Comment{}).
+	sql, e := query.Select(&testassets.Comment{}).
 		Field("Foo").
 		String()
 
@@ -153,66 +154,66 @@ func TestQuerySelect_InvalidField(t *testing.T) {
 }
 
 func TestWhereLike(t *testing.T) {
-	sql, e := Select(&testassets.Comment{}).Where(Like("Name", "Foo%")).String()
+	sql, e := query.Select(&testassets.Comment{}).Where(query.Like("Name", "Foo%")).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Name` LIKE 'Foo%'", sql)
 }
 
 func TestWhereLike_InvalidValue(t *testing.T) {
-	_, e := Select(&testassets.Comment{}).Where(Like("CommentID", "Foo%")).String()
+	_, e := query.Select(&testassets.Comment{}).Where(query.Like("CommentID", "Foo%")).String()
 	require.NotNil(t, e)
 	assert.Equal(t, "LIKE: INVALID VALUE: `Comment`.`%d` => Foo%", e.Error())
 }
 
 func TestWhereNotLike(t *testing.T) {
-	sql, e := Select(&testassets.Comment{}).Where(NotLike("Name", "Foo%")).String()
+	sql, e := query.Select(&testassets.Comment{}).Where(query.NotLike("Name", "Foo%")).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Name` NOT LIKE 'Foo%'", sql)
 }
 
 func TestWhereNotLike_InvalidValue(t *testing.T) {
-	_, e := Select(&testassets.Comment{}).Where(NotLike("CommentID", "Foo%")).String()
+	_, e := query.Select(&testassets.Comment{}).Where(query.NotLike("CommentID", "Foo%")).String()
 	require.NotNil(t, e)
 	assert.Equal(t, "NOT LIKE: INVALID VALUE: `Comment`.`%d` => Foo%", e.Error())
 }
 
 func TestUnion(t *testing.T) {
 	var e error
-	sql, e := Union(
-		Select(&testassets.Comment{}).Where(EQ("Content", "bar")),
-		Select(&testassets.Comment{}).Where(EQ("Content", "baz")),
+	sql, e := query.Union(
+		query.Select(&testassets.Comment{}).Where(query.EQ("Content", "bar")),
+		query.Select(&testassets.Comment{}).Where(query.EQ("Content", "baz")),
 	)
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Content` = 'bar' UNION ALL SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Content` = 'baz'", sql)
 }
 
 func TestUpdate(t *testing.T) {
-	sql, e := Update(&testassets.Comment{}).
+	sql, e := query.Update(&testassets.Comment{}).
 		Set("Content", "bar").
 		Set("ObjectID", 1).
-		Where(EQ("CommentID", 123)).String()
+		Where(query.EQ("CommentID", 123)).String()
 	require.Nil(t, e)
 	assert.Equal(t, "UPDATE `Comment` SET `Content` = 'bar', `ObjectID` = 1 WHERE `CommentID` = 123", sql)
 }
 
 func TestUpdate_InvalidField(t *testing.T) {
-	sql, e := Update(&testassets.Comment{}).
+	sql, e := query.Update(&testassets.Comment{}).
 		Set("Foo", "bar").
 		Set("ObjectID", 1).
-		Where(EQ("CommentID", 123)).String()
+		Where(query.EQ("CommentID", 123)).String()
 	require.NotNil(t, e)
 	assert.Equal(t, "UPDATE `Comment` SET `Foo` = 'bar', `ObjectID` = 1 WHERE `CommentID` = 123", sql)
 }
 
 func TestDelete(t *testing.T) {
-	sql, e := Delete(&testassets.Comment{}).
-		Where(EQ("CommentID", 123)).String()
+	sql, e := query.Delete(&testassets.Comment{}).
+		Where(query.EQ("CommentID", 123)).String()
 	require.Nil(t, e)
 	assert.Equal(t, "DELETE FROM `Comment` WHERE `CommentID` = 123", sql)
 }
 
 func TestInsert(t *testing.T) {
-	sql, e := Insert(&testassets.Comment{}).
+	sql, e := query.Insert(&testassets.Comment{}).
 		Set("DateCreated", 1).
 		Set("Content", "foo").
 		Set("ObjectType", 2).
@@ -224,7 +225,7 @@ func TestInsert(t *testing.T) {
 
 func TestInsert_InvalidFieldName(t *testing.T) {
 
-	sql, e := Insert(&testassets.Comment{}).
+	sql, e := query.Insert(&testassets.Comment{}).
 		Set("Foo", "Bar").String()
 
 	require.NotNil(t, e)
@@ -234,16 +235,16 @@ func TestInsert_InvalidFieldName(t *testing.T) {
 }
 
 func TestSelectFields(t *testing.T) {
-	sql, e := Select(&testassets.Job{}).
+	sql, e := query.Select(&testassets.Job{}).
 		Count("JobID", "ProjectsQuoted").
 		Sum("TotalPrice", "SalesVolume").
 		Sum("GrossProfit", "GM").
 		// Field("COALESCE(SUM(TotalPrice), 0)", "SalesVolume").
 		// Field("COALESCE(SUM(GrossProfit), 0)", "GM").
 		Where(
-			EQ("IsDeleted", 0),
-			And(),
-			Between("AwardDate", 1, 2),
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
 		).
 		String()
 	require.Nil(t, e)
@@ -251,7 +252,7 @@ func TestSelectFields(t *testing.T) {
 }
 
 func TestSum_InvalidField(t *testing.T) {
-	_, e := Select(&testassets.Job{}).
+	_, e := query.Select(&testassets.Job{}).
 		Sum("Foo", "Foo").String()
 	require.NotNil(t, e)
 	assert.Equal(t, "Sum(): INVALID COLUMN: `Job`.`Foo`", e.Error())
@@ -259,13 +260,13 @@ func TestSum_InvalidField(t *testing.T) {
 }
 
 func TestSelectFields2(t *testing.T) {
-	sql, e := Select(&testassets.Job{}).
+	sql, e := query.Select(&testassets.Job{}).
 		Field("JobID").
 		FieldAs("JobID", "foo").
 		Where(
-			EQ("IsDeleted", 0),
-			And(),
-			Between("AwardDate", 1, 2),
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
 		).
 		String()
 	require.Nil(t, e)
@@ -273,15 +274,15 @@ func TestSelectFields2(t *testing.T) {
 }
 
 func TestSelectFields3(t *testing.T) {
-	sql, e := Select(&testassets.Job{}).
+	sql, e := query.Select(&testassets.Job{}).
 		Fields(
 			"`t`.`JobID`",
 			"`t`.`JobID` AS `foo`",
 		).
 		Where(
-			EQ("IsDeleted", 0),
-			And(),
-			Between("AwardDate", 1, 2),
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
 		).
 		String()
 	require.Nil(t, e)
@@ -289,15 +290,15 @@ func TestSelectFields3(t *testing.T) {
 }
 
 func TestSelectAlias(t *testing.T) {
-	sql, e := Select(&testassets.Job{}).
+	sql, e := query.Select(&testassets.Job{}).
 		Alias("j").
 		Count("JobID", "ProjectsQuoted").
 		// Field("COALESCE(SUM(TotalPrice), 0)", "SalesVolume").
 		// Field("COALESCE(SUM(GrossProfit), 0)", "GM").
 		Where(
-			EQ("IsDeleted", 0),
-			And(),
-			Between("AwardDate", 1, 2),
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
 		).
 		String()
 	require.Nil(t, e)
@@ -306,29 +307,29 @@ func TestSelectAlias(t *testing.T) {
 
 func TestSelectExists(t *testing.T) {
 
-	actual, e := Select(&testassets.Job{}).
+	actual, e := query.Select(&testassets.Job{}).
 		Alias("j").
 		Count("JobID", "ProjectsQuoted").
 		Sum("TotalPrice", "SalesVolume").
 		Where(
-			Exists(
-				Select(&testassets.JobSales{}).
+			query.Exists(
+				query.Select(&testassets.JobSales{}).
 					Alias("js").
 					FieldRaw("1", "n").
 					Where(
-						EQF("JobID", "`j`.`JobID`"),
-						And(),
-						EQ("IsDeleted", 0),
-						And(),
-						EQ("UserID", 1),
+						query.EQF("JobID", "`j`.`JobID`"),
+						query.And(),
+						query.EQ("IsDeleted", 0),
+						query.And(),
+						query.EQ("UserID", 1),
 					),
 			),
 
 			//"SELECT 1 FROM `JobSales` `js` WHERE `js`.`JobID` = `j`.`JobID` AND `js`.`IsDeleted` = 0 AND `js`.`UserID` = 1"
-			And(),
-			EQ("IsDeleted", 0),
-			And(),
-			Between("AwardDate", 1, 2),
+			query.And(),
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
 		).String()
 
 	require.Nil(t, e)
@@ -340,20 +341,20 @@ func TestSelectExists(t *testing.T) {
 }
 
 func TestWhereTypeAll(t *testing.T) {
-	q, e := Select(&testassets.Job{}).Where(WhereAll()).String()
+	q, e := query.Select(&testassets.Job{}).Where(query.WhereAll()).String()
 	require.Nil(t, e)
 	expected := "SELECT `t`.* FROM `Job` `t` WHERE 1=1"
 	assert.Equal(t, expected, q)
 
-	q, e = Select(&testassets.Job{}).Where(WhereAll(), And(), EQ("IsDeleted", 0)).String()
+	q, e = query.Select(&testassets.Job{}).Where(query.WhereAll(), query.And(), query.EQ("IsDeleted", 0)).String()
 	require.Nil(t, e)
 	expected = "SELECT `t`.* FROM `Job` `t` WHERE 1=1 AND `t`.`IsDeleted` = 0"
 	assert.Equal(t, expected, q)
 }
 
 func TestWhere_MultiWheres(t *testing.T) {
-	q := Select(&testassets.Job{}).Where(WhereAll())
-	q.Where(And(), EQ("IsDeleted", 0))
+	q := query.Select(&testassets.Job{}).Where(query.WhereAll())
+	q.Where(query.And(), query.EQ("IsDeleted!", 0))
 	r, e := q.String()
 
 	expected := "SELECT `t`.* FROM `Job` `t` WHERE 1=1 AND `t`.`IsDeleted` = 0"
