@@ -156,12 +156,12 @@ func (q *Q) Sum(name Column, as string) *Q {
 }
 
 // Where().Equals("a", "b")
-func (q *Q) Where(args ...wherePart) *Q {
+func (q *Q) Where(args ...WherePart) *Q {
 	// allow for multiple where calls in single query
 	if q.where == nil {
 		q.where = &whereClause{
 			query:      q,
-			WhereParts: []wherePart{},
+			WhereParts: []WherePart{},
 		}
 	}
 
@@ -361,7 +361,7 @@ func isConjunction(whereType WhereType) bool {
 
 }
 
-func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []wherePart) string {
+func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePart) string {
 
 	sb := strings.Builder{}
 
@@ -518,26 +518,39 @@ const (
 	WhereTypeAll
 )
 
-type wherePart struct {
+// WherePart is a part of a where clause.
+// This object is an exposed part of the api to make conditional queries easier
+// EXAMPLE:
+//
+// 	wheres := []query.WherePart{
+// 		query.EQ(models.ObjectRelationship_Column_IsDeleted, 0),
+// 	}
+// 	if objectTypeFrom != constants.ObjectTypeUnknown {
+// 		wheres = append(wheres, query.And(), query.EQ(models.ObjectRelationship_Column_ObjectTypeFrom, objectTypeFrom))
+// 	}
+// 	if objectIDFrom > 0 {
+// 		wheres = append(wheres, query.And(), query.EQ(models.ObjectRelationship_Column_ObjectIDFrom, objectIDFrom))
+// 	}
+type WherePart struct {
 	whereType WhereType
 	fieldName string
 	values    []interface{}
-	subParts  []wherePart
+	subParts  []WherePart
 	e         error
 }
 
-func newWhereParent(whereType WhereType, fieldName string, values []interface{}) wherePart {
-	return wherePart{
+func newWhereParent(whereType WhereType, fieldName string, values []interface{}) WherePart {
+	return WherePart{
 		whereType: whereType,
 		fieldName: fieldName,
 		values:    values,
-		subParts:  []wherePart{},
+		subParts:  []WherePart{},
 	}
 }
 
 type whereClause struct {
 	query      *Q
-	WhereParts []wherePart
+	WhereParts []WherePart
 }
 
 ////
@@ -545,7 +558,7 @@ type whereClause struct {
 ////
 
 // EQ is an equals statement between a table column and a value
-func EQ(fieldName Column, value interface{}) wherePart {
+func EQ(fieldName Column, value interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeEquals,
 		string(fieldName),
@@ -555,7 +568,7 @@ func EQ(fieldName Column, value interface{}) wherePart {
 	)
 }
 
-func EQF(fieldName1, fieldName2 string) wherePart {
+func EQF(fieldName1, fieldName2 string) WherePart {
 	return newWhereParent(
 		WhereTypeEqualsField,
 		fieldName1,
@@ -563,7 +576,7 @@ func EQF(fieldName1, fieldName2 string) wherePart {
 	)
 }
 
-func NE(fieldName Column, value interface{}) wherePart {
+func NE(fieldName Column, value interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeNotEquals,
 		string(fieldName),
@@ -571,7 +584,7 @@ func NE(fieldName Column, value interface{}) wherePart {
 	)
 }
 
-func LT(fieldName Column, value interface{}) wherePart {
+func LT(fieldName Column, value interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeLessThan,
 		string(fieldName),
@@ -579,7 +592,7 @@ func LT(fieldName Column, value interface{}) wherePart {
 	)
 }
 
-func GT(fieldName Column, value interface{}) wherePart {
+func GT(fieldName Column, value interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeGreaterThan,
 		string(fieldName),
@@ -587,7 +600,7 @@ func GT(fieldName Column, value interface{}) wherePart {
 	)
 }
 
-func LTOE(fieldName Column, value interface{}) wherePart {
+func LTOE(fieldName Column, value interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeLessThanOrEqualTo,
 		string(fieldName),
@@ -595,7 +608,7 @@ func LTOE(fieldName Column, value interface{}) wherePart {
 	)
 }
 
-func GTOE(fieldName Column, value interface{}) wherePart {
+func GTOE(fieldName Column, value interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeGreaterThanOrEqualTo,
 		string(fieldName),
@@ -604,7 +617,7 @@ func GTOE(fieldName Column, value interface{}) wherePart {
 }
 
 // IN is an IN clause
-func IN(fieldName Column, values ...interface{}) wherePart {
+func IN(fieldName Column, values ...interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeIN,
 		string(fieldName),
@@ -614,7 +627,7 @@ func IN(fieldName Column, values ...interface{}) wherePart {
 
 // INString is a helper function for converting a slice of string arguments into
 // a slice of interface arguments, passed into an IN clause and returned
-func INString(fieldName Column, values []string) wherePart {
+func INString(fieldName Column, values []string) WherePart {
 	interfaces := make([]interface{}, len(values))
 
 	for k := range values {
@@ -626,7 +639,7 @@ func INString(fieldName Column, values []string) wherePart {
 
 // INInt64 is a helper function for converting a slice of string arguments into
 // a slice of interface arguments, passed into an IN clause and returned
-func INInt64(fieldName Column, values []int64) wherePart {
+func INInt64(fieldName Column, values []int64) WherePart {
 	interfaces := make([]interface{}, len(values))
 
 	for k := range values {
@@ -636,7 +649,7 @@ func INInt64(fieldName Column, values []int64) wherePart {
 	return IN(fieldName, interfaces...)
 }
 
-func Between(fieldName Column, from, to interface{}) wherePart {
+func Between(fieldName Column, from, to interface{}) WherePart {
 	return newWhereParent(
 		WhereTypeBetween,
 		string(fieldName),
@@ -644,7 +657,7 @@ func Between(fieldName Column, from, to interface{}) wherePart {
 	)
 }
 
-func Like(fieldName Column, value string) wherePart {
+func Like(fieldName Column, value string) WherePart {
 	return newWhereParent(
 		WhereTypeLike,
 		string(fieldName),
@@ -652,7 +665,7 @@ func Like(fieldName Column, value string) wherePart {
 	)
 }
 
-func NotLike(fieldName Column, value string) wherePart {
+func NotLike(fieldName Column, value string) WherePart {
 	return newWhereParent(
 		WhereTypeNotLike,
 		string(fieldName),
@@ -660,7 +673,7 @@ func NotLike(fieldName Column, value string) wherePart {
 	)
 }
 
-func And(args ...wherePart) wherePart {
+func And(args ...WherePart) WherePart {
 
 	and := newWhereParent(WhereTypeAnd, "", []interface{}{})
 
@@ -677,7 +690,7 @@ func And(args ...wherePart) wherePart {
 	return and
 }
 
-func Or(args ...wherePart) wherePart {
+func Or(args ...WherePart) WherePart {
 
 	or := newWhereParent(WhereTypeOr, "", []interface{}{})
 
@@ -695,7 +708,7 @@ func Or(args ...wherePart) wherePart {
 }
 
 // Parenthesis Start
-func PS() wherePart {
+func PS() WherePart {
 	return newWhereParent(
 		WhereTypeParenthesisStart,
 		"",
@@ -704,7 +717,7 @@ func PS() wherePart {
 }
 
 // Parenthesis End
-func PE() wherePart {
+func PE() WherePart {
 	return newWhereParent(
 		WhereTypeParenthesisEnd,
 		"",
@@ -712,7 +725,7 @@ func PE() wherePart {
 	)
 }
 
-func WhereAll() wherePart {
+func WhereAll() WherePart {
 	return newWhereParent(
 		WhereTypeAll,
 		"",
@@ -720,7 +733,7 @@ func WhereAll() wherePart {
 	)
 }
 
-func Exists(clause *Q) wherePart {
+func Exists(clause *Q) WherePart {
 	clauseString, e := clause.String()
 
 	w := newWhereParent(

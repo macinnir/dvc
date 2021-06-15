@@ -89,20 +89,20 @@ func (n *NullString) UnMarshalJSON(data []byte) error {
 }
 
 var (
-	Comment_TableName query.QueryTableName = "Comment"
+	Comment_TableName query.TableName = "Comment"
 
-	Comment_Column_CommentID   query.QueryColumn = "CommentID"
-	Comment_Column_DateCreated query.QueryColumn = "DateCreated"
-	Comment_Column_IsDeleted   query.QueryColumn = "IsDeleted"
-	Comment_Column_Content     query.QueryColumn = "Content"
-	Comment_Column_ObjectType  query.QueryColumn = "ObjectType"
-	Comment_Column_ObjectID    query.QueryColumn = "ObjectID"
+	Comment_Column_CommentID   query.Column = "CommentID"
+	Comment_Column_DateCreated query.Column = "DateCreated"
+	Comment_Column_IsDeleted   query.Column = "IsDeleted"
+	Comment_Column_Content     query.Column = "Content"
+	Comment_Column_ObjectType  query.Column = "ObjectType"
+	Comment_Column_ObjectID    query.Column = "ObjectID"
 
-	Comment_Columns       = []query.QueryColumn{Comment_Column_CommentID, Comment_Column_DateCreated, Comment_Column_IsDeleted, Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
-	Comment_Column_Types  = map[query.QueryColumn]string{"CommentID": "%d", "DateCreated": "%d", "IsDeleted": "%d", "Content": "%s", "ObjectType": "%d", "ObjectID": "%d"}
-	Comment_UpdateColumns = []query.QueryColumn{Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
-	Comment_InsertColumns = []query.QueryColumn{Comment_Column_DateCreated, Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
-	Comment_PrimaryKey    = "CommentID"
+	Comment_Columns                    = []query.Column{Comment_Column_CommentID, Comment_Column_DateCreated, Comment_Column_IsDeleted, Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
+	Comment_Column_Types               = map[query.Column]string{"CommentID": "%d", "DateCreated": "%d", "IsDeleted": "%d", "Content": "%s", "ObjectType": "%d", "ObjectID": "%d"}
+	Comment_UpdateColumns              = []query.Column{Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
+	Comment_InsertColumns              = []query.Column{Comment_Column_DateCreated, Comment_Column_Content, Comment_Column_ObjectType, Comment_Column_ObjectID}
+	Comment_PrimaryKey    query.Column = "CommentID"
 )
 
 // Comment is a `Comment` data model
@@ -116,19 +116,19 @@ type Comment struct {
 }
 
 // Comment_TableName is the name of the table
-func (c *Comment) Table_Name() query.QueryTableName {
+func (c *Comment) Table_Name() query.TableName {
 	return Comment_TableName
 }
 
-func (c *Comment) Table_Columns() []query.QueryColumn {
+func (c *Comment) Table_Columns() []query.Column {
 	return Comment_Columns
 }
 
-func (c *Comment) Table_Column_Types() map[query.QueryColumn]string {
+func (c *Comment) Table_Column_Types() map[query.Column]string {
 	return Comment_Column_Types
 }
 
-func (c *Comment) Table_PrimaryKey() query.QueryColumn {
+func (c *Comment) Table_PrimaryKey() query.Column {
 	return Comment_PrimaryKey
 }
 
@@ -138,12 +138,12 @@ func (c *Comment) Table_PrimaryKey_Value() int64 {
 }
 
 // Comment_InsertColumns is a list of all insert columns for this model
-func (c *Comment) Table_InsertColumns() []string {
+func (c *Comment) Table_InsertColumns() []query.Column {
 	return Comment_InsertColumns
 }
 
 // Comment_UpdateColumns is a list of all update columns for this model
-func (c *Comment) Table_UpdateColumns() []string {
+func (c *Comment) Table_UpdateColumns() []query.Column {
 	return Comment_UpdateColumns
 }
 
