@@ -2,7 +2,9 @@ package request
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"strconv"
 
@@ -28,19 +30,31 @@ type Request struct {
 	UserID           int64
 	RootRequest      *http.Request `json:"-"`
 	ActionType       int64
+	BodyReadCloser   io.ReadCloser
+}
+
+func isFileUpload(r *http.Request) bool {
+
+	v := r.Header.Get("Content-Type")
+	if v == "" {
+		return false
+	}
+	d, _, _ := mime.ParseMediaType(v)
+	return d == "multipart/form-data"
 }
 
 // NewRequest is a factory method for a request
 func NewRequest(r *http.Request) *Request {
 
 	req := &Request{
-		Method:      r.Method,
-		Path:        r.URL.RequestURI(),
-		Headers:     map[string]string{},
-		Params:      map[string]string{},
-		Body:        "",
-		RootRequest: r,
-		ActionType:  UserLogActionTypeAPI.Int64(),
+		Method:         r.Method,
+		Path:           r.URL.RequestURI(),
+		Headers:        map[string]string{},
+		Params:         map[string]string{},
+		Body:           "",
+		RootRequest:    r,
+		ActionType:     UserLogActionTypeAPI.Int64(),
+		BodyReadCloser: r.Body,
 	}
 
 	// Headers
@@ -53,11 +67,11 @@ func NewRequest(r *http.Request) *Request {
 	// URL Params
 	req.Params = mux.Vars(r)
 
-	defer r.Body.Close()
-
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
-
-	req.Body = string(bodyBytes)
+	if !isFileUpload(r) {
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		defer r.Body.Close()
+		req.Body = string(bodyBytes)
+	}
 
 	return req
 }
