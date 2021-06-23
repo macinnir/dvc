@@ -11,6 +11,8 @@ func TestExtractRootNameFromKey(t *testing.T) {
 		{"foo", "foo"},
 		{"foo_", "foo"},
 		{"foo_123", "foo"},
+		{"foo_bar_123", "foo_bar"},
+		{"foo_bar_123_456", "foo_bar_123"},
 	}
 
 	for k := range tests {

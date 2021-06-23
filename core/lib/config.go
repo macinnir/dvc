@@ -88,7 +88,9 @@ func ExtractRootNameFromKey(key string) string {
 
 	dbRootName := key
 	if strings.Contains(key, "_") {
-		dbRootName = strings.Split(key, "_")[0]
+		parts := strings.Split(key, "_")
+		dbRootName = strings.Join(parts[0:len(parts)-1], "_")
+		// dbRootName = strings.Split(key, "_")[0]
 	}
 
 	return dbRootName
