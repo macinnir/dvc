@@ -20,7 +20,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	summarize := false
 	apply := false
-	safeMode := false
+	// TODO safeMode := false
 
 	for k := range args {
 		switch args[k] {
@@ -28,8 +28,8 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			summarize = true
 		case "-a", "--apply":
 			apply = true
-		case "-s", "--safe-mode":
-			safeMode = true
+			// case "-s", "--safe-mode":
+			// 	safeMode = true
 		}
 	}
 
@@ -48,7 +48,9 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	if summarize {
 		compare.PrintComparisonSummary(comparisons)
-	} else {
+	}
+
+	if !summarize && !apply {
 		compare.PrintComparisons(comparisons)
 	}
 
@@ -59,37 +61,13 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			configs[config.Databases[k].Key] = config.Databases[k]
 		}
 
-		for k := range comparisons {
-
-			config := configs[comparisons[k].DatabaseKey]
-			connector, e := connectors.DBConnectorFactory(config)
-			if e != nil {
-				panic(e)
-			}
-			server := executor.NewExecutor(
-				config,
-				connector,
-			).Connect()
-
-			changes := comparisons[k].Changes
-
-			for l := range changes {
-
-				if safeMode && changes[l].IsDestructive {
-					fmt.Println("IS_DESTRUCTIVE!!!!")
-				}
-
-				change := strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(changes[l].SQL), "\n", ""), "\t", "")
-				if len(change) > 40 {
-					change = change[0:40] + "..."
-				}
-				fmt.Printf("Applying query %s...%s\n", changes[l].Type, change)
-				_, e = server.Connection.Exec(changes[l].SQL)
-				if e != nil {
-					panic(e)
-				}
-			}
+		if e = applyChanges(
+			configs,
+			comparisons,
+		); e != nil {
+			fmt.Println("SQL ERROR: ", e.Error())
 		}
+
 	}
 
 	return nil
@@ -165,4 +143,44 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	// 	lib.Errorf("Unknown argument: `%s`", c.Options, cmd)
 	// 	os.Exit(1)
 	// }
+}
+
+func applyChanges(
+	configs map[string]*lib.ConfigDatabase,
+	comparisons []*schema.SchemaComparison,
+) error {
+
+	for k := range comparisons {
+
+		config := configs[comparisons[k].DatabaseKey]
+		connector, e := connectors.DBConnectorFactory(config)
+		if e != nil {
+			panic(e)
+		}
+		server := executor.NewExecutor(
+			config,
+			connector,
+		).Connect()
+
+		changes := comparisons[k].Changes
+
+		for l := range changes {
+
+			// TODO if safeMode && changes[l].IsDestructive {
+			// 	fmt.Println("IS_DESTRUCTIVE!!!!")
+			// }
+
+			change := strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(changes[l].SQL), "\n", ""), "\t", "")
+			if len(change) > 80 {
+				change = change[0:80] + "..."
+			}
+			fmt.Printf("Applying query %s.%d %s...%s\n", config.Key, l, changes[l].Type, change)
+			_, e = server.Connection.Exec(changes[l].SQL)
+			if e != nil {
+				return fmt.Errorf("SQL ERROR on database %s (%s/%s):\n\n %s \n\n %w", config.Key, config.Host, config.Name, changes[l].SQL, e)
+			}
+		}
+	}
+
+	return nil
 }
