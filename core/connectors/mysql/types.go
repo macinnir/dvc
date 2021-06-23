@@ -15,6 +15,8 @@ const (
 	ColTypeText       = "text"
 	ColTypeMediumText = "mediumtext"
 	ColTypeLongText   = "longtext"
+	ColTypeBlob       = "blob"
+	ColTypeLongBlog   = "longblob"
 	ColTypeDecimal    = "decimal"
 	ColTypeNumeric    = "numeric"
 	ColTypeFloat      = "float"

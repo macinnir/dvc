@@ -84,8 +84,12 @@ func (ss *Sqlite) UseDatabase(server *schema.Server, databaseName string) (e err
 	return
 }
 
+func (ss *Sqlite) FetchDatabase(server *schema.Server, databaseName string) (*schema.Schema, error) {
+	return &schema.Schema{}, nil
+}
+
 // FetchDatabaseTables fetches the complete set of tables from this database
-func (ss *Sqlite) FetchDatabaseTables(server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error) {
+func (ss *Sqlite) fetchDatabaseTables(server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error) {
 
 	tables = map[string]*schema.Table{}
 
@@ -320,7 +324,7 @@ func (ss *Sqlite) FetchTableColumns(server *schema.Server, databaseName string, 
 
 // CreateChangeSQL generates sql statements based off of comparing two database objects
 // localSchema is authority, remoteSchema will be upgraded to match localSchema
-func (ss *Sqlite) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) *schema.SchemaComparison {
+func (ss *Sqlite) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema, databaseName string) *schema.SchemaComparison {
 
 	return &schema.SchemaComparison{}
 	// query := ""
