@@ -152,11 +152,6 @@ func CompareSchemas(
 
 	comparisons := []*schema.SchemaComparison{}
 
-	// var same bool
-	// if same, e = objectsAreSame(localSchemaList, remoteSchemaList); e != nil || same {
-	// 	return "", nil
-	// }
-
 	configMap := map[string]*lib.ConfigDatabase{}
 	for k := range config.Databases {
 		configMap[config.Databases[k].Key] = config.Databases[k]
@@ -167,35 +162,19 @@ func CompareSchemas(
 		localSchemaMap[localSchemaList.Schemas[k].Name] = k
 	}
 
-	for key := range remoteSchemas {
+	for connectionKey := range remoteSchemas {
 
-		remoteSchema := remoteSchemas[key]
-
-		rootName := lib.ExtractRootNameFromKey(key)
+		schemaName := lib.ExtractRootNameFromKey(connectionKey)
 
 		var connector connectors.IConnector
-		connector, _ = connectors.DBConnectorFactory(configMap[key])
-		localSchema := localSchemaList.Schemas[localSchemaMap[rootName]]
-
-		var comparison *schema.SchemaComparison
-		comparison = connector.CreateChangeSQL(localSchema, remoteSchema)
-		comparison.Database = configMap[key].Host + "/" + configMap[key].Name
-		comparison.DatabaseKey = key
+		connector, _ = connectors.DBConnectorFactory(configMap[connectionKey])
+		localSchema := localSchemaList.Schemas[localSchemaMap[schemaName]]
+		remoteSchema := remoteSchemas[connectionKey]
+		comparison := connector.CreateChangeSQL(localSchema, remoteSchema, configMap[connectionKey].Name)
+		comparison.Database = configMap[connectionKey].Host + "/" + configMap[connectionKey].Name
+		comparison.DatabaseKey = connectionKey
 		comparisons = append(comparisons, comparison)
 	}
-
-	// if len(localSchema.Enums) > 0 {
-	// 	// Compare remote to local
-	// 	for tableName := range localSchema.Enums {
-	// 		if same, _ = objectsAreSame(localSchema.Enums[tableName], remoteSchema.Enums[tableName]); !same {
-	// 			sql += c.connector.CompareEnums(remoteSchema, localSchema, tableName)
-	// 		}
-	// 	}
-	// }
-
-	// if len(sql) == 0 {
-	// 	fmt.Printf("The schema objects were not the same, but no change sql was generated.\n\n Something strange is afoot...\n")
-	// }
 
 	return comparisons
 }
