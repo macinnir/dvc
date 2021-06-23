@@ -7,14 +7,15 @@ import (
 )
 
 const (
-	RenameTable  = "RENAME_TABLE"
-	CreateTable  = "CREATE_TABLE"
-	DropTable    = "DROP_TABLE"
-	ChangeColumn = "CHANGE_COLUMN"
-	AddColumn    = "ADD_COLUMN"
-	DropColumn   = "DROP_COLUMN"
-	AddIndex     = "ADD_INDEX"
-	DropIndex    = "DROP_INDEX"
+	RenameTable        = "RENAME_TABLE"
+	CreateTable        = "CREATE_TABLE"
+	DropTable          = "DROP_TABLE"
+	ChangeColumn       = "CHANGE_COLUMN"
+	AddColumn          = "ADD_COLUMN"
+	DropColumn         = "DROP_COLUMN"
+	AddIndex           = "ADD_INDEX"
+	DropIndex          = "DROP_INDEX"
+	ChangeCharacterSet = "CHANGE_CHARACTER_SET"
 )
 
 type SchemaList struct {
@@ -23,11 +24,13 @@ type SchemaList struct {
 
 // Schema represents a database
 type Schema struct {
-	RunID         int64                               `json:"-"`
-	Name          string                              `json:"name"`
-	SortedSetKeys []string                            `json:"-"`
-	Tables        map[string]*Table                   `json:"tables"`
-	Enums         map[string][]map[string]interface{} `json:"-"`
+	RunID               int64                               `json:"-"`
+	Name                string                              `json:"name"`
+	SortedSetKeys       []string                            `json:"-"`
+	Tables              map[string]*Table                   `json:"tables"`
+	Enums               map[string][]map[string]interface{} `json:"-"`
+	DefaultCharacterSet string                              `json:"defaultCharacterSet"`
+	DefaultCollation    string                              `json:"defaultCollation"`
 }
 
 // ToSortedTables returns SortedTables
@@ -70,6 +73,7 @@ type Table struct {
 	Rows          int64              `json:"-"`
 	DataLength    int64              `json:"-"`
 	Collation     string             `json:"collation"`
+	CharacterSet  string             `json:"characterSet"`
 	AutoIncrement int64              `json:"-"`
 	Columns       map[string]*Column `json:"columns"`
 }
@@ -136,6 +140,7 @@ type Column struct {
 	MaxLength    int    `json:"maxLength"`
 	Precision    int    `json:"precision"`
 	CharSet      string `json:"charSet"`
+	Collation    string `json:"collation"`
 	Type         string `json:"type"`
 	ColumnKey    string `json:"columnKey"`
 	NumericScale int    `json:"numericScale"`

@@ -3,6 +3,13 @@
  * @implements IConnector
  */
 
+// TODO Add/remove primary key
+// ALTER TABLE `Profile` ADD PRIMARY KEY (`ProfileID`);
+// ALTER TABLE `Profile` DROP PRIMARY KEY
+// ALTER TABLE `Persons` ADD CONSTRAINT PK_Person PRIMARY KEY (ID,LastName);
+// ALTER TABLE Persons DROP PRIMARY KEY;
+// ALTER TABLE `Persons` DROP CONSTRAINT `PK_Person`
+
 package mysql
 
 import (
@@ -33,6 +40,7 @@ func NewMySQL(config *lib.ConfigDatabase) *MySQL {
 
 // Connect connects to a server and returns a new server object
 func (ss *MySQL) Connect() (server *schema.Server, e error) {
+	// fmt.Println("Connecting to ", ss.config.Name)
 	server = &schema.Server{Host: ss.config.Host}
 	var connectionString = ss.config.User + ":" + ss.config.Pass + "@tcp(" + ss.config.Host + ")/" + ss.config.Name + "?charset=utf8"
 	server.Connection, e = sql.Open("mysql", connectionString)
@@ -46,7 +54,7 @@ func (ss *MySQL) FetchDatabases(server *schema.Server) (databases map[string]*sc
 	var rows *sql.Rows
 	databases = map[string]*schema.Schema{}
 
-	if rows, e = server.Connection.Query("SHOW DATABASES"); e != nil {
+	if rows, e = server.Connection.Query("SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA"); e != nil {
 		return
 	}
 
@@ -55,9 +63,52 @@ func (ss *MySQL) FetchDatabases(server *schema.Server) (databases map[string]*sc
 	}
 
 	for rows.Next() {
+
 		databaseName := ""
-		rows.Scan(&databaseName)
-		databases[databaseName] = &schema.Schema{Name: databaseName}
+		characterSet := ""
+		collation := ""
+		rows.Scan(
+			&databaseName,
+			&characterSet,
+			&collation,
+		)
+		databases[databaseName] = &schema.Schema{
+			Name:                databaseName,
+			DefaultCharacterSet: characterSet,
+			DefaultCollation:    collation,
+		}
+
+		fmt.Println("CharacterSet", characterSet)
+		fmt.Println("Collation", collation)
+	}
+
+	return
+}
+
+// FetchDatabases fetches a set of database names from the target server
+// populating the Databases property with a map of Database objects
+func (ss *MySQL) fetchDatabaseMeta(server *schema.Server, schema *schema.Schema) (e error) {
+
+	var rows *sql.Rows
+
+	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '%s'", schema.Name)); e != nil {
+		return
+	}
+
+	if e == sql.ErrNoRows {
+		fmt.Println("SCHEMATA not found for database ", schema.Name)
+		return nil
+	}
+
+	if rows != nil {
+		defer rows.Close()
+	}
+
+	for rows.Next() {
+		rows.Scan(
+			&schema.DefaultCharacterSet,
+			&schema.DefaultCollation,
+		)
 	}
 
 	return
@@ -77,12 +128,31 @@ func (ss *MySQL) UseDatabase(server *schema.Server, databaseName string) (e erro
 	return
 }
 
-// FetchDatabaseTables fetches the complete set of tables from this database
-func (ss *MySQL) FetchDatabaseTables(server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error) {
+func (ss *MySQL) FetchDatabase(server *schema.Server, databaseName string) (*schema.Schema, error) {
+
+	var e error
+	schema := &schema.Schema{
+		Name: databaseName,
+	}
+
+	if e = ss.fetchDatabaseMeta(server, schema); e != nil {
+		return nil, e
+	}
+
+	if schema.Tables, e = ss.fetchDatabaseTables(server, databaseName); e != nil {
+		return nil, e
+	}
+
+	return schema, nil
+
+}
+
+// fetchDatabaseTables fetches the complete set of tables from this database
+func (ss *MySQL) fetchDatabaseTables(server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error) {
 
 	var rows *sql.Rows
-	query := "select `TABLE_NAME`, `ENGINE`, `VERSION`, `ROW_FORMAT`, `TABLE_ROWS`, `DATA_LENGTH`, `TABLE_COLLATION`, `AUTO_INCREMENT` FROM information_schema.tables WHERE TABLE_SCHEMA = '" + databaseName + "'"
-	// fmt.Printf("Query: %s\n", query)
+	query := "select t.`TABLE_NAME`, t.`ENGINE`, t.`VERSION`, t.`ROW_FORMAT`, t.`TABLE_ROWS`, t.`DATA_LENGTH`, t.`TABLE_COLLATION`, COALESCE(t.`AUTO_INCREMENT`, 0) AS `AUTO_INCREMENT`, ccsa.CHARACTER_SET_NAME FROM information_schema.tables t JOIN information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` ccsa ON ccsa.`COLLATION_NAME` = t.`TABLE_COLLATION` WHERE TABLE_SCHEMA = '" + databaseName + "'"
+
 	if rows, e = server.Connection.Query(query); e != nil {
 		return
 	}
@@ -106,6 +176,7 @@ func (ss *MySQL) FetchDatabaseTables(server *schema.Server, databaseName string)
 			&table.DataLength,
 			&table.Collation,
 			&table.AutoIncrement,
+			&table.CharacterSet,
 		)
 
 		table.Columns, e = ss.FetchTableColumns(server, databaseName, table.Name)
@@ -142,7 +213,8 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 			COLUMN_TYPE,
 			COLUMN_KEY,
 			EXTRA,
-			COALESCE(NUMERIC_SCALE, 0) as NumericScale
+			COALESCE(NUMERIC_SCALE, 0) as NumericScale,
+			COALESCE(COLLATION_NAME, '') as Collation
 		FROM information_schema.COLUMNS
 		WHERE
 			TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
@@ -173,6 +245,7 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 			&column.ColumnKey,
 			&column.Extra,
 			&column.NumericScale,
+			&column.Collation,
 		); e != nil {
 			return
 		}
@@ -195,7 +268,7 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 
 // CreateChangeSQL generates sql statements based off of comparing two database objects
 // localSchema is authority, remoteSchema will be upgraded to match localSchema
-func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema) *schema.SchemaComparison {
+func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema, databaseName string) *schema.SchemaComparison {
 
 	comparison := &schema.SchemaComparison{
 		Database: "",
@@ -205,6 +278,13 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 	createTableStatements := map[string][]*schema.SchemaChange{}
 	dropTableStatements := map[string][]*schema.SchemaChange{}
 
+	// Character Encoding
+	if localSchema.DefaultCharacterSet != remoteSchema.DefaultCharacterSet ||
+		localSchema.DefaultCollation != remoteSchema.DefaultCollation {
+		comparison.Changes = append(comparison.Changes, alterDatabaseCharacterSet(databaseName, localSchema.DefaultCharacterSet, localSchema.DefaultCollation))
+		comparison.Alterations++
+	}
+
 	// What tables are in local that aren't in remote?
 	for tableName, table := range localSchema.Tables {
 
@@ -213,6 +293,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 			createTableStatements[tableName] = createTable(table)
 		} else {
 			remoteTable := remoteSchema.Tables[tableName]
+
 			createTableChangeSQL(comparison, table, remoteTable)
 		}
 	}
@@ -498,6 +579,13 @@ func (ss *MySQL) FetchEnum(server *schema.Server, tableName string) (objects []m
 // If no change is found, an empty string is returned.
 func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schema.Table, remoteTable *schema.Table) {
 
+	if localTable.CharacterSet != remoteTable.CharacterSet ||
+		localTable.Collation != remoteTable.Collation {
+		fmt.Printf("%s CHANGE CHARSET FROM: %s/%s => %s/%s\n", remoteTable.Name, remoteTable.CharacterSet, remoteTable.Collation, localTable.CharacterSet, localTable.Collation)
+		comparison.Changes = append(comparison.Changes, alterTableCharacterSet(localTable.Name, localTable.CharacterSet, localTable.Collation))
+		comparison.Alterations++
+	}
+
 	createColumnStatements := map[string]*schema.SchemaChange{}
 	dropColumnStatements := map[string]*schema.SchemaChange{}
 	addIndexStatements := map[string]*schema.SchemaChange{}
@@ -653,6 +741,14 @@ func createTable(table *schema.Table) []*schema.SchemaChange {
 		sql += fmt.Sprintf(" ENGINE = %s", table.Engine)
 	}
 
+	if len(table.CharacterSet) > 0 {
+		sql += fmt.Sprintf(" CHARACTER SET %s", table.CharacterSet)
+	}
+
+	if len(table.Collation) > 0 {
+		sql += fmt.Sprintf(" COLLATE %s", table.Collation)
+	}
+
 	sql += ";"
 
 	// Create table
@@ -759,7 +855,9 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 		}
 	}
 
-	if localColumn.DataType != remoteColumn.DataType {
+	if localColumn.DataType != remoteColumn.DataType ||
+		localColumn.CharSet != remoteColumn.CharSet ||
+		localColumn.Collation != remoteColumn.Collation {
 		comparison.Changes = append(comparison.Changes, alterTableChangeColumn(table, localColumn, localColumn.Name))
 		comparison.Alterations++
 	}
@@ -767,18 +865,24 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 
 func alterTableChangeColumn(table *schema.Table, newColumn *schema.Column, oldColumnName string) *schema.SchemaChange {
 	query := createColumnSegment(newColumn)
+
+	sql := fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s", table.Name, oldColumnName, query)
+
 	return &schema.SchemaChange{
 		Type: schema.ChangeColumn,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s;", table.Name, oldColumnName, query),
+		SQL:  sql + ";",
 	}
 }
 
 // alterTableCreateColumn returns an alter table sql statement that adds a column
 func alterTableCreateColumn(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	query := createColumnSegment(column)
+
+	sql := fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s", table.Name, query)
+
 	return &schema.SchemaChange{
 		Type: schema.AddColumn,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s;", table.Name, query),
+		SQL:  sql + ";",
 	}
 }
 
@@ -802,6 +906,20 @@ func addUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaCh
 	return &schema.SchemaChange{
 		Type: schema.AddIndex,
 		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s_%s` (`%s`);", table.Name, table.Name, column.Name, column.Name),
+	}
+}
+
+func alterDatabaseCharacterSet(databaseName, characterSet, collation string) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type: schema.ChangeCharacterSet,
+		SQL:  fmt.Sprintf("ALTER DATABASE `%s` CHARACTER SET %s COLLATE %s;", databaseName, characterSet, collation),
+	}
+}
+
+func alterTableCharacterSet(tableName, characterSet, collation string) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type: schema.ChangeCharacterSet,
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` CONVERT TO CHARACTER SET %s COLLATE %s;", tableName, characterSet, collation),
 	}
 }
 
@@ -966,6 +1084,14 @@ func createColumnSegment(column *schema.Column) (sql string) {
 
 	} else {
 		sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+	}
+
+	if len(column.CharSet) > 0 {
+		sql += " CHARACTER SET " + column.CharSet
+	}
+
+	if len(column.Collation) > 0 {
+		sql += " COLLATE " + column.Collation
 	}
 
 	if !column.IsNullable {
