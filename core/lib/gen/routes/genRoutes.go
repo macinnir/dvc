@@ -396,6 +396,12 @@ func genAggregatesMap() map[string]map[string]string {
 		currentStruct := ""
 		for k := range contentLines {
 
+			contentLines[k] = strings.TrimSpace(contentLines[k])
+
+			if len(contentLines[k]) == 0 {
+				continue
+			}
+
 			if re.Match([]byte(contentLines[k])) {
 				structName := contentLines[k][5 : len(contentLines[k])-9]
 				// fmt.Println(k, structName)
@@ -405,8 +411,6 @@ func genAggregatesMap() map[string]map[string]string {
 			}
 
 			if len(currentStruct) > 0 {
-
-				contentLines[k] = strings.TrimSpace(contentLines[k])
 
 				if contentLines[k] == "}" {
 					currentStruct = ""
