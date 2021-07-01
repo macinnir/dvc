@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/macinnir/dvc/core/lib/utils/request"
+	"github.com/macinnir/dvc/core/lib/utils/types"
 )
 
 // Permission is the name of a permission
@@ -13,15 +14,7 @@ const (
 	AsOwnerSuffix            = "AsOwner"
 )
 
-type IUserContainer interface {
-	ID() int64
-	Activated() bool
-	Disabled() bool
-	Locked() bool
-	Permissions() []string
-}
-
-func HasPerm(req *request.Request, user IUserContainer, perm Permission) bool {
+func HasPerm(req *request.Request, user types.IUserContainer, perm Permission) bool {
 
 	// System user
 	if user.ID() == SuperUserID {

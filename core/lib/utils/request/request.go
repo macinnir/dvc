@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/macinnir/dvc/core/lib/utils/types"
 )
 
 // AuthHeaderKey is the name of the Authorization header
@@ -28,6 +29,7 @@ type Request struct {
 	ResponseCode     int64
 	Error            string
 	UserID           int64
+	User             types.IUserContainer
 	RootRequest      *http.Request `json:"-"`
 	ActionType       int64
 	BodyReadCloser   io.ReadCloser
