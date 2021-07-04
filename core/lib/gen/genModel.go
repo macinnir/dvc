@@ -18,7 +18,7 @@ import (
 )
 
 // GenModels generates models
-func GenModels(modelsDir string, force bool, clean bool) error {
+func GenModels(config *lib.Config, force bool, clean bool) error {
 
 	start := time.Now()
 	var schemaList *schema.SchemaList
@@ -34,7 +34,7 @@ func GenModels(modelsDir string, force bool, clean bool) error {
 
 	if clean {
 		for k := range schemaList.Schemas {
-			CleanGoModels(modelsDir, schemaList.Schemas[k])
+			CleanGoModels("gen/definitions/models", schemaList.Schemas[k])
 		}
 	}
 
@@ -76,7 +76,7 @@ func GenModels(modelsDir string, force bool, clean bool) error {
 
 			// TODO verbose flag
 			// fmt.Printf("Generating model `%s`\n", table.Name)
-			e = GenerateGoModel(modelsDir, schemaName, table)
+			e = GenerateGoModel(config.BasePackage, "gen/definitions/models", schemaName, table)
 			if e != nil {
 				return e
 			}
@@ -91,7 +91,7 @@ func GenModels(modelsDir string, force bool, clean bool) error {
 }
 
 // GenerateGoModel returns a string for a model in golang
-func GenerateGoModel(dir string, schemaName string, table *schema.Table) (e error) {
+func GenerateGoModel(packageName, dir string, schemaName string, table *schema.Table) (e error) {
 
 	lib.EnsureDir(dir)
 
@@ -104,7 +104,7 @@ func GenerateGoModel(dir string, schemaName string, table *schema.Table) (e erro
 	// }
 
 	// lib.Infof("Creating `%s`", g.Options, table.Name)s
-	e = buildGoModel(p, schemaName, table)
+	e = buildGoModel(packageName, p, schemaName, table)
 	return
 }
 
@@ -149,13 +149,13 @@ func InspectFile(filePath string) (s *lib.GoStruct, e error) {
 // 	return
 // }
 
-func buildGoModel(p string, schemaName string, table *schema.Table) (e error) {
+func buildGoModel(packageName, p string, schemaName string, table *schema.Table) (e error) {
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
 	// lib.Debugf("Generating model for table %s", g.Options, table.Name)
 
-	modelNode, e = buildModelNodeFromTable(table)
+	modelNode, e = buildModelNodeFromTable(packageName, table)
 	if e != nil {
 		return
 	}
@@ -170,14 +170,16 @@ func buildGoModel(p string, schemaName string, table *schema.Table) (e error) {
 }
 
 // buildModelNodeFromFile builds a node representation of a struct from a file
-func buildModelNodeFromTable(table *schema.Table) (modelNode *lib.GoStruct, e error) {
+func buildModelNodeFromTable(packageName string, table *schema.Table) (modelNode *lib.GoStruct, e error) {
 
 	modelNode = lib.NewGoStruct()
 	modelNode.Package = "models"
 	modelNode.Name = table.Name
 	modelNode.Comments = fmt.Sprintf("%s is a `%s` data model\n", table.Name, table.Name)
 	modelNode.Imports.Append("\"github.com/macinnir/dvc/core/lib/utils/query\"")
+	modelNode.Imports.Append("\"github.com/macinnir/dvc/core/lib/utils/db\"")
 	modelNode.Imports.Append("\"encoding/json\"")
+	modelNode.Imports.Append("\"fmt\"")
 
 	hasNull := false
 
@@ -347,12 +349,7 @@ func (c *` + modelNode.Name + `) Table_SchemaName() string {
 	return ` + modelNode.Name + `_SchemaName
 }
 
-// Select starts a select statement
-func (c *` + modelNode.Name + `) Select() *query.Q {
-	return query.Select(c)
-}
-
-// Select starts a select statement
+// FromID returns a FromID query statement
 func (c *` + modelNode.Name + `) FromID(id int64) string {
 	q, _ := query.Select(c).Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, id)).String()
 	return q
@@ -427,6 +424,107 @@ func (c *` + modelNode.Name + `) Destroy() string {
 			query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, c.` + primaryKey + `),
 		).String()
 	return sql 
+}
+
+func (r *` + modelNode.Name + `) Raw(db []db.IDB, shard int64, queryRaw string) ([]*` + modelNode.Name + `, error) {
+
+	var e error
+	model := []*` + modelNode.Name + `{}
+	e = db[shard].Select(&model, queryRaw)
+
+	if e != nil {
+		return nil, fmt.Errorf("` + modelNode.Name + `.Query(%s).Run(): %w", queryRaw, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `.Query(%s).Run()\n", queryRaw)
+
+	return model, nil
+}
+
+type ` + modelNode.Name + `DALSelector struct {
+	db    []db.IDB
+	shard int64
+	q     *query.Q
+}
+
+func (r *` + modelNode.Name + `) Select(db []db.IDB, shard int64) *` + modelNode.Name + `DALSelector {
+	return &` + modelNode.Name + `DALSelector{
+		db:    db,
+		shard: shard,
+		q:     query.Select(r),
+	}
+}
+
+func (ds *` + modelNode.Name + `DALSelector) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSelector {
+	ds.q.Where(whereParts...)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALSelector) Limit(limit, offset int64) *` + modelNode.Name + `DALSelector {
+	ds.q = ds.q.Limit(limit, offset)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALSelector) OrderBy(col query.Column, dir query.QueryOrderBy) *` + modelNode.Name + `DALSelector {
+	ds.q = ds.q.OrderBy(col, dir)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, error) {
+
+	model := []*` + modelNode.Name + `{}
+	q, e := ds.q.String()
+	if e != nil {
+		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query.String(): %w", e)
+	}
+
+	e = ds.db[ds.shard].Select(&model, q)
+
+	if e != nil {
+		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query(%s).Run(): %w", q, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DAL.Query(%s).Run()\n", q)
+
+	return model, nil
+}
+
+type ` + modelNode.Name + `DALCounter struct {
+	db    []db.IDB
+	shard int64
+	q     *query.Q
+}
+
+func (r *` + modelNode.Name + `) Count(db []db.IDB, shard int64) *` + modelNode.Name + `DALCounter {
+	return &` + modelNode.Name + `DALCounter{
+		db:    db,
+		shard: shard,
+		q:     query.Select(r).Count(r.Table_PrimaryKey(), "c"),
+	}
+}
+
+func (ds *` + modelNode.Name + `DALCounter) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALCounter {
+	ds.q.Where(whereParts...)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALCounter) Run() (int64, error) {
+
+	count := int64(0)
+	q, e := ds.q.String()
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.Query.String(): %w", e)
+	}
+
+	e = ds.db[ds.shard].Get(&count, q)
+
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.Query(%s).Run(): %w", q, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DALCounter.Query(%s).Run()\n", q)
+
+	return count, nil
 }
 `)
 
