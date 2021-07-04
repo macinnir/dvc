@@ -307,7 +307,8 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 
 	defaultImports := []string{
 		fmt.Sprintf("%s/%s", config.BasePackage, "gen/definitions/models"),
-		fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.IntegrationInterfaces),
+		"github.com/macinnir/dvc/core/lib/utils/db",
+		"github.com/macinnir/dvc/core/lib/utils/log",
 		"github.com/macinnir/dvc/core/lib/utils/errors",
 		"database/sql",
 		"context",
