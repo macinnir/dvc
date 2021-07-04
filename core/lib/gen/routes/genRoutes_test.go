@@ -1,11 +1,4 @@
-package gen
-
-import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-)
+package routes
 
 var controllerFilePath = "/Users/robertmacinnis/go/src/axis-api/core/controllers/AssignmentsController.go"
 var controller = `package controllers
@@ -295,51 +288,6 @@ func mapAssignmentsControllerRoutes(r *mux.Router, auth integrations.IAuth, c *c
 
 }`
 
-func TestExtractParamFromString(t *testing.T) {
-
-	tests := []struct {
-		p            string
-		paramName    string
-		paramType    string
-		paramPattern string
-	}{
-		{"fooID:[0-9]+}", "fooID", "int64", "[0-9]+"},
-		{"barID:[a-zA-Z]+}", "barID", "string", "[a-zA-Z]+"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.p, func(t *testing.T) {
-			param := extractParamFromString(test.p)
-			assert.Equal(t, test.paramName, param.Name)
-			assert.Equal(t, test.paramType, param.Type)
-			assert.Equal(t, test.paramPattern, param.Pattern)
-		})
-	}
-}
-
-func TestExtractParamsFromRoutePath(t *testing.T) {
-
-	route := "/get/{getID:[0-9]+}/something/{somethingID:[a-zA-Z-]+}/cool/{coolID:[0-9]+}"
-
-	params, e := extractParamsFromRoutePath(route)
-
-	require.Nil(t, e)
-	require.Len(t, params, 3)
-
-	assert.Equal(t, "getID", params[0].Name)
-	assert.Equal(t, "[0-9]+", params[0].Pattern)
-	assert.Equal(t, "int64", params[0].Type)
-
-	assert.Equal(t, "somethingID", params[1].Name)
-	assert.Equal(t, "[a-zA-Z-]+", params[1].Pattern)
-	assert.Equal(t, "string", params[1].Type)
-
-	assert.Equal(t, "coolID", params[2].Name)
-	assert.Equal(t, "[0-9]+", params[2].Pattern)
-	assert.Equal(t, "int64", params[2].Type)
-
-}
-
 // func TestExtractRoutesFromController(t *testing.T) {
 
 // 	// Arrange
@@ -434,30 +382,3 @@ func TestExtractParamsFromRoutePath(t *testing.T) {
 // 	assert.Equal(t, "DeleteAssignment", result[5].Name)
 // 	assert.Equal(t, "deletes an assignment", result[5].Description)
 // }
-
-// func TestBuildRoutesCodeFromController(t *testing.T) {
-// 	g := &Gen{}
-
-// 	ctl, e := g.BuildControllerObjFromController(controllerFilePath, []byte(controller))
-// 	require.Nil(t, e)
-
-// 	code := g.BuildRoutesCodeFromController(ctl)
-
-// 	assert.Equal(t, routesCode, code)
-// }
-
-func TestExtractControllerNameFromFileName(t *testing.T) {
-	var tests = []struct {
-		path string
-		name string
-	}{
-		{"AController.go", "A"},
-		{"AController_test.go", ""},
-		{"ALongControllerName", ""},
-		{"foo/bar/BazController.go", "Baz"},
-	}
-
-	for k := range tests {
-		assert.Equal(t, tests[k].name, extractControllerNameFromFileName(tests[k].path))
-	}
-}

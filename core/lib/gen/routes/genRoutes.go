@@ -14,13 +14,56 @@ import (
 	"github.com/macinnir/dvc/core/lib/gen"
 )
 
+func GenControllerBootstrap(config *lib.Config, dirs []string) {
+
+	tpl := `// DO NOT EDIT: Auto generated
+package gen
+
+import (
+
+`
+	for k := range dirs {
+		tpl += "\t\"" + path.Join(config.BasePackage, dirs[k]) + "\"\n"
+	}
+	tpl += `	"` + config.BasePackage + `/core/definitions"
+
+	"github.com/macinnir/dvc/core/lib/utils/request"
+)
+
+// Controllers is the main container for all of the controller modules 
+type Controllers struct {
+`
+
+	for k := range dirs {
+		packageName := path.Base(dirs[k])
+		tpl += "\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Controllers\n"
+	}
+
+	tpl += `}
+
+// NewControllers bootstraps all of the controller modules 
+func NewControllers(s *definitions.App, r request.IResponseLogger) *Controllers { 
+	return &Controllers{
+`
+
+	for k := range dirs {
+		packageName := path.Base(dirs[k])
+		tpl += "\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewControllers(s, r),\n"
+	}
+
+	tpl += `	}
+}`
+
+	ioutil.WriteFile("gen/controllers.go", []byte(tpl), 0777)
+
+}
+
 // GenRoutes generates a list of routes from a directory of controller files
 func GenRoutesAndPermissions(config *lib.Config) error {
 
 	imports := []string{
-		path.Join(config.BasePackage, config.Dirs.Controllers),
 		path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
-		path.Join(config.BasePackage, config.Dirs.Aggregates),
+		// path.Join(config.BasePackage, config.Dirs.Aggregates),
 		"net/http",
 		"github.com/gorilla/mux",
 	}
@@ -36,7 +79,7 @@ func GenRoutesAndPermissions(config *lib.Config) error {
 	packageUsesPermission := false
 
 	cf := fetcher.NewControllerFetcher()
-	controllers, e := cf.Fetch(config.Dirs.Controllers)
+	controllers, dirs, e := cf.FetchAll()
 
 	if e != nil {
 		return e
@@ -45,7 +88,6 @@ func GenRoutesAndPermissions(config *lib.Config) error {
 	for k := range controllers {
 
 		controller := controllers[k]
-		// fmt.Println("ControllerName:", controllerName)
 
 		if controller.PermCount > 0 {
 			packageUsesPermission = true
@@ -93,7 +135,7 @@ func GenRoutesAndPermissions(config *lib.Config) error {
 
 	final := `// Generated Code; DO NOT EDIT.
 
-package api
+package gen
 
 import (
 `
@@ -105,12 +147,12 @@ import (
 	final += `)
 
 // MapRoutesToControllers maps the routes to the controllers
-func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controllers.Controllers, res request.IResponseLogger, log integrations.ILog) {
+func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controllers, res request.IResponseLogger, log integrations.ILog) {
 
 	`
 	final += code
 
-	ioutil.WriteFile("core/api/routes.go", []byte(final), 0777)
+	ioutil.WriteFile("gen/routes.go", []byte(final), 0777)
 
 	routesContainer := &lib.RoutesJSONContainer{
 		Routes:     map[string]*lib.ControllerRoute{},
@@ -130,6 +172,8 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *controlle
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
 	// fmt.Println("Writing Routes JSON to path", lib.RoutesFilePath)
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
+
+	GenControllerBootstrap(config, dirs)
 
 	return nil
 }
@@ -169,14 +213,14 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 		}
 
 		if route.IsAuth {
-			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AuthMiddleware(func(w http.ResponseWriter, currentUser *aggregates.UserAggregate, req *request.Request) {\n", route.Path))
+			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AuthMiddleware(func(w http.ResponseWriter, req *request.Request) {\n", route.Path))
 			// s = append(s, fmt.Sprintf("\t\tcurrentUser := auth.GetCurrentUser(r)\n"))
 			// args = append(args, "currentUser")
 		} else {
 			s = append(s, fmt.Sprintf("\tr.Handle(\"%s\", auth.AnonMiddleware(func(w http.ResponseWriter, req *request.Request) {\n", route.Path))
 		}
 
-		s = append(s, fmt.Sprintf("\n\t\tlog.Debug(\"ROUTE: %s %s => %s\")\n\n", route.Method, route.Path, route.Name))
+		s = append(s, fmt.Sprintf("\t\tlog.Debug(\"ROUTE: %s %s => %s\")\n", route.Method, route.Path, route.Name))
 
 		// Permission
 		if route.IsAuth && len(route.Permission) > 0 {
@@ -184,11 +228,12 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 			// ucFirst
 			// permission := string(unicode.ToUpper(rune(route.Permission[0]))) + route.Permission[1:]
 
-			s = append(s, `		
-		if !utils.HasPerm(req, currentUser, permissions.`+route.Permission+`) {
+			s = append(s, `		// Requires permission `+route.Permission+`
+		if !utils.HasPerm(req, req.User, permissions.`+route.Permission+`) {
 			res.Forbidden(req, w)
 			return
-		}`)
+		}
+`)
 
 		}
 
@@ -197,7 +242,7 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 			if route.BodyType[0:1] == "*" {
 				route.BodyType = route.BodyType[1:]
 			}
-
+			s = append(s, "\t\t// Parse the body of type "+route.BodyType)
 			s = append(s, fmt.Sprintf("\t\tbody := &%s{}", route.BodyType))
 			s = append(s, "\t\treq.BodyJSON(body)\n")
 		}
@@ -305,7 +350,7 @@ func genDTOSMap() map[string]map[string]string {
 
 func genModelsMap() map[string]map[string]string {
 
-	modelsDir := "core/definitions/models"
+	modelsDir := "gen/definitions/models"
 
 	dirHandle, err := os.Open(modelsDir)
 
