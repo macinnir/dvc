@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/macinnir/dvc/core/lib/utils/query"
@@ -381,3 +382,75 @@ func TestWhere_MultiWheres(t *testing.T) {
 // 	assert.Nil(t, e)
 // 	assert.Equal(t, "UPDATE `Comment` SET `Content` = 'here is some test content', `ObjectType` = 1, `ObjectID` = 2 WHERE `CommentID` = 123", sql)
 // }
+
+func TestMod(t *testing.T) {
+	q, e := query.Select(&testassets.Job{}).Where(query.Mod("IsDeleted", 1, 0)).String()
+	expected := "SELECT `t`.* FROM `Job` `t` WHERE MOD(`t`.`IsDeleted`, 1) = 0"
+
+	assert.Nil(t, e)
+	assert.Equal(t, expected, q)
+}
+
+func TestModF(t *testing.T) {
+	q, e := query.Select(&testassets.Job{}).Where(query.Modf(1, "IsDeleted", 0)).String()
+	expected := "SELECT `t`.* FROM `Job` `t` WHERE MOD(1, `t`.`IsDeleted`) = 0"
+
+	assert.Nil(t, e)
+	assert.Equal(t, expected, q)
+}
+
+func TestBitAnd(t *testing.T) {
+	q, e := query.Select(&testassets.Job{}).Where(query.BitAnd("IsDeleted", 1, 0)).String()
+	expected := "SELECT `t`.* FROM `Job` `t` WHERE `t`.`IsDeleted` & 1 = 0"
+
+	assert.Nil(t, e)
+	assert.Equal(t, expected, q)
+}
+
+func TestModAndBitwise(t *testing.T) {
+	// now := time.Now()
+
+	dayBW := int64(16)       // int64(math.Pow(2, float64(now.Day())))
+	weekdayBW := int64(1)    // int64(math.Pow(2, float64(now.Weekday())))
+	hourBW := int64(2048)    // int64(math.Pow(2, float64(now.Hour())))
+	minute := int64(56)      // int64(time.Now().Minute())
+	seconds := 1625414209657 // time.Now().UnixNano() / 1000000
+	// SELECT * FROM TaskBatchSchedule tbs WHERE tbs.IsActive = 1 AND tbs.IsDeleted = 0 AND ( tbs.DOM = 0 OR 16 & tbs.DOM = 16 ) AND ( tbs.DOW = 0 OR 1 & tbs.DOW = 1 ) AND ( tbs.HOD = 0 OR 2048 & tbs.HOD = 2048 ) AND ( MOD(56, tbs.MOH ) = 0 AND ( tbs.LastRunDate + 60000 < 1625414209657 )
+
+	q := "SELECT `t`.* FROM `TaskBatchSchedule` `t` WHERE `t`.`IsActive` = 1 AND `t`.`IsDeleted` = 0 "
+	q += fmt.Sprintf("AND ( `t`.`DOM` = 0 OR `t`.`DOM` & %d = %d ) ", dayBW, dayBW)
+	q += fmt.Sprintf("AND ( `t`.`DOW` = 0 OR `t`.`DOW` & %d = %d ) ", weekdayBW, weekdayBW)
+	q += fmt.Sprintf("AND ( `t`.`HOD` = 0 OR `t`.`HOD` & %d = %d ) ", hourBW, hourBW)
+	// Every minute of the hour
+	q += fmt.Sprintf("AND ( MOD(%d, `t`.`MOH`) = 0 ) ", minute)
+	// It has been atleast 60 seconds since the last run
+	q += fmt.Sprintf("AND ( `t`.`LastRunDate` + 60000 < %d )", seconds)
+
+	actual, e := query.Select(&testassets.TaskBatchSchedule{}).
+		Where(
+			query.EQ("IsActive", 1),
+			query.And(),
+			query.EQ("IsDeleted", 0),
+			query.And(query.EQ("DOM", 0), query.Or(), query.BitAnd("DOM", dayBW, dayBW)),
+			query.And(query.EQ("DOW", 0), query.Or(), query.BitAnd("DOW", weekdayBW, weekdayBW)),
+			query.And(query.EQ("HOD", 0), query.Or(), query.BitAnd("HOD", hourBW, hourBW)),
+			query.And(query.Modf(minute, "MOH", 0)),
+			query.And(query.Rawf("`t`.`LastRunDate` + 60000 < %d", seconds)),
+		).
+		String()
+
+	// fmt.Println(q)
+
+	assert.Nil(t, e)
+	assert.Equal(t, q, actual)
+
+}
+
+func TestRaw(t *testing.T) {
+
+	q, e := query.Raw(&testassets.TaskBatchSchedule{}, "SELECT * FROM `TaskBatchSchedule` WHERE 1=1 ORDER BY `t`.`LastRunDate` DESC LIMIT 1 OFFSET 2").
+		String()
+
+	assert.Nil(t, e)
+	assert.Equal(t, "SELECT * FROM `TaskBatchSchedule` WHERE 1=1 ORDER BY `t`.`LastRunDate` DESC LIMIT 1 OFFSET 2", q)
+}

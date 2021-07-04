@@ -31,6 +31,7 @@ type QueryType int
 const (
 	QueryTypeNotSet QueryType = iota
 	QueryTypeSelect
+	QueryTypeRaw
 	QueryTypeUpdate
 	QueryTypeDelete
 	QueryTypeInsert
@@ -56,6 +57,7 @@ func (q QueryOrderBy) String() string {
 type Q struct {
 	fields      []string
 	alias       string
+	raw         string
 	model       IModel
 	queryType   QueryType
 	where       *whereClause
@@ -101,6 +103,11 @@ func (q *Q) OrderBy(col Column, dir QueryOrderBy) *Q {
 
 func (q *Q) Fields(fields ...string) *Q {
 	q.fields = fields
+	return q
+}
+
+func (q *Q) Raw(query string) *Q {
+	q.raw = query
 	return q
 }
 
@@ -216,6 +223,9 @@ func (q *Q) String() (string, error) {
 	var sb strings.Builder
 
 	switch q.queryType {
+	case QueryTypeRaw:
+		sb.WriteString(q.raw)
+		return sb.String(), nil
 	case QueryTypeSelect:
 
 		fields := "`" + q.alias + "`.*"
@@ -380,7 +390,12 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePa
 		// If this is is not a conjunction AND fieldName is not empty
 		if !isConj && len(w.fieldName) > 0 {
 
-			sb.WriteString(q.col(w.fieldName))
+			if w.whereType != WhereTypeMod &&
+				w.whereType != WhereTypeModF &&
+				w.whereType != WhereTypeBitAnd &&
+				w.whereType != WhereTypeRaw {
+				sb.WriteString(q.col(w.fieldName))
+			}
 
 			if _, ok := columnTypes[Column(w.fieldName)]; !ok {
 				q.errorInvalidColumn("WHERE()", w.fieldName)
@@ -437,6 +452,18 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePa
 			switch w.whereType {
 			case WhereTypeEqualsField:
 				sb.WriteString(w.values[0].(string))
+			case WhereTypeMod:
+				sb.WriteString(
+					"MOD(" + string(q.col(w.fieldName)) + ", " + fmt.Sprint(w.values[0]) + ") = " + fmt.Sprint(w.values[1]),
+				)
+			case WhereTypeModF:
+				sb.WriteString(
+					"MOD(" + fmt.Sprint(w.values[0]) + ", " + string(q.col(w.fieldName)) + ") = " + fmt.Sprint(w.values[1]),
+				)
+			case WhereTypeBitAnd:
+				sb.WriteString(
+					string(q.col(w.fieldName)) + " & " + fmt.Sprint(w.values[0]) + " = " + fmt.Sprint(w.values[1]),
+				)
 			case WhereTypeBetween:
 				list := []string{}
 				for l := range w.values {
@@ -457,6 +484,8 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePa
 					}
 				}
 				sb.WriteString("( " + strings.Join(list, ", ") + " )")
+			case WhereTypeRaw:
+				sb.WriteString(fmt.Sprint(w.values[0]))
 			default:
 				if column == "%s" {
 					sb.WriteString("'" + fmt.Sprint(w.values[0]) + "'")
@@ -516,6 +545,10 @@ const (
 	// e.g. SELECT * FROM `Foo` WHERE 1=1
 	//      SELECT * FROM `Foo` WHERE 1=1 AND FooID = 123;
 	WhereTypeAll
+	WhereTypeMod
+	WhereTypeModF
+	WhereTypeBitAnd
+	WhereTypeRaw
 )
 
 // WherePart is a part of a where clause.
@@ -539,7 +572,7 @@ type WherePart struct {
 	e         error
 }
 
-func newWhereParent(whereType WhereType, fieldName string, values []interface{}) WherePart {
+func newWherePart(whereType WhereType, fieldName string, values []interface{}) WherePart {
 	return WherePart{
 		whereType: whereType,
 		fieldName: fieldName,
@@ -559,7 +592,7 @@ type whereClause struct {
 
 // EQ is an equals statement between a table column and a value
 func EQ(fieldName Column, value interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeEquals,
 		string(fieldName),
 		[]interface{}{
@@ -569,7 +602,7 @@ func EQ(fieldName Column, value interface{}) WherePart {
 }
 
 func EQF(fieldName1, fieldName2 string) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeEqualsField,
 		fieldName1,
 		[]interface{}{fieldName2},
@@ -577,48 +610,79 @@ func EQF(fieldName1, fieldName2 string) WherePart {
 }
 
 func NE(fieldName Column, value interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeNotEquals,
 		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
+// Less Than
 func LT(fieldName Column, value interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeLessThan,
 		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
+// Greater Than
 func GT(fieldName Column, value interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeGreaterThan,
 		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
+// Less Than Or Equal
 func LTOE(fieldName Column, value interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeLessThanOrEqualTo,
 		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
+// Greater Than Or Equal
 func GTOE(fieldName Column, value interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeGreaterThanOrEqualTo,
 		string(fieldName),
 		[]interface{}{value},
 	)
 }
 
+// Mod MOD(`t`.`Field`, value) = remainder
+func Mod(fieldName Column, value, remainder int64) WherePart {
+	return newWherePart(
+		WhereTypeMod,
+		string(fieldName),
+		[]interface{}{value, remainder},
+	)
+}
+
+// Modf MOD(value, `t`.`Field`) = remainder
+func Modf(value int64, fieldName Column, remainder int64) WherePart {
+	return newWherePart(
+		WhereTypeModF,
+		string(fieldName),
+		[]interface{}{value, remainder},
+	)
+}
+
+// BitAnd `t`.`Field` & a = b
+func BitAnd(fieldName Column, a, b int64) WherePart {
+	return newWherePart(
+		WhereTypeBitAnd,
+		string(fieldName),
+		[]interface{}{a, b},
+	)
+}
+
 // IN is an IN clause
 func IN(fieldName Column, values ...interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeIN,
 		string(fieldName),
 		values,
@@ -637,6 +701,15 @@ func INString(fieldName Column, values []string) WherePart {
 	return IN(fieldName, interfaces...)
 }
 
+// Rawf
+func Rawf(str string, args ...interface{}) WherePart {
+	return newWherePart(
+		WhereTypeRaw,
+		"",
+		[]interface{}{fmt.Sprintf(str, args...)},
+	)
+}
+
 // INInt64 is a helper function for converting a slice of string arguments into
 // a slice of interface arguments, passed into an IN clause and returned
 func INInt64(fieldName Column, values []int64) WherePart {
@@ -650,7 +723,7 @@ func INInt64(fieldName Column, values []int64) WherePart {
 }
 
 func Between(fieldName Column, from, to interface{}) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeBetween,
 		string(fieldName),
 		[]interface{}{from, to},
@@ -658,7 +731,7 @@ func Between(fieldName Column, from, to interface{}) WherePart {
 }
 
 func Like(fieldName Column, value string) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeLike,
 		string(fieldName),
 		[]interface{}{value},
@@ -666,7 +739,7 @@ func Like(fieldName Column, value string) WherePart {
 }
 
 func NotLike(fieldName Column, value string) WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeNotLike,
 		string(fieldName),
 		[]interface{}{value},
@@ -675,7 +748,7 @@ func NotLike(fieldName Column, value string) WherePart {
 
 func And(args ...WherePart) WherePart {
 
-	and := newWhereParent(WhereTypeAnd, "", []interface{}{})
+	and := newWherePart(WhereTypeAnd, "", []interface{}{})
 
 	if len(args) > 0 {
 		and.subParts = append(and.subParts, PS())
@@ -692,7 +765,7 @@ func And(args ...WherePart) WherePart {
 
 func Or(args ...WherePart) WherePart {
 
-	or := newWhereParent(WhereTypeOr, "", []interface{}{})
+	or := newWherePart(WhereTypeOr, "", []interface{}{})
 
 	if len(args) > 0 {
 		or.subParts = append(or.subParts, PS())
@@ -709,7 +782,7 @@ func Or(args ...WherePart) WherePart {
 
 // Parenthesis Start
 func PS() WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeParenthesisStart,
 		"",
 		[]interface{}{},
@@ -718,7 +791,7 @@ func PS() WherePart {
 
 // Parenthesis End
 func PE() WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeParenthesisEnd,
 		"",
 		[]interface{}{},
@@ -726,7 +799,7 @@ func PE() WherePart {
 }
 
 func WhereAll() WherePart {
-	return newWhereParent(
+	return newWherePart(
 		WhereTypeAll,
 		"",
 		[]interface{}{},
@@ -736,7 +809,7 @@ func WhereAll() WherePart {
 func Exists(clause *Q) WherePart {
 	clauseString, e := clause.String()
 
-	w := newWhereParent(
+	w := newWherePart(
 		WhereTypeExists,
 		"",
 		[]interface{}{clauseString},
@@ -764,6 +837,13 @@ func Union(queries ...*Q) (string, error) {
 func Select(model IModel) *Q {
 	q := Query(model)
 	q.queryType = QueryTypeSelect
+	return q
+}
+
+func Raw(model IModel, query string) *Q {
+	q := Query(model)
+	q.queryType = QueryTypeRaw
+	q.raw = query
 	return q
 }
 
