@@ -29,11 +29,6 @@ var (
 	minShortShardID = 10000000
 )
 
-type IShortSharder interface {
-	NewRoundRobin() *ShortShardID
-	NewFromSubID(subID int64) *ShortShardID
-}
-
 type ShortSharder struct {
 	sequence       int64
 	numberOfShards int64
@@ -116,6 +111,10 @@ func (s *ShortSharder) NumberOfShards() int64 {
 
 func (s *ShortSharder) CurrentShardID() int64 {
 	return s.currentShardID
+}
+
+func (s *ShortSharder) FromID(id int64) *ShortShardID {
+	return NewShortShardIDFromID(id)
 }
 
 func NewShortSharder(numberOfShards int64) *ShortSharder {
