@@ -116,6 +116,8 @@ func toArgName(field string) string {
 
 func GenDALs(dalsDir string, config *lib.Config, force, clean bool) error {
 
+	lib.EnsureDir(dalsDir)
+
 	start := time.Now()
 	var schemaList *schema.SchemaList
 	var e error
@@ -198,7 +200,6 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 	// TODO verbose flag
 	// start := time.Now()
 	// TODO verbose flag
-	// fmt.Printf("Generating DAL `%s`...", p)
 	lib.EnsureDir(dir)
 
 	imports := []string{}
@@ -305,7 +306,7 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 	}
 
 	defaultImports := []string{
-		fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.Models),
+		fmt.Sprintf("%s/%s", config.BasePackage, "gen/definitions/models"),
 		fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.IntegrationInterfaces),
 		"github.com/macinnir/dvc/core/lib/utils/errors",
 		"database/sql",
@@ -363,13 +364,21 @@ import ({{range .Imports}}
 
 // {{.Table.Name}}DAL is a data repository for {{.Table.Name}} objects
 type {{.Table.Name}}DAL struct {
-	db  []integrations.IDB
-	log integrations.ILog
+	db  []db.IDB
+	log log.ILog
 }
 
 // New{{.Table.Name}}DAL returns a new instance of {{.Table.Name}}Repo
-func New{{.Table.Name}}DAL(db []integrations.IDB, log integrations.ILog) *{{.Table.Name}}DAL {
+func New{{.Table.Name}}DAL(db []db.IDB, log log.ILog) *{{.Table.Name}}DAL {
 	return &{{.Table.Name}}DAL{db, log}
+}
+
+func (r *{{.Table.Name}}DAL) Raw(shard int64, q string, args ...interface{}) ([]*models.{{.Table.Name}}, error) { 
+	return (&models.{{.Table.Name}}{}).Raw(r.db, shard, fmt.Sprintf(q, args...)) 
+}
+
+func (r *{{.Table.Name}}DAL) Select(shard int64) *models.{{.Table.Name}}DALSelector { 
+	return (&models.{{.Table.Name}}{}).Select(r.db, shard)
 }
 
 // Create creates a new {{.Table.Name}} entry in the database
@@ -902,6 +911,7 @@ func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy
 
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.GetMany(%d, %d, %s, %s) > %s", limit, offset, orderBy, orderDir, e.Error())
+		e = fmt.Errorf("ManyPaged: Select %w", e) 
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.GetMany(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
 	}
@@ -1232,15 +1242,17 @@ func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schem
 	lib.EnsureDir(dir)
 
 	data := struct {
-		Tables              map[string]*schema.Table
-		BasePackage         string
-		IntegrationsPackage string
-		ModelsPackage       string
+		Tables        map[string]*schema.Table
+		BasePackage   string
+		DBPackage     string
+		LogPackage    string
+		ModelsPackage string
 	}{
-		BasePackage:         config.BasePackage,
-		Tables:              tables,
-		IntegrationsPackage: fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.IntegrationInterfaces),
-		ModelsPackage:       fmt.Sprintf("%s/%s", config.BasePackage, config.Dirs.Models),
+		BasePackage:   config.BasePackage,
+		Tables:        tables,
+		DBPackage:     "github.com/macinnir/dvc/core/lib/utils/db",
+		LogPackage:    "github.com/macinnir/dvc/core/lib/utils/log",
+		ModelsPackage: fmt.Sprintf("%s/%s", config.BasePackage, "gen/definitions/models"),
 	}
 
 	tpl := `
@@ -1248,7 +1260,8 @@ func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schem
 package dal
 
 import (
-	"{{ .IntegrationsPackage }}"
+	"{{ .DBPackage }}"
+	"{{ .LogPackage }}"
 	"{{ .ModelsPackage }}"
 )
 
@@ -1259,7 +1272,7 @@ type DAL struct {
 }
 
 // BootstrapDAL bootstraps all of the DAL methods
-func BootstrapDAL(db map[string][]integrations.IDB, log integrations.ILog) *DAL {
+func BootstrapDAL(db map[string][]db.IDB, log log.ILog) *DAL {
 
 	d := &DAL{}
 	{{range .Tables}}
