@@ -44,7 +44,7 @@ const (
 	OrderDirDESC
 )
 
-func OrderByFromString(s string) OrderDir {
+func OrderDirFromString(s string) OrderDir {
 	s = strings.ToLower(s)
 	if s == "desc" {
 		return OrderDirDESC
@@ -428,6 +428,8 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePa
 			sb.WriteString(" <= ")
 		case WhereTypeIN:
 			sb.WriteString(" IN ")
+		case WhereTypeNotIN:
+			sb.WriteString(" NOT IN ")
 		case WhereTypeExists:
 			sb.WriteString("EXISTS")
 		case WhereTypeBetween:
@@ -483,7 +485,7 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePa
 					}
 				}
 				sb.WriteString(list[0] + " AND " + list[1])
-			case WhereTypeIN:
+			case WhereTypeIN, WhereTypeNotIN:
 				list := []string{}
 				for l := range w.values {
 					if column == "%s" {
@@ -543,6 +545,7 @@ const (
 	WhereTypeLike
 	WhereTypeNotLike
 	WhereTypeIN
+	WhereTypeNotIN
 	WhereTypeExists
 	WhereTypeAnd
 	WhereTypeOr
@@ -693,6 +696,15 @@ func BitAnd(fieldName Column, a, b int64) WherePart {
 func IN(fieldName Column, values ...interface{}) WherePart {
 	return newWherePart(
 		WhereTypeIN,
+		string(fieldName),
+		values,
+	)
+}
+
+// IN is an NOT IN clause
+func NOTIN(fieldName Column, values ...interface{}) WherePart {
+	return newWherePart(
+		WhereTypeNotIN,
 		string(fieldName),
 		values,
 	)

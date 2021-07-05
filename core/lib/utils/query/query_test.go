@@ -82,6 +82,24 @@ func TestQuerySelect(t *testing.T) {
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
 }
 
+func TestQuerySelect_WhereIN(t *testing.T) {
+	sql, e := query.Select(&testassets.Comment{}).
+		Where(
+			query.IN("Content", "foo", "bar", "baz"),
+		).String()
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Content` IN ( 'foo', 'bar', 'baz' )", sql)
+}
+
+func TestQuerySelect_WhereNotIN(t *testing.T) {
+	sql, e := query.Select(&testassets.Comment{}).
+		Where(
+			query.NOTIN("Content", "foo", "bar", "baz"),
+		).String()
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Content` NOT IN ( 'foo', 'bar', 'baz' )", sql)
+}
+
 func TestQuerySelect_InvalidFieldName(t *testing.T) {
 
 	sql, e := query.Select(&testassets.Comment{}).
