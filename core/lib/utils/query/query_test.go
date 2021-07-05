@@ -76,7 +76,7 @@ func TestQuerySelect(t *testing.T) {
 			query.And(),
 			query.NE("ObjectID", "5"),
 		).
-		OrderBy("Content", query.QueryOrderByASC).
+		OrderBy("Content", query.OrderDirASC).
 		Limit(1, 2).String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)

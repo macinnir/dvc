@@ -37,19 +37,28 @@ const (
 	QueryTypeInsert
 )
 
-type QueryOrderBy int
+type OrderDir int
 
 const (
-	QueryOrderByASC QueryOrderBy = iota
-	QueryOrderByDESC
+	OrderDirASC OrderDir = iota
+	OrderDirDESC
 )
 
-func (q QueryOrderBy) String() string {
+func OrderByFromString(s string) OrderDir {
+	s = strings.ToLower(s)
+	if s == "desc" {
+		return OrderDirDESC
+	}
+
+	return OrderDirASC
+}
+
+func (q OrderDir) String() string {
 	switch q {
-	case QueryOrderByASC:
+	case OrderDirASC:
 		return "ASC"
 	default:
-		// QueryOrderByDESC
+		// OrderDirDESC
 		return "DESC"
 	}
 }
@@ -96,7 +105,7 @@ func (q *Q) Limit(limit, offset int64) *Q {
 	return q
 }
 
-func (q *Q) OrderBy(col Column, dir QueryOrderBy) *Q {
+func (q *Q) OrderBy(col Column, dir OrderDir) *Q {
 	q.orderBy = append(q.orderBy, []string{string(col), dir.String()})
 	return q
 }
