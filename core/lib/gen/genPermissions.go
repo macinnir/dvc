@@ -10,9 +10,34 @@ import (
 	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/fetcher"
 )
 
-func loadPermissionsFromJSON() map[string]string {
+func fetchAllPermissions(controllersDir string) (map[string]string, error) {
+
+	cf := fetcher.NewControllerFetcher()
+	permissionMap := LoadPermissionsFromJSON()
+	controllers, _, e := cf.FetchAll()
+	if e != nil {
+		return nil, e
+	}
+
+	for k := range controllers {
+
+		controller := controllers[k]
+		// Extract the permissions from the controller
+		permissionMap[controller.Name+"_View"] = "View " + controller.Name
+
+		for k := range controller.Routes {
+			permissionMap[controller.Routes[k].Permission] = controller.Routes[k].Description
+		}
+	}
+
+	return permissionMap, nil
+}
+
+// LoadPermissionsFromJSON loads a set of permissions from a JSON file
+func LoadPermissionsFromJSON() map[string]string {
 	permissionMap := map[string]string{}
 	fileBytes, e := ioutil.ReadFile(lib.PermissionsFile)
 	if e != nil {
@@ -47,7 +72,6 @@ func GenGoPerms(config *lib.Config) (e error) {
 
 func BuildPermissionsGoFile(permissionMap map[string]string) {
 
-	// permissionMap := loadPermissionsFromJSON()
 	permissions := make([]string, 0, len(permissionMap))
 
 	for k := range permissionMap {

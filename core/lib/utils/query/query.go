@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/macinnir/dvc/core/lib/utils/db"
 )
 
 type Column string
@@ -18,10 +20,10 @@ type IModel interface {
 	Table_UpdateColumns() []Column
 	Table_Column_Types() map[Column]string
 	String() string
-	Update() string
-	Create() string
-	Destroy() string
-	FromID(id int64) string
+	Update(db db.IDB) error
+	Create(db db.IDB) error
+	Delete(db db.IDB) error
+	FromID(db db.IDB, id int64) (IModel, error)
 
 	// Table_Column_Values() map[string]interface{}
 }

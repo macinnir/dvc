@@ -25,7 +25,7 @@ import (
 	for k := range dirs {
 		tpl += "\t\"" + path.Join(config.BasePackage, dirs[k]) + "\"\n"
 	}
-	tpl += `	"` + config.BasePackage + `/core/definitions"
+	tpl += `	"` + config.BasePackage + `/app"
 
 	"github.com/macinnir/dvc/core/lib/utils/request"
 )
@@ -42,7 +42,7 @@ type Controllers struct {
 	tpl += `}
 
 // NewControllers bootstraps all of the controller modules 
-func NewControllers(s *definitions.App, r request.IResponseLogger) *Controllers { 
+func NewControllers(s *app.App, r request.IResponseLogger) *Controllers { 
 	return &Controllers{
 `
 
@@ -144,7 +144,9 @@ import (
 		final += fmt.Sprintf("\t\"%s\"\n", i)
 	}
 
-	final += `)
+	final += `
+	appdtos "` + config.BasePackage + `/app/definitions/dtos"
+)
 
 // MapRoutesToControllers maps the routes to the controllers
 func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controllers, res request.IResponseLogger, log integrations.ILog) {

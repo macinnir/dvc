@@ -375,30 +375,37 @@ func New{{.Table.Name}}DAL(db []db.IDB, log log.ILog) *{{.Table.Name}}DAL {
 }
 
 func (r *{{.Table.Name}}DAL) Raw(shard int64, q string, args ...interface{}) ([]*models.{{.Table.Name}}, error) { 
-	return (&models.{{.Table.Name}}{}).Raw(r.db, shard, fmt.Sprintf(q, args...)) 
+	return (&models.{{.Table.Name}}{}).Raw(r.db[shard], fmt.Sprintf(q, args...)) 
 }
 
 func (r *{{.Table.Name}}DAL) Select(shard int64) *models.{{.Table.Name}}DALSelector { 
-	return (&models.{{.Table.Name}}{}).Select(r.db, shard)
+	return (&models.{{.Table.Name}}{}).Select(r.db[shard])
+}
+
+func (r *{{.Table.Name}}DAL) Count(shard int64) *models.{{.Table.Name}}DALCounter { 
+	return (&models.{{.Table.Name}}{}).Count(r.db[shard])
+}
+
+func (r *{{.Table.Name}}DAL) Get(shard int64) *models.{{.Table.Name}}DALGetter { 
+	return (&models.{{.Table.Name}}{}).Get(r.db[shard])
 }
 
 // Create creates a new {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) (e error) {
-{{if .IsDateCreated}}
-	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
-{{if .IsLastUpdated}}
-	model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
+func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) error {
 
-	var result sql.Result
-	result, e = r.db[shard].Exec("{{.InsertSQL}}", {{.InsertArgs}})
+	{{if .IsDateCreated}}
+		model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
+	{{if .IsLastUpdated}}
+		model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
+
+	e := model.Create(r.db[shard])
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Insert > %s", e.Error())
-		return
+		return e		
 	}
 
-	model.{{.PrimaryKey}}, e = result.LastInsertId()
-
 	r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
+
 	return
 }
 
@@ -777,6 +784,8 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 	return
 }
 
+{{if not $col.IsString}} // This is a string??{{end}}
+
 {{if not $col.IsString}}
 // ManyFrom{{$col.Name}}s returns a slice of {{$.Table.Name}} models from {{$col.Name}}s
 func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | toArgName}}s []{{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) (collection []*models.{{$.Table.Name}}, e error) {
@@ -793,7 +802,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 	for _, id := range {{$col.Name | toArgName}}s {
 		if _, ok := idGate[id]; !ok { 
 			idGate[id] = true 
-			ids = append(ids, fmt.Sprintf("%d", id))
+			ids = append(ids, fmt.Sprintf("{{$col.FmtType}}", id))
 		}
 	}
 
@@ -893,7 +902,7 @@ func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy
 		orderDirString = "DESC"
 	}
 
-	query := fmt.Sprintf("SELECT * FROM ` + "`{{.Table.Name}}` WHERE 1=1" + `") 
+	query := "SELECT * FROM ` + "`{{.Table.Name}}` WHERE 1=1" + `"
 
 	{{if $.IsDeleted}}
 	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
@@ -915,23 +924,6 @@ func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy
 		e = fmt.Errorf("ManyPaged: Select %w", e) 
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.GetMany(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
-	}
-	return
-}
-
-// Count returns the number of {{.Table.Name}} records
-func (r *{{.Table.Name}}DAL) Count(shard int64) (count int64, e error) {
-	count = 0
-
-	query := "SELECT COUNT(*) FROM ` + "`{{.Table.Name}}`" + ` WHERE 1=1"
-	{{if $.IsDeleted}}
-	query += "` + " AND `IsDeleted` = 0" + `"{{end}}
-
-	e = r.db[shard].Get(&count, query)
-	if e != nil {
-		r.log.Errorf("{{.Table.Name}}DAL.Count > %s", e.Error())
-	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.Count()")
 	}
 	return
 }`

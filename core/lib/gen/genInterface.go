@@ -29,6 +29,50 @@ func GenInterface(comment, pkgName, ifaceName, ifaceComment string, methods []st
 	return lib.FormatCode(code)
 }
 
+func fetchExistingInterfaceFiles(srcDir string) ([]string, error) {
+
+	// fmt.Println("Fetching files for dir ", srcDir)
+	filePaths := []string{}
+	var files []os.FileInfo
+	var e error
+
+	// DAL
+	if files, e = ioutil.ReadDir(srcDir); e != nil {
+		return filePaths, e
+	}
+
+	for k := range files {
+
+		f := files[k]
+
+		filePath := path.Join(srcDir, files[k].Name())
+
+		if files[k].IsDir() {
+			var subFiles []string
+			if subFiles, e = fetchExistingInterfaceFiles(filePath); e != nil {
+				return filePaths, e
+			}
+			filePaths = append(filePaths, subFiles...)
+			continue
+		}
+
+		// Filter out files that don't have upper case first letter names
+		if !unicode.IsUpper([]rune(f.Name())[0]) {
+			continue
+		}
+
+		// Verify this is a go file
+		if f.Name()[len(f.Name())-3:] != ".go" {
+			continue
+		}
+
+		filePaths = append(filePaths, filePath)
+	}
+
+	return filePaths, nil
+
+}
+
 func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
 	// fmt.Println("Fetching files for dir ", srcDir)
@@ -86,7 +130,129 @@ func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
 }
 
+// services/services.go
+func GenServicesBootstrap(config *lib.Config) error {
+
+	lib.EnsureDir("app/definitions")
+	lib.EnsureDir("core/definitions")
+
+	var files []os.FileInfo
+	var e error
+	files, e = ioutil.ReadDir("core/services")
+	packages := []string{}
+	for k := range files {
+		if files[k].IsDir() {
+			packages = append(packages, path.Join("core/services", files[k].Name()))
+		}
+	}
+
+	files, e = ioutil.ReadDir("app/services")
+	for k := range files {
+		if files[k].IsDir() {
+			packages = append(packages, path.Join("app/services", files[k].Name()))
+		}
+	}
+
+	// 	tpl := `// DO NOT EDIT; Auto generated
+	// package services
+
+	// import (
+	// 	"` + path.Join(config.BasePackage, config.Dirs.Integrations) + `"
+	// 	"` + path.Join(config.BasePackage, "gen/dal") + `"
+	// 	"` + path.Join(config.BasePackage, "core/definitions") + `"
+	// 	"` + path.Join(config.BasePackage, "core") + `"
+	// 	"` + path.Join(config.BasePackage, "core/repos") + `"
+	// 	"` + path.Join(config.BasePackage, "core/cache") + `"
+	// `
+	// 	for k := range packages {
+	// 		tpl += "\t\"" + path.Join(config.BasePackage, packages[k]) + "\"\n"
+	// 	}
+	// 	tpl += `
+	// )
+
+	// func bootstrapServices(
+	// 	d *dal.DAL,
+	// 	config *core.Config,
+	// 	i *integrations.Integrations,
+	// 	a *AuthLog,
+	// 	r *repos.Repos,
+	// 	c *cache.Cache,
+	// ) *definitions.Services {
+	// 	return &definitions.Services {
+	// `
+
+	// 	for k := range packages {
+	// 		packageName := path.Base(packages[k])
+	// 		tpl += "\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(d, config, i, a, r, c),\n"
+	// 	}
+
+	// 	tpl += `	}
+	// }
+	// `
+
+	// 	ioutil.WriteFile(path.Join(config.Dirs.Services, "services.go"), []byte(tpl), 0777)
+
+	// Write Definitions file
+	tpl := `// DO NOT EDIT; Auto generated
+package definitions 
+
+import (
+	"` + path.Join(config.BasePackage, "core") + `"
+	"` + path.Join(config.BasePackage, "gen/dal") + `"
+	"` + path.Join(config.BasePackage, "core/integrations") + `"
+	i "` + path.Join(config.BasePackage, "core/definitions/integrations") + `"
+`
+
+	for k := range packages {
+		tpl += "\t\"" + path.Join(config.BasePackage, packages[k]) + "\"\n"
+	}
+
+	tpl += `)
+
+// Services is a container for all services 
+type Services struct {
+`
+	for k := range packages {
+		packageName := path.Base(packages[k])
+		tpl += "\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Services\n"
+	}
+	tpl += `}
+
+// App is a container for the services layer down
+type App struct { 
+	Config *core.Config
+	DAL *dal.DAL
+	Services *Services
+	Integrations *integrations.Integrations 
+	Log i.ILog
+	APILog i.IAuthLog
+}
+
+// Finish cleans up any connections from the app
+func (a *App) Finish() {
+	for schemaName := range a.Integrations.DB {
+		for k := range a.Integrations.DB[schemaName] {
+			a.Integrations.DB[schemaName][k].Close()
+		}
+	}
+}
+`
+	ioutil.WriteFile("gen/definitions/app.go", []byte(tpl), 0777)
+
+	return e
+}
+
 func GenInterfaces(srcDir, destDir string) error {
+
+	existingInterfaces, _ := fetchExistingInterfaceFiles(destDir)
+
+	existingInterfaceMap := map[string]bool{}
+	for k := range existingInterfaces {
+		baseName := path.Base(existingInterfaces[k])
+		s := baseName[1 : len(baseName)-3]
+		existingInterfaceMap[s] = true
+		// fmt.Println(path.Base(existingInterfaces[k][1 : len(existingInterfaces[k])-3])
+	}
 
 	start := time.Now()
 
@@ -99,11 +265,14 @@ func GenInterfaces(srcDir, destDir string) error {
 		return e
 	}
 
+	// removeInterface := []string{}
+	addedInterfaceMap := map[string]bool{}
 	for k := range files {
 
 		srcFile := files[k]
 		baseName := filepath.Base(srcFile)
 		structName := baseName[0 : len(baseName)-3]
+		addedInterfaceMap[structName] = true
 		interfaceName := "I" + structName
 		packageName := filepath.Base(filepath.Dir(srcFile))
 		destDirName := filepath.Base(destDir)
@@ -153,6 +322,16 @@ func GenInterfaces(srcDir, destDir string) error {
 
 		generatedInterfaces++
 
+	}
+
+	for k := range existingInterfaceMap {
+		if _, ok := addedInterfaceMap[k]; !ok {
+			fullPath := path.Join(destDir, "I"+k+".go")
+			// if e = os.Remove(fullPath); e != nil {
+			// 	return fmt.Errorf("remove file %s: %e", fullPath, e)
+			// }
+			fmt.Println("Removed interface at ", fullPath)
+		}
 	}
 
 	fmt.Printf("Generated %d interfaces to %s in %f seconds\n", generatedInterfaces, destDir, time.Since(start).Seconds())

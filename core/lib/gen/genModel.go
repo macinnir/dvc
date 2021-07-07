@@ -180,6 +180,7 @@ func buildModelNodeFromTable(packageName string, table *schema.Table) (modelNode
 	modelNode.Imports.Append("\"github.com/macinnir/dvc/core/lib/utils/db\"")
 	modelNode.Imports.Append("\"encoding/json\"")
 	modelNode.Imports.Append("\"fmt\"")
+	modelNode.Imports.Append("\"database/sql\"")
 
 	hasNull := false
 
@@ -350,9 +351,20 @@ func (c *` + modelNode.Name + `) Table_SchemaName() string {
 }
 
 // FromID returns a FromID query statement
-func (c *` + modelNode.Name + `) FromID(id int64) string {
+func (c *` + modelNode.Name + `) FromID(db db.IDB, id int64) (*` + modelNode.Name + `, error) {
 	q, _ := query.Select(c).Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, id)).String()
-	return q
+	var e error 
+
+	model := &` + modelNode.Name + `{}
+
+	if e = db.Get(model, q); e != nil {
+		if e == sql.ErrNoRows { 
+			return nil, nil
+		}
+		return nil, e 
+	} 
+
+	return model, nil
 }
 
 // String returns a json marshalled string of the object 
@@ -362,10 +374,10 @@ func (c *` + modelNode.Name + `) String() string {
 }
 
 // Update updates a ` + modelNode.Name + ` record
-func (c *` + modelNode.Name + `) Update() string {
-
-	var sql string 
-	sql, _ = query.Update(c).
+func (c *` + modelNode.Name + `) Update(db db.IDB) error {
+	var e error 
+	var ql string 
+	ql, _ = query.Update(c).
 `)
 	for k := range updateColumns {
 		col := updateColumns[k]
@@ -383,13 +395,19 @@ func (c *` + modelNode.Name + `) Update() string {
 		Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, c.` + primaryKey + `)).
 	String()
 
-	return sql 
+	_, e = db.Exec(ql) 
+	if e != nil {
+		return fmt.Errorf("` + modelNode.Name + `.Update(): %w", e)
+	}
+
+	return e 
 }
 
 // Create inserts a ` + modelNode.Name + ` record
-func (c *` + modelNode.Name + `) Create() string { 
+func (c *` + modelNode.Name + `) Create(db db.IDB) error { 
 
-	var sql string 
+	var e error 
+	var ql string 
 	q := query.Insert(c)
 
 	if c.` + primaryKey + ` > 0 { 
@@ -411,26 +429,43 @@ func (c *` + modelNode.Name + `) Create() string {
 	}
 	b.WriteString(`
 
-	sql, _ = q.String() 
-	return sql 
+	var result sql.Result 
+	result, e = db.Exec(ql) 
+	if e != nil {
+		return fmt.Errorf("` + modelNode.Name + `.Create(): %w", e)
+	}
+
+	// Assumes auto-increment 
+	if c.` + primaryKey + ` == 0 {
+		c.` + primaryKey + `, e = result.LastInsertId()
+	}
+
+	return e 
 } 
 	`)
 	b.WriteString(`
 
 // Destroy deletes a ` + modelNode.Name + ` record
-func (c *` + modelNode.Name + `) Destroy() string {
-	sql, _ := query.Delete(c).
+func (c *` + modelNode.Name + `) Delete(db db.IDB) error {
+	var e error 
+	ql, _ := query.Delete(c).
 		Where(
 			query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, c.` + primaryKey + `),
 		).String()
-	return sql 
+
+	_, e = db.Exec(ql)
+	if e != nil {
+		return fmt.Errorf("` + modelNode.Name + `.Delete(): %w", e)
+	}
+
+	return e
 }
 
-func (r *` + modelNode.Name + `) Raw(db []db.IDB, shard int64, queryRaw string) ([]*` + modelNode.Name + `, error) {
+func (r *` + modelNode.Name + `) Raw(db db.IDB, queryRaw string) ([]*` + modelNode.Name + `, error) {
 
 	var e error
 	model := []*` + modelNode.Name + `{}
-	e = db[shard].Select(&model, queryRaw)
+	e = db.Select(&model, queryRaw)
 
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `.Query(%s).Run(): %w", queryRaw, e)
@@ -442,17 +477,21 @@ func (r *` + modelNode.Name + `) Raw(db []db.IDB, shard int64, queryRaw string) 
 }
 
 type ` + modelNode.Name + `DALSelector struct {
-	db    []db.IDB
-	shard int64
-	q     *query.Q
+	db    	 db.IDB
+	q     	 *query.Q
+	isSingle bool 
 }
 
-func (r *` + modelNode.Name + `) Select(db []db.IDB, shard int64) *` + modelNode.Name + `DALSelector {
+func (r *` + modelNode.Name + `) Select(db db.IDB) *` + modelNode.Name + `DALSelector {
 	return &` + modelNode.Name + `DALSelector{
 		db:    db,
-		shard: shard,
 		q:     query.Select(r),
 	}
+}
+
+func (r *` + modelNode.Name + `DALSelector) Alias(alias string) *` + modelNode.Name + `DALSelector { 
+	r.q.Alias(alias) 
+	return r
 }
 
 func (ds *` + modelNode.Name + `DALSelector) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSelector {
@@ -465,7 +504,7 @@ func (ds *` + modelNode.Name + `DALSelector) Limit(limit, offset int64) *` + mod
 	return ds
 }
 
-func (ds *` + modelNode.Name + `DALSelector) OrderBy(col query.Column, dir query.QueryOrderBy) *` + modelNode.Name + `DALSelector {
+func (ds *` + modelNode.Name + `DALSelector) OrderBy(col query.Column, dir query.OrderDir) *` + modelNode.Name + `DALSelector {
 	ds.q = ds.q.OrderBy(col, dir)
 	return ds
 }
@@ -478,7 +517,7 @@ func (ds *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, e
 		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query.String(): %w", e)
 	}
 
-	e = ds.db[ds.shard].Select(&model, q)
+	e = ds.db.Select(&model, q)
 
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query(%s).Run(): %w", q, e)
@@ -490,17 +529,21 @@ func (ds *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, e
 }
 
 type ` + modelNode.Name + `DALCounter struct {
-	db    []db.IDB
-	shard int64
+	db    db.IDB
 	q     *query.Q
 }
 
-func (r *` + modelNode.Name + `) Count(db []db.IDB, shard int64) *` + modelNode.Name + `DALCounter {
+func (r *` + modelNode.Name + `) Count(db db.IDB) *` + modelNode.Name + `DALCounter {
 	return &` + modelNode.Name + `DALCounter{
 		db:    db,
-		shard: shard,
 		q:     query.Select(r).Count(r.Table_PrimaryKey(), "c"),
 	}
+}
+
+
+func (r *` + modelNode.Name + `DALCounter) Alias(alias string) *` + modelNode.Name + `DALCounter { 
+	r.q.Alias(alias) 
+	return r
 }
 
 func (ds *` + modelNode.Name + `DALCounter) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALCounter {
@@ -516,7 +559,7 @@ func (ds *` + modelNode.Name + `DALCounter) Run() (int64, error) {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.Query.String(): %w", e)
 	}
 
-	e = ds.db[ds.shard].Get(&count, q)
+	e = ds.db.Get(&count, q)
 
 	if e != nil {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.Query(%s).Run(): %w", q, e)
@@ -525,6 +568,55 @@ func (ds *` + modelNode.Name + `DALCounter) Run() (int64, error) {
 	fmt.Printf("` + modelNode.Name + `DALCounter.Query(%s).Run()\n", q)
 
 	return count, nil
+}
+
+type ` + modelNode.Name + `DALGetter struct {
+	db    	 db.IDB
+	q     	 *query.Q
+}
+
+func (r *` + modelNode.Name + `) Get(db db.IDB) *` + modelNode.Name + `DALGetter {
+	return &` + modelNode.Name + `DALGetter{
+		db:    db,
+		q:     query.Select(r),
+	}
+}
+
+func (r *` + modelNode.Name + `DALGetter) Alias(alias string) *` + modelNode.Name + `DALGetter { 
+	r.q.Alias(alias) 
+	return r
+}
+
+func (ds *` + modelNode.Name + `DALGetter) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALGetter {
+	ds.q.Where(whereParts...)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALGetter) OrderBy(col query.Column, dir query.OrderDir) *` + modelNode.Name + `DALGetter {
+	ds.q = ds.q.OrderBy(col, dir)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error) {
+
+	model := &` + modelNode.Name + `{}
+	q, e := ds.q.String()
+	if e != nil {
+		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Query.String(): %w", e)
+	}
+
+	e = ds.db.Get(&model, q)
+
+	if e != nil {
+		if e == sql.ErrNoRows { 
+			return nil, nil 
+		}
+		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Run(%s): %w", q, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DALGetter.Get(%s).Run()\n", q)
+
+	return model, nil
 }
 `)
 
