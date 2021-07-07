@@ -257,7 +257,7 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 		if column.Default == "''" {
 			column.Default = ""
 		}
-
+		column.IsString = isString(column.DataType)
 		columns[column.Name] = &column
 	}
 

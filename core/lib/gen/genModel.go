@@ -351,7 +351,7 @@ func (c *` + modelNode.Name + `) Table_SchemaName() string {
 }
 
 // FromID returns a FromID query statement
-func (c *` + modelNode.Name + `) FromID(db db.IDB, id int64) (*` + modelNode.Name + `, error) {
+func (c *` + modelNode.Name + `) FromID(db db.IDB, id int64) (query.IModel, error) {
 	q, _ := query.Select(c).Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, id)).String()
 	var e error 
 
@@ -407,7 +407,6 @@ func (c *` + modelNode.Name + `) Update(db db.IDB) error {
 func (c *` + modelNode.Name + `) Create(db db.IDB) error { 
 
 	var e error 
-	var ql string 
 	q := query.Insert(c)
 
 	if c.` + primaryKey + ` > 0 { 
@@ -429,6 +428,7 @@ func (c *` + modelNode.Name + `) Create(db db.IDB) error {
 	}
 	b.WriteString(`
 
+	ql, _ := q.String()
 	var result sql.Result 
 	result, e = db.Exec(ql) 
 	if e != nil {
@@ -628,6 +628,8 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 	if e != nil {
 		log.Fatalf("FORMAT ERROR: File: %s; Error: %s\n%s", modelNode.Name, e.Error(), b.String())
 	}
+
+	file, e = lib.FormatCode(string(file))
 	return
 }
 

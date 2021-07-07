@@ -391,13 +391,12 @@ func (r *{{.Table.Name}}DAL) Get(shard int64) *models.{{.Table.Name}}DALGetter {
 }
 
 // Create creates a new {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) error {
-
-	{{if .IsDateCreated}}
-		model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
+func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) error { {{if .IsDateCreated}}
+	
+	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
 	{{if .IsLastUpdated}}
-		model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
-
+	model.LastUpdated = time.Now().UnixNano() / 1000000
+	{{end}}
 	e := model.Create(r.db[shard])
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Insert > %s", e.Error())
@@ -406,7 +405,7 @@ func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) 
 
 	r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
 
-	return
+	return nil
 }
 
 // CreateMany creates {{.Table.Name}} objects in chunks

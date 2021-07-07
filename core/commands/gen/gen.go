@@ -5,6 +5,7 @@ import (
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/gen"
+	"github.com/macinnir/dvc/core/lib/gen/routes"
 	"go.uber.org/zap"
 )
 
@@ -33,14 +34,16 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	switch cmd {
 	case "models":
-		gen.GenModels(config.Dirs.Models, force, clean)
+		gen.GenModels(config, force, clean)
 	case "dals":
-		gen.GenDALs(config.Dirs.Dals, config, force, clean)
+		gen.GenDALs("gen/dal", config, force, clean)
 	case "interfaces":
-		gen.GenInterfaces(config.Dirs.Dals, config.Dirs.DalInterfaces)
-		gen.GenInterfaces(config.Dirs.Services, config.Dirs.ServiceInterfaces)
+		gen.GenServicesBootstrap(config)
+		gen.GenInterfaces("gen/dal", "gen/definitions/dal")
+		gen.GenInterfaces("core/services", "gen/definitions/services")
+		gen.GenInterfaces("app/services", "gen/definitions/services")
 	case "routes":
-		if e := gen.GenRoutesAndPermissions(config); e != nil {
+		if e := routes.GenRoutesAndPermissions(config); e != nil {
 			return e
 		}
 	case "tsperms":
