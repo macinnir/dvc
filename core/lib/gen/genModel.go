@@ -605,7 +605,7 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&model, q)
+	e = ds.db.Get(model, q)
 
 	if e != nil {
 		if e == sql.ErrNoRows { 
