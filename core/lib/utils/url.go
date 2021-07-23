@@ -7,13 +7,7 @@ import (
 
 func QueryIDs(query string) []int64 {
 
-	var idsString []string
-
-	if strings.Contains(query, ",") {
-		idsString = strings.Split(query, ",")
-	} else {
-		idsString = []string{query}
-	}
+	idsString := QueryStrings(query)
 
 	ids := []int64{}
 	for k := 0; k < len(idsString); k++ {
@@ -27,4 +21,18 @@ func QueryIDs(query string) []int64 {
 	}
 
 	return ids
+}
+
+func QueryStrings(query string) []string {
+
+	var idsString []string
+
+	if strings.Contains(query, ",") {
+		idsString = strings.Split(query, ",")
+	} else {
+		idsString = []string{query}
+	}
+
+	return idsString
+
 }
