@@ -3,6 +3,7 @@ package testassets
 import (
 	"encoding/json"
 
+	"github.com/macinnir/dvc/core/lib/utils/db"
 	"github.com/macinnir/dvc/core/lib/utils/query"
 )
 
@@ -99,18 +100,18 @@ func (c *JobSales) String() string {
 	return string(b)
 }
 
-func (c *JobSales) Destroy() string {
-	return ""
+func (c *JobSales) Create(db db.IDB) error {
+	return nil
 }
 
-func (c *JobSales) Update() string {
-	return ""
+func (c *JobSales) Update(db db.IDB) error {
+	return nil
 }
 
-func (c *JobSales) Create() string {
-	return ""
+func (c *JobSales) Delete(db db.IDB) error {
+	return nil
 }
 
-func (c *JobSales) FromID(id int64) string {
-	return ""
+func (c *JobSales) FromID(db db.IDB, id int64) (query.IModel, error) {
+	return nil, nil
 }

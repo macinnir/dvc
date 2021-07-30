@@ -3,6 +3,7 @@ package testassets
 import (
 	"encoding/json"
 
+	"github.com/macinnir/dvc/core/lib/utils/db"
 	"github.com/macinnir/dvc/core/lib/utils/query"
 )
 
@@ -108,76 +109,24 @@ func (c *TaskBatchSchedule) Table_SchemaName() string {
 	return TaskBatchSchedule_SchemaName
 }
 
-// Select starts a select statement
-func (c *TaskBatchSchedule) FromID(id int64) string {
-	q, _ := query.Select(c).Where(query.EQ(TaskBatchSchedule_Column_TaskBatchScheduleID, id)).String()
-	return q
-}
-
 // String returns a json marshalled string of the object
 func (c *TaskBatchSchedule) String() string {
 	bytes, _ := json.Marshal(c)
 	return string(bytes)
 }
 
-// Update updates a TaskBatchSchedule record
-func (c *TaskBatchSchedule) Update() string {
-
-	var sql string
-	sql, _ = query.Update(c).
-		Set(TaskBatchSchedule_Column_TaskBatchID, c.TaskBatchID).
-		Set(TaskBatchSchedule_Column_DOM, c.DOM).
-		Set(TaskBatchSchedule_Column_DOW, c.DOW).
-		Set(TaskBatchSchedule_Column_HOD, c.HOD).
-		Set(TaskBatchSchedule_Column_MOH, c.MOH).
-		Set(TaskBatchSchedule_Column_IsDeleted, c.IsDeleted).
-		Set(TaskBatchSchedule_Column_IsActive, c.IsActive).
-		Set(TaskBatchSchedule_Column_CurrentStatus, c.CurrentStatus).
-		Set(TaskBatchSchedule_Column_LastRunDate, c.LastRunDate).
-		Set(TaskBatchSchedule_Column_LastSuccessDate, c.LastSuccessDate).
-		Set(TaskBatchSchedule_Column_LastErrorDate, c.LastErrorDate).
-		Set(TaskBatchSchedule_Column_NumFailed, c.NumFailed).
-		Set(TaskBatchSchedule_Column_NumFinished, c.NumFinished).
-		Set(TaskBatchSchedule_Column_NumAttempted, c.NumAttempted).
-		Where(query.EQ(TaskBatchSchedule_Column_TaskBatchScheduleID, c.TaskBatchScheduleID)).
-		String()
-
-	return sql
+func (c *TaskBatchSchedule) Create(db db.IDB) error {
+	return nil
 }
 
-// Create inserts a TaskBatchSchedule record
-func (c *TaskBatchSchedule) Create() string {
-
-	var sql string
-	q := query.Insert(c)
-
-	if c.TaskBatchScheduleID > 0 {
-		q.Set(TaskBatchSchedule_Column_TaskBatchScheduleID, c.TaskBatchScheduleID)
-	}
-	q.Set(TaskBatchSchedule_Column_TaskBatchID, c.TaskBatchID)
-	q.Set(TaskBatchSchedule_Column_DOM, c.DOM)
-	q.Set(TaskBatchSchedule_Column_DOW, c.DOW)
-	q.Set(TaskBatchSchedule_Column_HOD, c.HOD)
-	q.Set(TaskBatchSchedule_Column_MOH, c.MOH)
-	q.Set(TaskBatchSchedule_Column_DateCreated, c.DateCreated)
-	q.Set(TaskBatchSchedule_Column_IsActive, c.IsActive)
-	q.Set(TaskBatchSchedule_Column_CurrentStatus, c.CurrentStatus)
-	q.Set(TaskBatchSchedule_Column_LastRunDate, c.LastRunDate)
-	q.Set(TaskBatchSchedule_Column_LastSuccessDate, c.LastSuccessDate)
-	q.Set(TaskBatchSchedule_Column_LastErrorDate, c.LastErrorDate)
-	q.Set(TaskBatchSchedule_Column_NumFailed, c.NumFailed)
-	q.Set(TaskBatchSchedule_Column_NumFinished, c.NumFinished)
-	q.Set(TaskBatchSchedule_Column_NumAttempted, c.NumAttempted)
-
-	sql, _ = q.String()
-	return sql
+func (c *TaskBatchSchedule) Update(db db.IDB) error {
+	return nil
 }
 
-// Destroy deletes a TaskBatchSchedule record
-func (c *TaskBatchSchedule) Destroy() string {
-	sql, _ := query.Delete(c).
-		Where(
-			query.EQ(TaskBatchSchedule_Column_TaskBatchScheduleID, c.TaskBatchScheduleID),
-		).String()
-	return sql
+func (c *TaskBatchSchedule) Delete(db db.IDB) error {
+	return nil
+}
+
+func (c *TaskBatchSchedule) FromID(db db.IDB, id int64) (query.IModel, error) {
+	return nil, nil
 }
