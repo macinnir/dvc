@@ -327,7 +327,6 @@ func TestSelectAlias(t *testing.T) {
 func TestSelectExists(t *testing.T) {
 
 	actual, e := query.Select(&testassets.Job{}).
-		Alias("j").
 		Count("JobID", "ProjectsQuoted").
 		Sum("TotalPrice", "SalesVolume").
 		Where(
@@ -336,7 +335,7 @@ func TestSelectExists(t *testing.T) {
 					Alias("js").
 					FieldRaw("1", "n").
 					Where(
-						query.EQF("JobID", "`j`.`JobID`"),
+						query.EQF("JobID", "`t`.`JobID`"),
 						query.And(),
 						query.EQ("IsDeleted", 0),
 						query.And(),
@@ -352,9 +351,9 @@ func TestSelectExists(t *testing.T) {
 		).String()
 
 	require.Nil(t, e)
-	expected := "SELECT COUNT(`j`.`JobID`) AS `ProjectsQuoted`, COALESCE(SUM(`j`.`TotalPrice`), 0) AS `SalesVolume` FROM `Job` `j` WHERE"
-	expected += " EXISTS ( SELECT 1 AS `n` FROM `JobSales` `js` WHERE `js`.`JobID` = `j`.`JobID` AND `js`.`IsDeleted` = 0 AND `js`.`UserID` = 1 )"
-	expected += " AND `j`.`IsDeleted` = 0 AND `j`.`AwardDate` BETWEEN 1 AND 2"
+	expected := "SELECT COUNT(`t`.`JobID`) AS `ProjectsQuoted`, COALESCE(SUM(`t`.`TotalPrice`), 0) AS `SalesVolume` FROM `Job` `t` WHERE"
+	expected += " EXISTS ( SELECT 1 AS `n` FROM `JobSales` `js` WHERE `js`.`JobID` = `t`.`JobID` AND `js`.`IsDeleted` = 0 AND `js`.`UserID` = 1 )"
+	expected += " AND `t`.`IsDeleted` = 0 AND `t`.`AwardDate` BETWEEN 1 AND 2"
 
 	assert.Equal(t, expected, actual)
 }
@@ -464,6 +463,23 @@ func TestModAndBitwise(t *testing.T) {
 
 }
 
+func TestGrouping(t *testing.T) {
+	expected := "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND ( ( `t`.`DateFrom` BETWEEN 1 AND 2 ) OR ( `t`.`DateTo` BETWEEN 3 AND 4 ) )"
+	actual, e := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.EQ("IsDeleted", 0),
+			query.And(
+				query.Paren(query.Between("DateFrom", 1, 2)),
+				query.Or(),
+				query.Paren(query.Between("DateTo", 3, 4)),
+			),
+		).
+		String()
+
+	assert.Nil(t, e)
+	assert.Equal(t, expected, actual)
+}
+
 func TestRaw(t *testing.T) {
 
 	q, e := query.Raw(&testassets.TaskBatchSchedule{}, "SELECT * FROM `TaskBatchSchedule` WHERE 1=1 ORDER BY `t`.`LastRunDate` DESC LIMIT 1 OFFSET 2").
@@ -472,3 +488,14 @@ func TestRaw(t *testing.T) {
 	assert.Nil(t, e)
 	assert.Equal(t, "SELECT * FROM `TaskBatchSchedule` WHERE 1=1 ORDER BY `t`.`LastRunDate` DESC LIMIT 1 OFFSET 2", q)
 }
+
+// func TestWhereSelect(t *testing.T) {
+// 	expected := "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` < (SELECT QuoteNumberFullInt FROM QuoteNumber WHERE QuoteNumberID = %d) AND `t`.`IsDeleted` = 0 AND `t`.`JobID` > 0 ORDER BY `t`.`QuoteNumberFullInt` DESC LIMIT 1"
+
+// 	q, e := query.Select(&testassets.Comment{}).Where(
+// 		query.LT(testassets.Comment_Column_CommentID, )
+// 	).String()
+
+// 	assert.Nil(t, e)
+// 	assert.Equal(t, expected, q)
+// }

@@ -444,6 +444,7 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []WherePa
 			sb.WriteString(" )")
 		case WhereTypeParenthesisStart:
 			sb.WriteString("( ")
+		case WhereTypeNone:
 		case WhereTypeAll:
 			sb.WriteString("1=1")
 
@@ -553,6 +554,7 @@ const (
 	WhereTypeOr
 	WhereTypeParenthesisEnd
 	WhereTypeParenthesisStart
+	WhereTypeNone
 	// WhereTypeAll is a WHERE clause of `1=1` used for convenience
 	// when conditionally adding WHERE clauses starting with a conjunction (AND/OR,etc)
 	// separating them.
@@ -801,6 +803,21 @@ func Or(args ...WherePart) WherePart {
 	}
 
 	return or
+}
+
+func Paren(args ...WherePart) WherePart {
+	n := newWherePart(WhereTypeNone, "", []interface{}{})
+
+	if len(args) > 0 {
+		n.subParts = append(n.subParts, PS())
+		for k := range args {
+			n.subParts = append(n.subParts, args[k])
+		}
+
+		n.subParts = append(n.subParts, PE())
+	}
+
+	return n
 }
 
 // Parenthesis Start
