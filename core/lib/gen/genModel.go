@@ -494,30 +494,39 @@ func (r *` + modelNode.Name + `DALSelector) Alias(alias string) *` + modelNode.N
 	return r
 }
 
-func (ds *` + modelNode.Name + `DALSelector) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSelector {
-	ds.q.Where(whereParts...)
-	return ds
+func (r *` + modelNode.Name + `DALSelector) Sum(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+	r.q.Sum(fieldName, fieldAlias)
+	return r
 }
 
-func (ds *` + modelNode.Name + `DALSelector) Limit(limit, offset int64) *` + modelNode.Name + `DALSelector {
-	ds.q = ds.q.Limit(limit, offset)
-	return ds
+func (r *` + modelNode.Name + `DALSelector) Count(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+	r.q.Count(fieldName, fieldAlias)
+	return r
 }
 
-func (ds *` + modelNode.Name + `DALSelector) OrderBy(col query.Column, dir query.OrderDir) *` + modelNode.Name + `DALSelector {
-	ds.q = ds.q.OrderBy(col, dir)
-	return ds
+func (r *` + modelNode.Name + `DALSelector) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSelector {
+	r.q.Where(whereParts...)
+	return r
 }
 
-func (ds *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, error) {
+func (r *` + modelNode.Name + `DALSelector) Limit(limit, offset int64) *` + modelNode.Name + `DALSelector {
+	r.q = r.q.Limit(limit, offset)
+	return r
+}
 
+func (r *` + modelNode.Name + `DALSelector) OrderBy(col query.Column, dir query.OrderDir) *` + modelNode.Name + `DALSelector {
+	r.q = r.q.OrderBy(col, dir)
+	return r
+}
+
+func (r *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, error) {
 	model := []*` + modelNode.Name + `{}
-	q, e := ds.q.String()
+	q, e := r.q.String()
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query.String(): %w", e)
 	}
 
-	e = ds.db.Select(&model, q)
+	e = r.db.Select(&model, q)
 
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query(%s).Run(): %w", q, e)
@@ -528,6 +537,7 @@ func (ds *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, e
 	return model, nil
 }
 
+// Counter 
 type ` + modelNode.Name + `DALCounter struct {
 	db    db.IDB
 	q     *query.Q
@@ -539,7 +549,6 @@ func (r *` + modelNode.Name + `) Count(db db.IDB) *` + modelNode.Name + `DALCoun
 		q:     query.Select(r).Count(r.Table_PrimaryKey(), "c"),
 	}
 }
-
 
 func (r *` + modelNode.Name + `DALCounter) Alias(alias string) *` + modelNode.Name + `DALCounter { 
 	r.q.Alias(alias) 
@@ -568,6 +577,43 @@ func (ds *` + modelNode.Name + `DALCounter) Run() (int64, error) {
 	fmt.Printf("` + modelNode.Name + `DALCounter.Query(%s).Run()\n", q)
 
 	return count, nil
+}
+
+// Summer
+type ` + modelNode.Name + `DALSummer struct {
+	db    db.IDB
+	q     *query.Q
+}
+
+func (r *` + modelNode.Name + `) Sum(db db.IDB, col query.Column) *` + modelNode.Name + `DALSummer {
+	return &` + modelNode.Name + `DALSummer{
+		db:    db,
+		q:     query.Select(r).Sum(col, "c"),
+	}
+}
+
+func (ds *` + modelNode.Name + `DALSummer) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSummer {
+	ds.q.Where(whereParts...)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALSummer) Run() (float64, error) {
+
+	sum := float64(0)
+	q, e := ds.q.String()
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALSummer.Query.String(): %w", e)
+	}
+
+	e = ds.db.Get(&sum, q)
+
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALSummer.Query(%s).Run(): %w", q, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DALSummer.Query(%s).Run()\n", q)
+
+	return sum, nil
 }
 
 type ` + modelNode.Name + `DALGetter struct {

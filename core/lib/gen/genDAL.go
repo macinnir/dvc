@@ -310,6 +310,7 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 		"github.com/macinnir/dvc/core/lib/utils/db",
 		"github.com/macinnir/dvc/core/lib/utils/log",
 		"github.com/macinnir/dvc/core/lib/utils/errors",
+		"github.com/macinnir/dvc/core/lib/utils/query",
 		"database/sql",
 		"context",
 		"fmt",
@@ -384,6 +385,10 @@ func (r *{{.Table.Name}}DAL) Select(shard int64) *models.{{.Table.Name}}DALSelec
 
 func (r *{{.Table.Name}}DAL) Count(shard int64) *models.{{.Table.Name}}DALCounter { 
 	return (&models.{{.Table.Name}}{}).Count(r.db[shard])
+}
+
+func (r *{{.Table.Name}}DAL) Sum(shard int64, col query.Column) *models.{{.Table.Name}}DALSummer { 
+	return (&models.{{.Table.Name}}{}).Sum(r.db[shard], col)
 }
 
 func (r *{{.Table.Name}}DAL) Get(shard int64) *models.{{.Table.Name}}DALGetter { 
