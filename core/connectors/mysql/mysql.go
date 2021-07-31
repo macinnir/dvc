@@ -836,7 +836,7 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 			}
 		}
 
-		// 5
+		// 5 Drop multi key, add unique key
 		if remoteColumn.ColumnKey == KeyMUL && localColumn.ColumnKey == KeyUNI {
 			comparison.Changes = append(comparison.Changes, dropIndex(table, localColumn))
 			comparison.Deletions++
@@ -845,7 +845,7 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 			comparison.Additions++
 		}
 
-		// 6
+		// 6 Drop unique key, add remote key
 		if remoteColumn.ColumnKey == KeyUNI && localColumn.ColumnKey == KeyMUL {
 			comparison.Changes = append(comparison.Changes, dropUniqueIndex(table, localColumn))
 			comparison.Deletions++
@@ -857,7 +857,8 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 
 	if localColumn.DataType != remoteColumn.DataType ||
 		localColumn.CharSet != remoteColumn.CharSet ||
-		localColumn.Collation != remoteColumn.Collation {
+		localColumn.Collation != remoteColumn.Collation ||
+		localColumn.MaxLength != remoteColumn.MaxLength {
 		comparison.Changes = append(comparison.Changes, alterTableChangeColumn(table, localColumn, localColumn.Name))
 		comparison.Alterations++
 	}

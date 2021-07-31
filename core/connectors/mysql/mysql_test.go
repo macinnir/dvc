@@ -91,7 +91,7 @@ func TestCreateChangeSQL_NoChanges(t *testing.T) {
 
 	tables := testassets.TablesNoChange()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 
 	assert.Equal(t, 0, comparison.Additions)
 	assert.Equal(t, 0, comparison.Deletions)
@@ -112,7 +112,7 @@ func TestCreateChangeSQL_DropColumn(t *testing.T) {
 
 	tables := testassets.TablesDropColumn()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 
 	assert.Equal(t, 0, comparison.Additions)
 	assert.Equal(t, 1, comparison.Deletions)
@@ -124,13 +124,31 @@ func TestCreateChangeSQL_DropColumn(t *testing.T) {
 
 }
 
+func TestCreateChangeSQL_ChangeVarcharColumnSize(t *testing.T) {
+
+	s := NewMySQL(&lib.ConfigDatabase{})
+
+	tables := testassets.TablesChangeVarcharColumnSize()
+
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
+
+	assert.Equal(t, 0, comparison.Additions)
+	assert.Equal(t, 0, comparison.Deletions)
+	assert.Equal(t, 1, comparison.Alterations)
+	require.Equal(t, 1, len(comparison.Changes))
+
+	assert.Equal(t, schema.ChangeColumn, comparison.Changes[0].Type)
+	assert.Equal(t, "ALTER TABLE `Foo` CHANGE `Name` `Name` varchar(200) NOT NULL DEFAULT '';", comparison.Changes[0].SQL)
+
+}
+
 func TestCreateChangeSQL_AddColumn(t *testing.T) {
 
 	s := NewMySQL(&lib.ConfigDatabase{})
 
 	tables := testassets.TablesAddColumn()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 
 	assert.Equal(t, 1, comparison.Additions)
 	assert.Equal(t, 0, comparison.Deletions)
@@ -147,7 +165,7 @@ func TestCreateChangeSQL_AddColumnWithUniqueIndex(t *testing.T) {
 
 	tables := testassets.TablesAddColumnWithUniqueIndex()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 
 	assert.Equal(t, 2, comparison.Additions)
 	assert.Equal(t, 0, comparison.Deletions)
@@ -166,7 +184,7 @@ func TestCreateChangeSQL_DropColumnWithUniqueIndex(t *testing.T) {
 
 	tables := testassets.TablesAddColumnWithUniqueIndex()
 
-	comparison := s.CreateChangeSQL(tables[1], tables[0])
+	comparison := s.CreateChangeSQL(tables[1], tables[0], "Foo")
 
 	assert.Equal(t, 0, comparison.Additions)
 	assert.Equal(t, 2, comparison.Deletions)
@@ -185,7 +203,7 @@ func TestCreateChangeSQL_AddColumnWithIndex(t *testing.T) {
 
 	tables := testassets.TablesAddColumnWithIndex()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 
 	assert.Equal(t, 2, comparison.Additions)
 	assert.Equal(t, 0, comparison.Deletions)
@@ -204,7 +222,7 @@ func TestCreateChangeSQL_DropColumnWithIndex(t *testing.T) {
 
 	tables := testassets.TablesAddColumnWithIndex()
 
-	comparison := s.CreateChangeSQL(tables[1], tables[0])
+	comparison := s.CreateChangeSQL(tables[1], tables[0], "Foo")
 
 	assert.Equal(t, 0, comparison.Additions)
 	assert.Equal(t, 2, comparison.Deletions)
@@ -223,7 +241,7 @@ func TestCreateChangeSQL_DropAutoIncrement(t *testing.T) {
 
 	tables := testassets.TablesDropAutoIncrement()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 
 	assert.Equal(t, 0, comparison.Additions)
 	assert.Equal(t, 0, comparison.Deletions)
@@ -240,7 +258,7 @@ func TestCreateTable(t *testing.T) {
 
 	tables := testassets.TablesAddTable()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 	assert.Equal(t, 1, comparison.Additions)
 	assert.Equal(t, 0, comparison.Deletions)
 	assert.Equal(t, 0, comparison.Alterations)
@@ -261,7 +279,7 @@ func TestDropTable(t *testing.T) {
 
 	tables := testassets.TablesDropTable()
 
-	comparison := s.CreateChangeSQL(tables[0], tables[1])
+	comparison := s.CreateChangeSQL(tables[0], tables[1], "Foo")
 	assert.Equal(t, 0, comparison.Additions)
 	assert.Equal(t, 1, comparison.Deletions)
 	assert.Equal(t, 0, comparison.Alterations)

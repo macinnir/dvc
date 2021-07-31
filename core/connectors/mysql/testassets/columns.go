@@ -84,6 +84,25 @@ var (
 		IsString:     true,
 	}
 
+	columnNameSize100 = &schema.Column{
+		Name:         "Name",
+		Position:     4,
+		Default:      "",
+		IsNullable:   false,
+		IsUnsigned:   false,
+		DataType:     "varchar",
+		MaxLength:    100,
+		Precision:    3,
+		CharSet:      "",
+		Type:         "varchar(100)",
+		ColumnKey:    "",
+		NumericScale: 0,
+		Extra:        "",
+		FmtType:      "%s",
+		GoType:       "string",
+		IsString:     true,
+	}
+
 	columnNameWithUniqueIndex = &schema.Column{
 		Name:         "Name",
 		Position:     4,

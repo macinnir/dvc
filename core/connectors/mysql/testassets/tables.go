@@ -91,6 +91,37 @@ func TablesAddColumn() []*schema.Schema {
 	}
 }
 
+func TablesChangeVarcharColumnSize() []*schema.Schema {
+	return []*schema.Schema{
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"Name":        columnName,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+		{
+			Tables: map[string]*schema.Table{
+				"Foo": {
+					Name: "Foo",
+					Columns: map[string]*schema.Column{
+						"FooID":       columnFooID,
+						"Name":        columnNameSize100,
+						"DateCreated": columnDateCreated,
+						"IsDeleted":   columnIsDeleted,
+					},
+				},
+			},
+		},
+	}
+}
+
 func TablesAddColumnWithUniqueIndex() []*schema.Schema {
 	return []*schema.Schema{
 		{
