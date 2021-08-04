@@ -504,7 +504,7 @@ func (r *` + modelNode.Name + `DALSelector) Count(fieldName query.Column, fieldA
 	return r
 }
 
-func (r *` + modelNode.Name + `DALSelector) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSelector {
+func (r *` + modelNode.Name + `DALSelector) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALSelector {
 	r.q.Where(whereParts...)
 	return r
 }
@@ -555,7 +555,7 @@ func (r *` + modelNode.Name + `DALCounter) Alias(alias string) *` + modelNode.Na
 	return r
 }
 
-func (ds *` + modelNode.Name + `DALCounter) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALCounter {
+func (ds *` + modelNode.Name + `DALCounter) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALCounter {
 	ds.q.Where(whereParts...)
 	return ds
 }
@@ -592,7 +592,7 @@ func (r *` + modelNode.Name + `) Sum(db db.IDB, col query.Column) *` + modelNode
 	}
 }
 
-func (ds *` + modelNode.Name + `DALSummer) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALSummer {
+func (ds *` + modelNode.Name + `DALSummer) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALSummer {
 	ds.q.Where(whereParts...)
 	return ds
 }
@@ -633,7 +633,7 @@ func (r *` + modelNode.Name + `DALGetter) Alias(alias string) *` + modelNode.Nam
 	return r
 }
 
-func (ds *` + modelNode.Name + `DALGetter) Where(whereParts ...query.WherePart) *` + modelNode.Name + `DALGetter {
+func (ds *` + modelNode.Name + `DALGetter) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALGetter {
 	ds.q.Where(whereParts...)
 	return ds
 }
