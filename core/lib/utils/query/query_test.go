@@ -489,6 +489,36 @@ func TestRaw(t *testing.T) {
 	assert.Equal(t, "SELECT * FROM `TaskBatchSchedule` WHERE 1=1 ORDER BY `t`.`LastRunDate` DESC LIMIT 1 OFFSET 2", q)
 }
 
+func TestAnds(t *testing.T) {
+	q, e := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ands(
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+				nil,
+			),
+		).String()
+
+	assert.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`IsLocked` = 0 AND `t`.`Year` = 2021", q)
+}
+
+func TestOrs(t *testing.T) {
+	q, e := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ors(
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+				nil,
+			),
+		).String()
+
+	assert.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 OR `t`.`IsLocked` = 0 OR `t`.`Year` = 2021", q)
+}
+
 // func TestWhereSelect(t *testing.T) {
 // 	expected := "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` < (SELECT QuoteNumberFullInt FROM QuoteNumber WHERE QuoteNumberID = %d) AND `t`.`IsDeleted` = 0 AND `t`.`JobID` > 0 ORDER BY `t`.`QuoteNumberFullInt` DESC LIMIT 1"
 

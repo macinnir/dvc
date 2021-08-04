@@ -234,7 +234,7 @@ func (r *FiscalYearDALSelector) Count(fieldName query.Column, fieldAlias string)
 	return r
 }
 
-func (r *FiscalYearDALSelector) Where(whereParts ...query.WherePart) *FiscalYearDALSelector {
+func (r *FiscalYearDALSelector) Where(whereParts ...*query.WherePart) *FiscalYearDALSelector {
 	r.q.Where(whereParts...)
 	return r
 }
@@ -285,7 +285,7 @@ func (r *FiscalYearDALCounter) Alias(alias string) *FiscalYearDALCounter {
 	return r
 }
 
-func (ds *FiscalYearDALCounter) Where(whereParts ...query.WherePart) *FiscalYearDALCounter {
+func (ds *FiscalYearDALCounter) Where(whereParts ...*query.WherePart) *FiscalYearDALCounter {
 	ds.q.Where(whereParts...)
 	return ds
 }
@@ -322,7 +322,7 @@ func (r *FiscalYear) Sum(db db.IDB, col query.Column) *FiscalYearDALSummer {
 	}
 }
 
-func (ds *FiscalYearDALSummer) Where(whereParts ...query.WherePart) *FiscalYearDALSummer {
+func (ds *FiscalYearDALSummer) Where(whereParts ...*query.WherePart) *FiscalYearDALSummer {
 	ds.q.Where(whereParts...)
 	return ds
 }
@@ -363,7 +363,7 @@ func (r *FiscalYearDALGetter) Alias(alias string) *FiscalYearDALGetter {
 	return r
 }
 
-func (ds *FiscalYearDALGetter) Where(whereParts ...query.WherePart) *FiscalYearDALGetter {
+func (ds *FiscalYearDALGetter) Where(whereParts ...*query.WherePart) *FiscalYearDALGetter {
 	ds.q.Where(whereParts...)
 	return ds
 }
