@@ -811,26 +811,28 @@ func Ands(args ...*WherePart) *WherePart {
 
 	ands := newWherePart(WhereTypeNone, "", []interface{}{})
 
-	i := 0
-	l := len(args) - 1
+	subParts := []*WherePart{}
 
 	for k := range args {
 
 		if args[k] == nil {
-			l--
 			continue
 		}
 
-		i++
+		subParts = append(subParts, args[k])
+	}
 
-		ands.subParts = append(ands.subParts, args[k])
+	for k := range subParts {
+
+		ands.subParts = append(ands.subParts, subParts[k])
 
 		// Last item
-		if i == l {
+		if k == len(subParts)-1 {
 			break
 		}
 
 		ands.subParts = append(ands.subParts, And())
+
 	}
 
 	return ands
@@ -865,31 +867,32 @@ func Ors(args ...*WherePart) *WherePart {
 		return args[0]
 	}
 
-	ands := newWherePart(WhereTypeNone, "", []interface{}{})
+	ors := newWherePart(WhereTypeNone, "", []interface{}{})
 
-	i := 0
-	l := len(args) - 1
+	subParts := []*WherePart{}
 
 	for k := range args {
 
 		if args[k] == nil {
-			l--
 			continue
 		}
 
-		i++
+		subParts = append(subParts, args[k])
+	}
 
-		ands.subParts = append(ands.subParts, args[k])
+	for k := range subParts {
+
+		ors.subParts = append(ors.subParts, subParts[k])
 
 		// Last item
-		if i == l {
+		if k == len(subParts)-1 {
 			break
 		}
 
-		ands.subParts = append(ands.subParts, Or())
+		ors.subParts = append(ors.subParts, Or())
 	}
 
-	return ands
+	return ors
 }
 
 func Paren(args ...*WherePart) *WherePart {

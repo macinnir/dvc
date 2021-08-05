@@ -490,22 +490,69 @@ func TestRaw(t *testing.T) {
 }
 
 func TestAnds(t *testing.T) {
-	q, e := query.Select(&testassets.FiscalYear{}).
+	q1, e1 := query.Select(&testassets.FiscalYear{}).
 		Where(
 			query.Ands(
 				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.Between(testassets.FiscalYear_Column_DateFrom, 1, 2),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+			),
+		).String()
+
+	q2, e2 := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ands(
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.Between(testassets.FiscalYear_Column_DateFrom, 1, 2),
 				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
 				query.EQ(testassets.FiscalYear_Column_Year, 2021),
 				nil,
 			),
 		).String()
 
-	assert.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`IsLocked` = 0 AND `t`.`Year` = 2021", q)
+	q3, e3 := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ands(
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.Between(testassets.FiscalYear_Column_DateFrom, 1, 2),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				nil,
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+			),
+		).String()
+	q4, e4 := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ands(
+				nil,
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.Between(testassets.FiscalYear_Column_DateFrom, 1, 2),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+			),
+		).String()
+
+	assert.Nil(t, e1)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`DateFrom` BETWEEN 1 AND 2 AND `t`.`IsLocked` = 0 AND `t`.`Year` = 2021", q1)
+	assert.Nil(t, e2)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`DateFrom` BETWEEN 1 AND 2 AND `t`.`IsLocked` = 0 AND `t`.`Year` = 2021", q2)
+	assert.Nil(t, e3)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`DateFrom` BETWEEN 1 AND 2 AND `t`.`IsLocked` = 0 AND `t`.`Year` = 2021", q3)
+	assert.Nil(t, e4)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 AND `t`.`DateFrom` BETWEEN 1 AND 2 AND `t`.`IsLocked` = 0 AND `t`.`Year` = 2021", q4)
 }
 
 func TestOrs(t *testing.T) {
-	q, e := query.Select(&testassets.FiscalYear{}).
+	q1, e1 := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ors(
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+			),
+		).String()
+
+	q2, e2 := query.Select(&testassets.FiscalYear{}).
 		Where(
 			query.Ors(
 				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
@@ -515,8 +562,34 @@ func TestOrs(t *testing.T) {
 			),
 		).String()
 
-	assert.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 OR `t`.`IsLocked` = 0 OR `t`.`Year` = 2021", q)
+	q3, e3 := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ors(
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				nil,
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+			),
+		).String()
+
+	q4, e4 := query.Select(&testassets.FiscalYear{}).
+		Where(
+			query.Ors(
+				nil,
+				query.EQ(testassets.FiscalYear_Column_IsDeleted, 0),
+				query.EQ(testassets.FiscalYear_Column_IsLocked, 0),
+				query.EQ(testassets.FiscalYear_Column_Year, 2021),
+			),
+		).String()
+
+	assert.Nil(t, e1)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 OR `t`.`IsLocked` = 0 OR `t`.`Year` = 2021", q1)
+	assert.Nil(t, e2)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 OR `t`.`IsLocked` = 0 OR `t`.`Year` = 2021", q2)
+	assert.Nil(t, e3)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 OR `t`.`IsLocked` = 0 OR `t`.`Year` = 2021", q3)
+	assert.Nil(t, e4)
+	assert.Equal(t, "SELECT `t`.* FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0 OR `t`.`IsLocked` = 0 OR `t`.`Year` = 2021", q4)
 }
 
 // func TestWhereSelect(t *testing.T) {
