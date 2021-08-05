@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/macinnir/dvc/core/lib/utils/types"
@@ -156,4 +157,25 @@ func (r *Request) AuthKey() string {
 	}
 
 	return authKey[len(AuthHeaderValuePrefix):]
+}
+
+// IP returns the IP from which the request originated
+func (r *Request) IP() string {
+
+	var ip string
+	var ok bool
+
+	ip, ok = r.Headers["X-Forwarded-For"]
+
+	// Return localhost by default
+	if !ok || len(ip) == 0 {
+		return "127.0.0.1"
+	}
+
+	if strings.Contains(ip, ", ") {
+		ips := strings.Split(ip, ", ")
+		return ips[0]
+	}
+
+	return ip
 }

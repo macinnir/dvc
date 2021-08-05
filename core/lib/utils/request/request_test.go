@@ -48,3 +48,31 @@ func TestAuthHeaderEmpty(t *testing.T) {
 	request := &Request{}
 	assert.Equal(t, "", request.AuthKey())
 }
+
+func TestIP_Exists(t *testing.T) {
+	request := &Request{
+		Headers: map[string]string{
+			"X-Forwarded-For": "123.123.123.123",
+		},
+	}
+
+	assert.Equal(t, "123.123.123.123", request.IP())
+}
+
+func TestIP_Empty(t *testing.T) {
+	request := &Request{
+		Headers: map[string]string{},
+	}
+
+	assert.Equal(t, "127.0.0.1", request.IP())
+}
+
+func TestIP_Multiple(t *testing.T) {
+	request := &Request{
+		Headers: map[string]string{
+			"X-Forwarded-For": "24.180.127.227, 34.117.111.176",
+		},
+	}
+
+	assert.Equal(t, "24.180.127.227", request.IP())
+}
