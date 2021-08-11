@@ -2,7 +2,6 @@ package gen
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
@@ -48,13 +47,16 @@ func LoadPermissionsFromJSON() map[string]string {
 }
 
 func GenTSPerms(config *lib.Config) (e error) {
+
+	lib.EnsureDir(config.TypescriptPermissionsPath)
+
 	var permissionMap map[string]string
 	permissionMap, e = fetchAllPermissions(config.Dirs.Controllers)
 	if e != nil {
 		return
 	}
 	str := BuildTypescriptPermissions(permissionMap)
-	fmt.Println(str)
+	e = ioutil.WriteFile(path.Join(config.TypescriptPermissionsPath, "permissions.ts"), []byte(str), 0777)
 	return
 }
 

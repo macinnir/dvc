@@ -31,11 +31,12 @@ type ConfigDatabase struct {
 
 // Config contains a set of configuration values used throughout the application
 type Config struct {
-	ChangeSetPath        string            `json:"changesetPath"`
-	BasePackage          string            `json:"basePackage"`
-	Databases            []*ConfigDatabase `json:"Databases"`
-	TypescriptModelsPath string            `json:"TypescriptModelsPath"`
-	Packages             struct {
+	ChangeSetPath             string            `json:"changesetPath"`
+	BasePackage               string            `json:"basePackage"`
+	Databases                 []*ConfigDatabase `json:"Databases"`
+	TypescriptModelsPath      string            `json:"TypescriptModelsPath"`
+	TypescriptPermissionsPath string            `json:"TypescriptPermissionsPath"`
+	Packages                  struct {
 		Cache    string `json:"cache"`
 		Models   string `json:"models"`
 		Schema   string `json:"schema"`
