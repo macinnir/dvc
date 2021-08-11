@@ -6,6 +6,7 @@ import (
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/gen"
 	"github.com/macinnir/dvc/core/lib/gen/routes"
+	"github.com/macinnir/dvc/core/lib/gen/typescript"
 	"go.uber.org/zap"
 )
 
@@ -44,6 +45,11 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		gen.GenInterfaces("app/services", "gen/definitions/services")
 	case "routes":
 		if e := routes.GenRoutesAndPermissions(config); e != nil {
+			return e
+		}
+	case "ts":
+
+		if e := typescript.GenerateTypescriptTypes(config); e != nil {
 			return e
 		}
 	case "tsperms":
