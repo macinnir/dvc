@@ -130,7 +130,7 @@ func GenRoutesAndPermissions(config *lib.Config) error {
 
 	if packageUsesPermission {
 		imports = append(imports, "github.com/macinnir/dvc/core/lib/utils")
-		imports = append(imports, path.Join(config.BasePackage, config.Dirs.Permissions))
+		imports = append(imports, path.Join(config.BasePackage, lib.GoPermissionsPath))
 	}
 
 	final := `// Generated Code; DO NOT EDIT.

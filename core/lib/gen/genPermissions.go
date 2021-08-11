@@ -130,7 +130,9 @@ func BuildPermissionsGoFile(permissionMap map[string]string) {
 	}	
 	
 	`)
-	permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
+	lib.EnsureDir(lib.GoPermissionsPath)
+	// permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
+	permissionsFilePath := path.Join(lib.GoPermissionsPath, "permissions.go")
 	var permissionsFileBytes []byte
 
 	var e error

@@ -12,4 +12,6 @@ const (
 	ModelsDir           = "models"
 	IntegrationsDir     = "integrations"
 	DALsDir             = "dals"
+	// Generated Go file containing constants for all route permissions
+	GoPermissionsPath = "gen/permissions"
 )
