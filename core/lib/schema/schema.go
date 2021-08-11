@@ -107,7 +107,7 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 		fieldType = "int64"
 	case "tinyint":
 		fieldType = "int"
-	case "tinytext", "text", "longtext", "varchar", "date", "datetime", "char", "enum":
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set":
 		fieldType = "string"
 	case "decimal":
 		fieldType = "float64"
@@ -136,8 +136,22 @@ func DataTypeToTypescriptString(column *Column) (fieldType string) {
 	fieldType = "number"
 
 	switch column.DataType {
-	case "varchar", "enum", "text", "date", "datetime", "char", "longtext":
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
 		fieldType = "string"
+	}
+
+	return
+}
+
+// TODO move to mysql specific
+// TODO make column types constants in mysql
+func DataTypeToTypescriptDefault(column *Column) (fieldType string) {
+
+	fieldType = "0"
+
+	switch column.DataType {
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
+		fieldType = "''"
 	}
 
 	return
