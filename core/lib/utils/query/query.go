@@ -712,6 +712,8 @@ func IN(fieldName Column, values ...interface{}) *WherePart {
 }
 
 // IN is an NOT IN clause
+// Example: query.NOTIN("col1", "foo", "bar", "baz")
+// Example: queyr.NOTIN("col2", 1, 2, 3)
 func NOTIN(fieldName Column, values ...interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeNotIN,
@@ -732,7 +734,8 @@ func INString(fieldName Column, values []string) *WherePart {
 	return IN(fieldName, interfaces...)
 }
 
-// Rawf
+// Rawf is a raw SQL statement
+// Example: query.Rawf("`t`.`LastRunDate` + 60000 < %d", seconds)),
 func Rawf(str string, args ...interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeRaw,
