@@ -2,6 +2,7 @@ package gen
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/gen"
@@ -49,9 +50,13 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		}
 	case "ts":
 
-		if e := typescript.GenerateTypescriptTypes(config); e != nil {
+		if e := typescript.GenerateTypescriptModels(config); e != nil {
 			return e
 		}
+
+	case "tsdtos":
+		fmt.Println("Generating Typescript DTOs")
+		typescript.GenerateTypesriptDTOs(config)
 	case "tsperms":
 		if e := gen.GenTSPerms(config); e != nil {
 			return e
