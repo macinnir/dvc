@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/macinnir/dvc/core/lib"
 	"go.uber.org/zap"
@@ -10,10 +11,18 @@ import (
 const HelpCommandName = "help"
 
 func PrintHelp(log *zap.Logger, config *lib.Config, args []string) error {
+
+	commandList := []string{}
+	for commandName := range commands {
+		commandList = append(commandList, commandName)
+	}
+
+	sort.Strings(commandList)
+
 	fmt.Println("Commands:")
 	fmt.Println("----------------------------")
-	for commandName := range commands {
-		fmt.Println("\t" + commandName)
+	for k := range commandList {
+		fmt.Println("\t" + commandList[k])
 	}
 	fmt.Println("----------------------------")
 	return nil

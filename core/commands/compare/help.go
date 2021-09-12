@@ -4,7 +4,7 @@ import "fmt"
 
 func Help() {
 	fmt.Println(`
-	compare 
+	compare [[local_schema]] [[remote_connection]]
 		
 		Compare two schemas and output the difference.
 

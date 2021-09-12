@@ -8,6 +8,7 @@ require (
 	github.com/fatih/structtag v1.2.0
 	github.com/go-errors/errors v1.4.0
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/google/martian v2.1.0+incompatible
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
 	github.com/mattn/go-sqlite3 v1.11.0

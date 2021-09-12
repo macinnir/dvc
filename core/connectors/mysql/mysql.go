@@ -49,13 +49,14 @@ func (ss *MySQL) Connect() (server *schema.Server, e error) {
 
 // FetchDatabases fetches a set of database names from the target server
 // populating the Databases property with a map of Database objects
-func (ss *MySQL) FetchDatabases(server *schema.Server) (databases map[string]*schema.Schema, e error) {
+func (ss *MySQL) FetchDatabases(server *schema.Server) (map[string]*schema.Database, error) {
 
+	var e error
+	var databases = map[string]*schema.Database{}
 	var rows *sql.Rows
-	databases = map[string]*schema.Schema{}
 
 	if rows, e = server.Connection.Query("SELECT SCHEMA_NAME, DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA"); e != nil {
-		return
+		return nil, e
 	}
 
 	if rows != nil {
@@ -72,7 +73,7 @@ func (ss *MySQL) FetchDatabases(server *schema.Server) (databases map[string]*sc
 			&characterSet,
 			&collation,
 		)
-		databases[databaseName] = &schema.Schema{
+		databases[databaseName] = &schema.Database{
 			Name:                databaseName,
 			DefaultCharacterSet: characterSet,
 			DefaultCollation:    collation,
@@ -82,12 +83,12 @@ func (ss *MySQL) FetchDatabases(server *schema.Server) (databases map[string]*sc
 		fmt.Println("Collation", collation)
 	}
 
-	return
+	return databases, nil
 }
 
 // FetchDatabases fetches a set of database names from the target server
 // populating the Databases property with a map of Database objects
-func (ss *MySQL) fetchDatabaseMeta(server *schema.Server, schema *schema.Schema) (e error) {
+func (ss *MySQL) fetchDatabaseMeta(server *schema.Server, schema *schema.Database) (e error) {
 
 	var rows *sql.Rows
 
@@ -128,22 +129,22 @@ func (ss *MySQL) UseDatabase(server *schema.Server, databaseName string) (e erro
 	return
 }
 
-func (ss *MySQL) FetchDatabase(server *schema.Server, databaseName string) (*schema.Schema, error) {
+func (ss *MySQL) FetchDatabase(server *schema.Server, databaseName string) (*schema.Database, error) {
 
 	var e error
-	schema := &schema.Schema{
+	database := &schema.Database{
 		Name: databaseName,
 	}
 
-	if e = ss.fetchDatabaseMeta(server, schema); e != nil {
+	if e = ss.fetchDatabaseMeta(server, database); e != nil {
 		return nil, e
 	}
 
-	if schema.Tables, e = ss.fetchDatabaseTables(server, databaseName); e != nil {
+	if database.Tables, e = ss.fetchDatabaseTables(server, databaseName); e != nil {
 		return nil, e
 	}
 
-	return schema, nil
+	return database, nil
 
 }
 
@@ -279,8 +280,9 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 	dropTableStatements := map[string][]*schema.SchemaChange{}
 
 	// Character Encoding
-	if localSchema.DefaultCharacterSet != remoteSchema.DefaultCharacterSet ||
-		localSchema.DefaultCollation != remoteSchema.DefaultCollation {
+	if len(localSchema.DefaultCharacterSet) > 0 && (localSchema.DefaultCharacterSet != remoteSchema.DefaultCharacterSet ||
+		localSchema.DefaultCollation != remoteSchema.DefaultCollation) {
+
 		comparison.Changes = append(comparison.Changes, alterDatabaseCharacterSet(databaseName, localSchema.DefaultCharacterSet, localSchema.DefaultCollation))
 		comparison.Alterations++
 	}
@@ -819,6 +821,9 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 			case KeyUNI:
 				comparison.Changes = append(comparison.Changes, dropUniqueIndex(table, localColumn))
 				comparison.Deletions++
+			case KeyPRI:
+				comparison.Changes = append(comparison.Changes, dropPrimaryKey(table, localColumn))
+				comparison.Deletions++
 			}
 		}
 
@@ -832,6 +837,9 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 			// 4
 			case KeyUNI:
 				comparison.Changes = append(comparison.Changes, addUniqueIndex(table, localColumn))
+				comparison.Additions++
+			case KeyPRI:
+				comparison.Changes = append(comparison.Changes, addPrimaryKey(table, localColumn))
 				comparison.Additions++
 			}
 		}
@@ -910,6 +918,14 @@ func addUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaCh
 	}
 }
 
+// alternative: https://www.techonthenet.com/mysql/primary_keys.php
+func addPrimaryKey(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type: schema.AddIndex,
+		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD PRIMARY KEY (`%s`);", table.Name, column.Name),
+	}
+}
+
 func alterDatabaseCharacterSet(databaseName, characterSet, collation string) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.ChangeCharacterSet,
@@ -938,6 +954,15 @@ func dropUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaC
 	return &schema.SchemaChange{
 		Type:          schema.DropIndex,
 		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s_%s`;", table.Name, table.Name, column.Name),
+		IsDestructive: true,
+	}
+}
+
+// dropPrimaryKey returns an alter table sql statement that drops a primary key
+func dropPrimaryKey(table *schema.Table, column *schema.Column) *schema.SchemaChange {
+	return &schema.SchemaChange{
+		Type:          schema.DropIndex,
+		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP PRIMARY KEY;", table.Name),
 		IsDestructive: true,
 	}
 }

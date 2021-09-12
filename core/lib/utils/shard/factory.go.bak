@@ -1,0 +1,35 @@
+package shard
+
+type ShardType int
+
+const (
+	ShardTypeStandard ShardType = iota
+	ShardTypeShort
+)
+
+type ISharder interface {
+	NewRoundRobin() IShard
+	NewFromSubID(subID int64) IShard
+	NewFromString(str string) IShard
+	GetShardFromSubID(subID int64) IShard
+	FromID(id int64) IShard
+	NumberOfShards() int64
+	CurrentShardID() int64
+}
+
+type IShard interface {
+	Shard() int64
+	Timestamp() int64
+	ID() int64
+}
+
+func SharderFactory(shardType ShardType, numberOfShards int64) ISharder {
+
+	switch shardType {
+	case ShardTypeStandard:
+		return NewSharder(numberOfShards)
+	case ShardTypeShort:
+		return NewShortSharder(numberOfShards)
+	}
+
+}

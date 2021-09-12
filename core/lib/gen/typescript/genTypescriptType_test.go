@@ -9,7 +9,7 @@ import (
 
 func TestGenerateTypescriptType(t *testing.T) {
 
-	g, e := GenerateTypescriptType(fooObj)
+	g, e := GenerateTypescriptModel(fooObj)
 
 	assert.Nil(t, e)
 	assert.Equal(t, tsFoo, g)
@@ -84,3 +84,48 @@ export const newBar = () : Bar => ({
 });
 
 `
+
+func TestGenerateTypescriptDTO(t *testing.T) {
+	str, _ := GenerateTypescriptDTO("./testassets/CreateWebsiteDTO.go")
+	expected := `/**
+ * Generated Code; DO NOT EDIT
+ *
+ * CreateWebsiteDTO
+ */
+export type CreateWebsiteDTO = {
+
+	// BaseURL string
+	BaseURL: string;
+
+	// IDs []int64
+	IDs: number[];
+
+	// IsActive int
+	IsActive: number;
+
+	// ScheduleIntervalMinutes int64
+	ScheduleIntervalMinutes: number;
+
+	// Title string
+	Title: string;
+
+}
+
+// newCreateWebsiteDTO is a factory method for new CreateWebsiteDTO objects
+export const newCreateWebsiteDTO = () : CreateWebsiteDTO => ({
+	BaseURL: '',
+	IDs: [],
+	IsActive: 0,
+	ScheduleIntervalMinutes: 0,
+	Title: '',
+});
+
+`
+
+	assert.Equal(t, expected, str)
+}
+
+func TestGenerateTypescriptDTO_WithModelsAndDTOs(t *testing.T) {
+	GenerateTypescriptDTO("./testassets/UpdateJobDTO.go")
+	// fmt.Println(str)
+}

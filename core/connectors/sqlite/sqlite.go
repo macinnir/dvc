@@ -38,16 +38,16 @@ func (ss *Sqlite) Connect() (server *schema.Server, e error) {
 
 // FetchDatabases fetches a set of database names from the target server
 // populating the Databases property with a map of Database objects
-func (ss *Sqlite) FetchDatabases(server *schema.Server) (databases map[string]*schema.Schema, e error) {
+func (ss *Sqlite) FetchDatabases(server *schema.Server) (databases map[string]*schema.Database, e error) {
 
 	// databases in sqlite
 	// .databases
 	// main: /Users/robertmacinnis/src/github.com/macinnir/dvc/dbTest.db
 
 	// var rows *sql.Rows
-	databases = map[string]*schema.Schema{}
+	databases = map[string]*schema.Database{}
 
-	databases[ss.config.Name] = &schema.Schema{Name: ss.config.Name}
+	databases[ss.config.Name] = &schema.Database{Name: ss.config.Name}
 
 	return
 
@@ -84,8 +84,8 @@ func (ss *Sqlite) UseDatabase(server *schema.Server, databaseName string) (e err
 	return
 }
 
-func (ss *Sqlite) FetchDatabase(server *schema.Server, databaseName string) (*schema.Schema, error) {
-	return &schema.Schema{}, nil
+func (ss *Sqlite) FetchDatabase(server *schema.Server, databaseName string) (*schema.Database, error) {
+	return &schema.Database{}, nil
 }
 
 // FetchDatabaseTables fetches the complete set of tables from this database

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/macinnir/dvc/core/lib"
@@ -17,9 +18,31 @@ const (
 // loadDatabase loads a database from configuration
 func LoadLocalSchemas() (*SchemaList, error) {
 
-	fileBytes, e := ioutil.ReadFile(lib.SchemasFilePath)
+	var e error
+	var appSchema *SchemaList
+	var coreSchema *SchemaList
 
-	if e != nil {
+	if appSchema, e = loadSchema(lib.SchemasFilePath); e != nil {
+		return nil, e
+	}
+
+	if coreSchema, e = loadSchema(lib.CoreSchemasFilePath); e != nil {
+		return nil, e
+	}
+
+	appSchema.Schemas = append(appSchema.Schemas, coreSchema.Schemas...)
+
+	return appSchema, nil
+}
+
+func loadSchema(filePath string) (*SchemaList, error) {
+
+	fmt.Println("Load schema from ", filePath)
+
+	var e error
+	var fileBytes []byte
+
+	if fileBytes, e = ioutil.ReadFile(filePath); e != nil {
 		return nil, e
 	}
 
@@ -27,8 +50,7 @@ func LoadLocalSchemas() (*SchemaList, error) {
 		Schemas: []*Schema{},
 	}
 
-	e = json.Unmarshal(fileBytes, schemaList)
-	if e != nil {
+	if e = json.Unmarshal(fileBytes, schemaList); e != nil {
 		return nil, e
 	}
 
@@ -131,11 +153,11 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 
 // TODO move to mysql specific
 // TODO make column types constants in mysql
-func DataTypeToTypescriptString(column *Column) (fieldType string) {
+func DataTypeToTypescriptString(dbDataType string) (fieldType string) {
 
 	fieldType = "number"
 
-	switch column.DataType {
+	switch dbDataType {
 	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
 		fieldType = "string"
 	}
@@ -143,15 +165,55 @@ func DataTypeToTypescriptString(column *Column) (fieldType string) {
 	return
 }
 
+func GoTypeToTypescriptString(goDataType string) (fieldType string) {
+
+	fieldType = "number"
+
+	isArray := len(goDataType) > 0 && goDataType[0:1] == "["
+
+	switch goDataType {
+	case "string", "null.String":
+		fieldType = "string"
+	case "bool":
+		fieldType = "boolean"
+	}
+
+	if isArray {
+		fieldType += "[]"
+	}
+
+	return
+}
+
 // TODO move to mysql specific
 // TODO make column types constants in mysql
-func DataTypeToTypescriptDefault(column *Column) (fieldType string) {
+func DataTypeToTypescriptDefault(dataType string) (fieldType string) {
 
 	fieldType = "0"
 
-	switch column.DataType {
+	switch dataType {
 	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
 		fieldType = "''"
+	}
+
+	return
+}
+
+// TODO move to mysql specific
+// TODO make column types constants in mysql
+func GoTypeToTypescriptDefault(goDataType string) (fieldType string) {
+
+	fieldType = "0"
+
+	if len(goDataType) > 0 && goDataType[0:1] == "[" {
+		return "[]"
+	}
+
+	switch goDataType {
+	case "string", "null.String":
+		fieldType = "''"
+	case "bool":
+		fieldType = "false"
 	}
 
 	return

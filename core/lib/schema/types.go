@@ -22,7 +22,29 @@ type SchemaList struct {
 	Schemas []*Schema `json:"schemas"`
 }
 
-// Schema represents a database
+// Database represents a database
+type Database struct {
+	RunID               int64                               `json:"-"`
+	Name                string                              `json:"name"`
+	SortedSetKeys       []string                            `json:"-"`
+	Tables              map[string]*Table                   `json:"tables"`
+	Enums               map[string][]map[string]interface{} `json:"-"`
+	DefaultCharacterSet string                              `json:"defaultCharacterSet"`
+	DefaultCollation    string                              `json:"defaultCollation"`
+}
+
+func (d *Database) ToSchema(schemaName string) *Schema {
+	return &Schema{
+		Name:                schemaName,
+		SortedSetKeys:       d.SortedSetKeys,
+		Tables:              d.Tables,
+		Enums:               d.Enums,
+		DefaultCharacterSet: d.DefaultCharacterSet,
+		DefaultCollation:    d.DefaultCollation,
+	}
+}
+
+// Schema represents a database structure
 type Schema struct {
 	RunID               int64                               `json:"-"`
 	Name                string                              `json:"name"`

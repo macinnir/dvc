@@ -164,8 +164,7 @@ func CompareSchemas(
 
 	for connectionKey := range remoteSchemas {
 
-		schemaName := lib.ExtractRootNameFromKey(connectionKey)
-
+		schemaName := remoteSchemas[connectionKey].Name
 		var connector connectors.IConnector
 		connector, _ = connectors.DBConnectorFactory(configMap[connectionKey])
 		localSchema := localSchemaList.Schemas[localSchemaMap[schemaName]]
@@ -199,7 +198,10 @@ func PrintComparisons(comparisons []*schema.SchemaComparison) {
 			sql += "\n"
 		}
 
+		sql += "\n\n"
+		sql += "--\n"
 		sql += "-- End for " + c.DatabaseKey + "\n"
+		sql += "--\n"
 
 	}
 

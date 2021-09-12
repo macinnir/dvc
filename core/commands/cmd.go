@@ -10,6 +10,7 @@ import (
 	"github.com/macinnir/dvc/core/commands/cli"
 	"github.com/macinnir/dvc/core/commands/clone"
 	"github.com/macinnir/dvc/core/commands/compare"
+	"github.com/macinnir/dvc/core/commands/connections"
 	"github.com/macinnir/dvc/core/commands/data"
 	"github.com/macinnir/dvc/core/commands/dump"
 	"github.com/macinnir/dvc/core/commands/export"
@@ -20,8 +21,10 @@ import (
 	"github.com/macinnir/dvc/core/commands/ls"
 	"github.com/macinnir/dvc/core/commands/refresh"
 	"github.com/macinnir/dvc/core/commands/rm"
+	"github.com/macinnir/dvc/core/commands/schemas"
 	"github.com/macinnir/dvc/core/commands/selectcmd"
 	"github.com/macinnir/dvc/core/commands/test"
+	"github.com/macinnir/dvc/core/commands/transfer"
 
 	"github.com/macinnir/dvc/core/lib"
 )
@@ -40,43 +43,49 @@ var helps map[string]Help
 
 func makeCommands() {
 	commands = map[string]Command{
-		add.CommandName:       add.Cmd,
-		clone.CommandName:     clone.Cmd,
-		compare.CommandName:   compare.Cmd,
-		data.CommandName:      data.Cmd,
-		dump.CommandName:      dump.Cmd,
-		export.CommandName:    export.Cmd,
-		gen.CommandName:       gen.Cmd,
-		HelpCommandName:       PrintHelp,
-		importcmd.CommandName: importcmd.Cmd,
-		insert.CommandName:    insert.Cmd,
-		inspect.CommandName:   inspect.Cmd,
-		ls.CommandName:        ls.Cmd,
-		refresh.CommandName:   refresh.Cmd,
-		rm.CommandName:        rm.Cmd,
-		selectcmd.CommandName: selectcmd.Cmd,
-		test.CommandName:      test.Cmd,
-		cli.CommandName:       cli.Cmd,
+		add.CommandName:         add.Cmd,
+		clone.CommandName:       clone.Cmd,
+		compare.CommandName:     compare.Cmd,
+		data.CommandName:        data.Cmd,
+		dump.CommandName:        dump.Cmd,
+		export.CommandName:      export.Cmd,
+		gen.CommandName:         gen.Cmd,
+		HelpCommandName:         PrintHelp,
+		importcmd.CommandName:   importcmd.Cmd,
+		insert.CommandName:      insert.Cmd,
+		inspect.CommandName:     inspect.Cmd,
+		ls.CommandName:          ls.Cmd,
+		refresh.CommandName:     refresh.Cmd,
+		rm.CommandName:          rm.Cmd,
+		selectcmd.CommandName:   selectcmd.Cmd,
+		test.CommandName:        test.Cmd,
+		cli.CommandName:         cli.Cmd,
+		transfer.CommandName:    transfer.Cmd,
+		schemas.CommandName:     schemas.Cmd,
+		connections.CommandName: connections.Cmd,
 	}
 }
 
 func makeHelp() {
 	helps = map[string]Help{
-		add.CommandName:       add.Help,
-		clone.CommandName:     clone.Help,
-		compare.CommandName:   compare.Help,
-		data.CommandName:      data.Help,
-		dump.CommandName:      dump.Help,
-		export.CommandName:    export.Help,
-		gen.CommandName:       gen.Help,
-		importcmd.CommandName: importcmd.Help,
-		insert.CommandName:    insert.Help,
-		inspect.CommandName:   inspect.Help,
-		ls.CommandName:        ls.Help,
-		refresh.CommandName:   refresh.Help,
-		rm.CommandName:        rm.Help,
-		selectcmd.CommandName: selectcmd.Help,
-		test.CommandName:      test.Help,
+		add.CommandName:         add.Help,
+		clone.CommandName:       clone.Help,
+		compare.CommandName:     compare.Help,
+		data.CommandName:        data.Help,
+		dump.CommandName:        dump.Help,
+		export.CommandName:      export.Help,
+		gen.CommandName:         gen.Help,
+		importcmd.CommandName:   importcmd.Help,
+		insert.CommandName:      insert.Help,
+		inspect.CommandName:     inspect.Help,
+		ls.CommandName:          ls.Help,
+		refresh.CommandName:     refresh.Help,
+		rm.CommandName:          rm.Help,
+		selectcmd.CommandName:   selectcmd.Help,
+		test.CommandName:        test.Help,
+		transfer.CommandName:    transfer.Help,
+		schemas.CommandName:     schemas.Help,
+		connections.CommandName: connections.Help,
 	}
 }
 

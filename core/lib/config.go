@@ -35,6 +35,8 @@ type Config struct {
 	BasePackage               string            `json:"basePackage"`
 	Databases                 []*ConfigDatabase `json:"Databases"`
 	TypescriptModelsPath      string            `json:"TypescriptModelsPath"`
+	TypescriptDTOsPath        string            `json:"TypescriptDTOsPath"`
+	TypescriptAggregatesPath  string            `json:"TypescriptAggregatesPath"`
 	TypescriptPermissionsPath string            `json:"TypescriptPermissionsPath"`
 	Packages                  struct {
 		Cache    string `json:"cache"`

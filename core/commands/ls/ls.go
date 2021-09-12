@@ -18,7 +18,6 @@ const CommandName = "ls"
 func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 
 	localSchemaList, _ := schema.LoadLocalSchemas()
-	database := localSchemaList.Schemas[0]
 	// database, e := lib.LoadSchema(config.Databases[0])
 
 	// if e != nil {
@@ -31,22 +30,28 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	// ls [partialName] 			Show all tables with name containing [partialName]
 	// ls .[fieldPartialName] 		Show all columns with name containing [fieldPartialName]
 	// ls - Show all tables
-	fmt.Println("args", args)
+	// fmt.Println("args", args)
 	if len(args) == 0 {
 
-		results := database.ToSortedTables()
-		t := lib.NewCLITable([]string{"Table", "Columns", "Collation", "Engine", "Row Format"})
+		t := lib.NewCLITable([]string{"Schema", "Table", "Columns", "Collation", "Engine", "Row Format"})
 
-		for _, table := range results {
-			t.Row()
-			t.Col(table.Name)
-			t.Colf("%d", len(table.Columns))
-			t.Col(table.Collation)
-			t.Col(table.Engine)
-			t.Col(table.RowFormat)
+		for k := range localSchemaList.Schemas {
+
+			localSchema := localSchemaList.Schemas[k]
+			results := localSchema.ToSortedTables()
+
+			for _, table := range results {
+				t.Row()
+				t.Col(localSchema.Name)
+				t.Col(table.Name)
+				t.Colf("%d", len(table.Columns))
+				t.Col(table.Collation)
+				t.Col(table.Engine)
+				t.Col(table.RowFormat)
+			}
 		}
-
 		fmt.Println(t.String())
+
 		return nil
 	}
 
@@ -61,41 +66,46 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 
 		fmt.Printf("Searching all fields for `%s`\n", fieldSearch)
 
-		sortedTables := database.ToSortedTables()
+		t := lib.NewCLITable([]string{"Schema", "Table", "Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
 
-		columns := []*schema.ColumnWithTable{}
+		for k := range localSchemaList.Schemas {
 
-		for j := range sortedTables {
-			for k := range sortedTables[j].Columns {
-				if strings.Contains(strings.ToLower(sortedTables[j].Columns[k].Name), fieldSearch) {
-					column := &schema.ColumnWithTable{
-						Column:    sortedTables[j].Columns[k],
-						TableName: sortedTables[j].Name,
+			localSchema := localSchemaList.Schemas[k]
+			sortedTables := localSchema.ToSortedTables()
+
+			columns := []*schema.ColumnWithTable{}
+
+			for j := range sortedTables {
+				for k := range sortedTables[j].Columns {
+					if strings.Contains(strings.ToLower(sortedTables[j].Columns[k].Name), fieldSearch) {
+						column := &schema.ColumnWithTable{
+							Column:    sortedTables[j].Columns[k],
+							TableName: sortedTables[j].Name,
+						}
+						columns = append(columns, column)
 					}
-					columns = append(columns, column)
 				}
 			}
-		}
 
-		t := lib.NewCLITable([]string{"Table", "Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
+			for _, col := range columns {
 
-		for _, col := range columns {
+				t.Row()
+				t.Col(localSchema.Name)
+				t.Col(col.TableName)
+				t.Col(col.Name)
+				t.Col(col.DataType)
+				t.Colf("%d", col.MaxLength)
 
-			t.Row()
-			t.Col(col.TableName)
-			t.Col(col.Name)
-			t.Col(col.DataType)
-			t.Colf("%d", col.MaxLength)
+				if col.IsNullable {
+					t.Col("YES")
+				} else {
+					t.Col("NO")
+				}
 
-			if col.IsNullable {
-				t.Col("YES")
-			} else {
-				t.Col("NO")
+				t.Col(col.Default)
+				t.Col(col.Extra)
+				t.Col(col.ColumnKey)
 			}
-
-			t.Col(col.Default)
-			t.Col(col.Extra)
-			t.Col(col.ColumnKey)
 		}
 
 		fmt.Println(t.String())
@@ -103,32 +113,39 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 		return nil
 	}
 
+	// ls [tableName] -  Show all column in the table [tableName]
+	var table *schema.Table
 	tableName := strings.Trim(strings.ToLower(args[0]), " ")
+	schemaName := ""
 
-	// findTable
-	for k := range database.Tables {
-		if strings.ToLower(database.Tables[k].Name) == tableName {
-			tableName = database.Tables[k].Name
-			// Found
-			break
+	for k := range localSchemaList.Schemas {
+
+		localSchema := localSchemaList.Schemas[k]
+
+		// findTable
+		for k := range localSchema.Tables {
+			if strings.ToLower(localSchema.Tables[k].Name) == tableName {
+				table = localSchema.Tables[k]
+				schemaName = localSchema.Name
+				// Found
+				break
+			}
 		}
 	}
 
-	// ls [tableName] -  Show all column in the table [tableName]
-	if _, ok := database.Tables[tableName]; ok {
+	if table != nil {
+
+		t := lib.NewCLITable([]string{"Schema", "Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
 
 		fmt.Printf("Listing all columns for table `%s`\n", tableName)
 
-		table := database.Tables[tableName]
-
 		sortedColumns := table.ToSortedColumns()
-
-		t := lib.NewCLITable([]string{"Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
 
 		for _, col := range sortedColumns {
 
 			t.Row()
 
+			t.Col(schemaName)
 			t.Col(col.Name)
 			t.Col(col.DataType)
 			t.Colf("%d", col.MaxLength)
@@ -149,22 +166,27 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	}
 
 	// ls [partialTableName] - Show all tables with name containing [partialTableName]
-	sortedTables := database.ToSortedTables()
-	tableSearch := strings.Trim(strings.ToLower(args[0]), " ")
+	t := lib.NewCLITable([]string{"Schema", "Table", "Columns", "Collation", "Engine", "Row Format"})
 
-	t := lib.NewCLITable([]string{"Table", "Columns", "Collation", "Engine", "Row Format"})
-	for _, table := range sortedTables {
+	for k := range localSchemaList.Schemas {
+		localSchema := localSchemaList.Schemas[k]
+		sortedTables := localSchema.ToSortedTables()
+		tableSearch := strings.Trim(strings.ToLower(args[0]), " ")
 
-		if !strings.Contains(strings.ToLower(table.Name), tableSearch) {
-			continue
+		for _, table := range sortedTables {
+
+			if !strings.Contains(strings.ToLower(table.Name), tableSearch) {
+				continue
+			}
+
+			t.Row()
+			t.Col(localSchema.Name)
+			t.Col(table.Name)
+			t.Colf("%d", len(table.Columns))
+			t.Col(table.Collation)
+			t.Col(table.Engine)
+			t.Col(table.RowFormat)
 		}
-
-		t.Row()
-		t.Col(table.Name)
-		t.Colf("%d", len(table.Columns))
-		t.Col(table.Collation)
-		t.Col(table.Engine)
-		t.Col(table.RowFormat)
 	}
 
 	fmt.Println(t.String())

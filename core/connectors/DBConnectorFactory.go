@@ -27,11 +27,11 @@ func DBConnectorFactory(config *lib.ConfigDatabase) (connector IConnector, e err
 // IConnector defines the shape of a connector to a database
 type IConnector interface {
 	Connect() (server *schema.Server, e error)
-	FetchDatabases(server *schema.Server) (databases map[string]*schema.Schema, e error)
+	FetchDatabases(server *schema.Server) (databases map[string]*schema.Database, e error)
 	// FetchEnums(server *Server) (enums map[string][]map[string]interface{})
 	FetchEnum(server *schema.Server, tableName string) []map[string]interface{}
 	UseDatabase(server *schema.Server, databaseName string) (e error)
-	FetchDatabase(server *schema.Server, databaseName string) (schema *schema.Schema, e error)
+	FetchDatabase(server *schema.Server, databaseName string) (schema *schema.Database, e error)
 	FetchTableColumns(server *schema.Server, databaseName string, tableName string) (columns map[string]*schema.Column, e error)
 	CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schema.Schema, databaseName string) (s *schema.SchemaComparison)
 	// CompareEnums(remoteSchema *schema.Schema, localSchema *schema.Schema, tableName string) (sql string)

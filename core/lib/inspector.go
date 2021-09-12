@@ -6,7 +6,9 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
+	"io/ioutil"
 	"log"
+	"path"
 	"strings"
 
 	"golang.org/x/tools/imports"
@@ -21,6 +23,83 @@ func FormatCode(code string) ([]byte, error) {
 		Comments:  true,
 	}
 	return imports.Process("", []byte(code), opts)
+}
+
+type ParsedStruct struct {
+	Docs   []string
+	Name   string
+	Fields map[string]string
+}
+
+func ParseStruct2(filePath string) (*ParsedStruct, error) {
+
+	p := &ParsedStruct{
+		Docs:   []string{},
+		Fields: map[string]string{},
+	}
+
+	fileBytes, _ := ioutil.ReadFile(filePath)
+
+	src := string(fileBytes)
+
+	// Create the AST by parsing src.
+	fset := token.NewFileSet() // positions are relative to fset
+	f, err := parser.ParseFile(fset, path.Base(filePath), src, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, node := range f.Decls {
+		switch node.(type) {
+
+		case *ast.GenDecl:
+			decl := node.(*ast.GenDecl)
+			for _, spec := range decl.Specs {
+				switch spec.(type) {
+				case *ast.TypeSpec:
+					typeSpec := spec.(*ast.TypeSpec)
+
+					if decl.Doc != nil {
+						for _, d := range decl.Doc.List {
+							p.Docs = append(p.Docs, string(src[d.Pos()-1:d.End()-1]))
+						}
+					}
+
+					p.Name = typeSpec.Name.Name
+
+					switch typeSpec.Type.(type) {
+					case *ast.StructType:
+						structType := typeSpec.Type.(*ast.StructType)
+						for _, field := range structType.Fields.List {
+
+							fieldType := ""
+
+							switch field.Type.(type) {
+							case *ast.ArrayType:
+								fmt.Println(structType.Fields)
+								at := field.Type.(*ast.ArrayType)
+								fieldType = "[]" + fmt.Sprint(at.Elt)
+								fmt.Println("ArrayType: ", at.Elt)
+							case *ast.Ident:
+								i := field.Type.(*ast.Ident)
+								fieldType = i.Name
+							}
+
+							for _, name := range field.Names {
+								// fmt.Printf("\tField: name=%s type=%s\n", name.Name, fieldType)
+								p.Fields[name.Name] = fieldType
+
+							}
+
+						}
+
+					}
+				}
+			}
+		}
+	}
+
+	return p, nil
 }
 
 // ParseStruct parses a struct

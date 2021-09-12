@@ -22,23 +22,111 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	apply := false
 	// TODO safeMode := false
 
+	filteredArgs := []string{}
+
 	for k := range args {
 		switch args[k] {
 		case "-u", "--summarize":
 			summarize = true
 		case "-a", "--apply":
 			apply = true
-			// case "-s", "--safe-mode":
-			// 	safeMode = true
+		// case "-s", "--safe-mode":
+		// 	safeMode = true
+		default:
+			filteredArgs = append(filteredArgs, args[k])
 		}
 	}
+
+	if len(filteredArgs) > 0 {
+		return CompareSingle(config, filteredArgs, summarize, apply)
+	}
+
+	return CompareAll(config, summarize, apply)
+}
+
+func CompareSingle(config *lib.Config, args []string, summarize, apply bool) error {
+
+	localSchema := ""
+	remoteConnectionName := ""
+	if len(args) > 0 {
+		localSchema = args[0]
+	}
+
+	if len(args) > 1 {
+		remoteConnectionName = args[1]
+	}
+
+	if len(localSchema) == 0 {
+		return fmt.Errorf("Missing local schema name")
+	}
+
+	if len(remoteConnectionName) == 0 {
+		return fmt.Errorf("Missing remote connection name")
+	}
+
+	var e error
+	var remoteSchema *schema.Schema
+	remoteSchema, e = importer.FetchSchema(config, localSchema, remoteConnectionName)
+	if e != nil {
+		return fmt.Errorf("Error importing schemas: %w", e)
+	}
+
+	var localSchemaList *schema.SchemaList
+	localSchemaList, _ = schema.LoadLocalSchemas()
+
+	var targetLocalSchema *schema.Schema
+	for k := range localSchemaList.Schemas {
+		if localSchemaList.Schemas[k].Name == localSchema {
+			targetLocalSchema = localSchemaList.Schemas[k]
+		}
+	}
+
+	if targetLocalSchema == nil {
+		return fmt.Errorf("Cannot find Target Local Schema `%s`", localSchema)
+	}
+
+	comparisons := compare.CompareSchemas(config, &schema.SchemaList{
+		Schemas: []*schema.Schema{
+			targetLocalSchema,
+		},
+	}, map[string]*schema.Schema{
+		remoteConnectionName: remoteSchema,
+	})
+
+	if summarize {
+		compare.PrintComparisonSummary(comparisons)
+	}
+
+	if !summarize && !apply {
+		compare.PrintComparisons(comparisons)
+	}
+
+	if apply {
+
+		configs := map[string]*lib.ConfigDatabase{}
+		for k := range config.Databases {
+			configs[config.Databases[k].Key] = config.Databases[k]
+		}
+
+		if e = applyChanges(
+			configs,
+			comparisons,
+		); e != nil {
+			fmt.Println("SQL ERROR: ", e.Error())
+		}
+
+	}
+
+	return nil
+}
+
+func CompareAll(config *lib.Config, summarize, apply bool) error {
 
 	var e error
 	var remoteSchemas map[string]*schema.Schema
 	remoteSchemas, e = importer.FetchAllSchemas(config)
 	if e != nil {
-		log.Error("Error importing schemas", zap.Error(e))
-		return e
+		return fmt.Errorf("Error importing schemas: %w", e)
 	}
 
 	var localSchemaList *schema.SchemaList
@@ -71,78 +159,6 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	}
 
 	return nil
-	// cmd := "print"
-	// sql := ""
-	// outfile := ""
-
-	// lib.Debugf("Args: %v", c.Options, args)
-	// if len(args) > 0 {
-
-	// 	for len(args) > 0 {
-
-	// 		switch args[0] {
-	// 		case "-r", "--reverse":
-	// 			c.Options |= lib.OptReverse
-	// 		case "-u", "--summary":
-	// 			c.Options |= lib.OptSummary
-	// 		case "print":
-	// 			cmd = "print"
-	// 		case "apply":
-	// 			cmd = "apply"
-	// 		default:
-
-	// 			if len(args[0]) > len("-o=") && args[0][0:len("-o=")] == "-o=" {
-	// 				outfile = args[0][len("-o="):]
-	// 				if len(outfile) == 0 {
-	// 					lib.Error("Outfile argument cannot be empty", c.Options)
-	// 					os.Exit(1)
-	// 				}
-	// 				cmd = "write"
-	// 			} else if args[0][0] == '-' {
-	// 				lib.Errorf("Unrecognized option '%s'. Try the --help option for more information\n", c.Options, args[0])
-	// 				os.Exit(1)
-	// 				// c.errLog.Fatalf("Unrecognized option '%s'. Try the --help option for more information\n", arg)
-	// 			}
-
-	// 			// Check if outfile argument is non-empty
-
-	// 			break
-	// 		}
-	// 		args = args[1:]
-	// 	}
-
-	// }
-
-	// Do the comparison
-	// TODO pass all options (e.g. verbose)
-	// TODO -reverse | -r as option
-	// reverse := false
-	// if sql, e = cmp.CompareSchema(config.Databases[0], reverse); e != nil {
-	// 	log.Sugar().Errorf(e.Error())
-	// 	return e
-	// }
-
-	// if len(sql) == 0 {
-	// 	log.Info("No changes found")
-	// 	return nil
-	// }
-
-	// switch cmd {
-	// case "apply":
-	// 	writeSQLToLog(sql)
-	// 	e = cmp.ApplyChangeset(sql)
-	// 	if e != nil {
-	// 		lib.Error(e.Error(), c.Options)
-	// 		os.Exit(1)
-	// 	}
-
-	// case "print":
-	// 	// Print to stdout
-	// 	fmt.Printf("%s", sql)
-	// default:
-	// 	lib.Errorf("Unknown argument: `%s`", c.Options, cmd)
-	// 	os.Exit(1)
-	// }
 }
 
 func applyChanges(
