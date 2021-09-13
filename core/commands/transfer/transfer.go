@@ -24,18 +24,18 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	var remoteSchemas map[string]*schema.Schema
 	doRun := false
 
-	fromDatabase := ""
-	toDatabase := ""
+	fromConnectionName := ""
+	toConnectionName := ""
 	tableName := ""
 
 	if len(args) < 2 {
 		fmt.Println("Usage: dvc transfer [source_database] [destination_database] [[table_name]] [[-r|--run]]")
 		return errors.New("Insufficient arguments...")
 	}
-	fromDatabase = args[0]
-	toDatabase = args[1]
+	fromConnectionName = args[0]
+	toConnectionName = args[1]
 
-	if fromDatabase == toDatabase {
+	if fromConnectionName == toConnectionName {
 		return errors.New("Source and destination databases must be different")
 	}
 
@@ -51,14 +51,18 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	}
 
 	fmt.Println("Args: ", len(args))
-	fmt.Printf("From: %s; To: %s; Table: %s\n", fromDatabase, toDatabase, tableName)
+	fmt.Printf("From: %s; To: %s; Table: %s\n", fromConnectionName, toConnectionName, tableName)
 
 	if remoteSchemas, e = importer.FetchAllSchemas(config); e != nil {
 		return e
 	}
 
-	if _, ok := remoteSchemas[fromDatabase]; !ok {
-		return errors.New("Unknown database key: " + fromDatabase)
+	if _, ok := remoteSchemas[fromConnectionName]; !ok {
+		return errors.New("Unknown connection key: " + fromConnectionName)
+	}
+
+	if _, ok := remoteSchemas[toConnectionName]; !ok {
+		return errors.New("Unknown connection key: " + toConnectionName)
 	}
 
 	sql := []string{}
@@ -71,22 +75,25 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 
 	// Migrate single table
 	if len(tableName) > 0 {
-		if _, ok := remoteSchemas[fromDatabase].Tables[tableName]; !ok {
-			return errors.New("Table `" + tableName + "` not found in source schema")
-		}
+		// if _, ok := remoteSchemas[fromConnectionName].Tables[tableName]; !ok {
+		// 	return errors.New("Table `" + tableName + "` not found in source schema")
+		// }
 
 		tables = []string{tableName}
 	} else {
-		for tableName := range remoteSchemas[fromDatabase].Tables {
+		for tableName := range remoteSchemas[fromConnectionName].Tables {
 			tables = append(tables, tableName)
 		}
 	}
 
-	sourceDatabaseConfig := configs[fromDatabase]
+	sourceDatabaseConfig := configs[fromConnectionName]
 	sourceDatabaseName := sourceDatabaseConfig.Name
 
+	destinationDatabaseConfig := configs[toConnectionName]
+	destinationDatabaseName := destinationDatabaseConfig.Name
+
 	for k := range tables {
-		sql = append(sql, transferSQL(sourceDatabaseName, toDatabase, tables[k])...)
+		sql = append(sql, transferSQL(sourceDatabaseName, destinationDatabaseName, tables[k])...)
 	}
 
 	if doRun {
