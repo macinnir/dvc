@@ -38,6 +38,9 @@ type IResponseLogger interface {
 	// JSON Returns an ok status with json-encoded body
 	JSON(r *Request, w http.ResponseWriter, body interface{})
 
+	// HTML Returns an ok status with html body
+	HTML(r *Request, w http.ResponseWriter, body string)
+
 	// OK Returns an ok status
 	OK(r *Request, w http.ResponseWriter)
 }

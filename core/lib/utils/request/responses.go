@@ -117,6 +117,13 @@ func JSON(r *Request, w http.ResponseWriter, body interface{}) {
 	w.Write(payload)
 }
 
+func HTML(r *Request, w http.ResponseWriter, content string) {
+	r.ResponseCode = 200
+	log.Printf("INF HTTP %s %s 200 OK", r.Method, r.Path)
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(content))
+}
+
 // OK Returns an ok status
 func OK(r *Request, w http.ResponseWriter) {
 	r.ResponseCode = 200

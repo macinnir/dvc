@@ -86,6 +86,11 @@ func (s *Response) JSON(r *Request, w http.ResponseWriter, body interface{}) {
 	JSON(r, w, body)
 }
 
+// HTML Returns an ok status with html body
+func (s *Response) HTML(r *Request, w http.ResponseWriter, body string) {
+	HTML(r, w, body)
+}
+
 // OK Returns an ok status
 func (s *Response) OK(r *Request, w http.ResponseWriter) {
 	OK(r, w)
