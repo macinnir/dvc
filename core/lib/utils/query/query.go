@@ -126,7 +126,7 @@ func (q *Q) Raw(query string) *Q {
 func (q *Q) Field(name Column) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("SELECT", string(name))
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Field", string(name))
 	}
 
 	q.fields = append(q.fields, "`"+q.alias+"`.`"+string(name)+"`")
@@ -138,7 +138,7 @@ func (q *Q) Field(name Column) *Q {
 func (q *Q) FieldAs(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("SELECT", string(name))
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Field...as", string(name))
 	}
 
 	q.fields = append(q.fields, "`"+q.alias+"`.`"+string(name)+"` AS `"+as+"`")
@@ -156,7 +156,7 @@ func (q *Q) FieldRaw(fieldStr, as string) *Q {
 func (q *Q) Count(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("COUNT()", string(name))
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...COUNT()", string(name))
 		return q
 	}
 
@@ -166,7 +166,7 @@ func (q *Q) Count(name Column, as string) *Q {
 func (q *Q) Sum(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
-		q.errorInvalidColumn("Sum()", string(name))
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Sum()", string(name))
 		return q
 	}
 
@@ -229,6 +229,14 @@ func (q *Q) Where(args ...*WherePart) *Q {
 
 // }
 
+type QueryErrorType string
+
+const (
+	QUERY_ERROR_INVALID_VALUE      QueryErrorType = "Invalid value"
+	QUERY_ERROR_INVALID_COLUMN     QueryErrorType = "Invalid Column Name"
+	QUERY_ERROR_EMPTY_WHERE_CLAUSE QueryErrorType = "Empty where clause"
+)
+
 func (q *Q) String() (string, error) {
 
 	var sb strings.Builder
@@ -282,7 +290,7 @@ func (q *Q) String() (string, error) {
 			val := fmt.Sprint(q.sets[colName])
 
 			if _, ok := q.columnTypes[colName]; !ok {
-				q.errorInvalidColumn("UPDATE()", string(colName))
+				q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "UPDATE...SET", string(colName))
 				val = "'" + val + "'"
 			} else {
 				if q.columnTypes[colName] == "%s" {
@@ -307,7 +315,7 @@ func (q *Q) String() (string, error) {
 			colName := q.setSorter[k]
 
 			if _, ok := q.columnTypes[colName]; !ok {
-				q.errorInvalidColumn("INSERT()", string(colName))
+				q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "INSERT...SET", string(colName))
 			}
 
 			val := fmt.Sprint(q.sets[colName])
@@ -325,19 +333,26 @@ func (q *Q) String() (string, error) {
 	}
 
 	if q.where != nil && q.queryType != QueryTypeInsert {
-		sb.WriteString(" WHERE ")
 		whereClause := q.printWhereClause(q.columnTypes, q.where.WhereParts)
-		if len(whereClause) == 0 {
-			fmt.Println(q.where.WhereParts, q.queryType)
-			q.error(fmt.Sprintf("EMPTY_WHERE_CLAUSE: `%s`", q.model.Table_Name()))
+		if len(whereClause) > 0 {
+			sb.WriteString(" WHERE ")
+			sb.WriteString(whereClause)
 		}
+		// fmt.Println(q.where.WhereParts, q.queryType)
+		// q.errorInvalidColumn(QUERY_ERROR_EMPTY_WHERE_CLAUSE, "WHERE", "")
+		// q.error(fmt.Sprintf("EMPTY_WHERE_CLAUSE: `%s`", q.model.Table_Name()))
 
-		sb.WriteString(whereClause)
 	}
 
 	if q.queryType == QueryTypeSelect && len(q.orderBy) > 0 {
 		orderBys := []string{}
 		for k := range q.orderBy {
+
+			// Validate the order by column
+			if _, ok := q.columnTypes[Column(q.orderBy[k][0])]; !ok {
+				q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "ORDER BY", q.orderBy[k][0])
+			}
+
 			orderBys = append(orderBys, q.col(q.orderBy[k][0])+" "+strings.ToUpper(q.orderBy[k][1]))
 		}
 		sb.WriteString(" ORDER BY " + strings.Join(orderBys, ","))
@@ -413,7 +428,7 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			}
 
 			if _, ok := columnTypes[Column(w.fieldName)]; !ok {
-				q.errorInvalidColumn("WHERE()", w.fieldName)
+				q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "WHERE...", w.fieldName)
 			}
 		}
 
@@ -454,13 +469,13 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 
 		case WhereTypeLike:
 			if column != "%s" {
-				q.errorInvalidValue("LIKE", column, w.values[0])
+				q.errorInvalidColumn(QUERY_ERROR_INVALID_VALUE, "WHERE...LIKE", "`"+column+"` value: "+fmt.Sprint(w.values[0]))
 			}
 			sb.WriteString(" LIKE ")
 
 		case WhereTypeNotLike:
 			if column != "%s" {
-				q.errorInvalidValue("NOT LIKE", column, w.values[0])
+				q.errorInvalidColumn(QUERY_ERROR_INVALID_VALUE, "WHERE...NOT LIKE", "`"+column+"` value: "+fmt.Sprint(w.values[0]))
 			}
 			sb.WriteString(" NOT LIKE ")
 		}
@@ -530,12 +545,8 @@ func (q *Q) error(err string) {
 	q.errors = append(q.errors, err)
 }
 
-func (q *Q) errorInvalidColumn(errType string, name string) {
-	q.error(fmt.Sprintf("%s: INVALID COLUMN: `%s`.`%s`", errType, q.model.Table_Name(), name))
-}
-
-func (q *Q) errorInvalidValue(errType, name string, value interface{}) {
-	q.error(fmt.Sprintf("%s: INVALID VALUE: `%s`.`%s` => %v", errType, q.model.Table_Name(), name, value))
+func (q *Q) errorInvalidColumn(errType QueryErrorType, queryErrorLocation, comment string) {
+	q.error(fmt.Sprintf("%s at %s in model `%s` -- %s", errType, queryErrorLocation, q.model.Table_Name(), comment))
 }
 
 type WhereType int

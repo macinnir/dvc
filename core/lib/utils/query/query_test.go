@@ -82,6 +82,17 @@ func TestQuerySelect(t *testing.T) {
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
 }
 
+func TestQuerySelect_InvalidOrderByColumn(t *testing.T) {
+
+	q, e := query.Select(&testassets.Comment{}).OrderBy("CommentID", query.OrderDirASC).String()
+	assert.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` ORDER BY `t`.`CommentID` ASC", q)
+
+	q, e = query.Select(&testassets.Comment{}).OrderBy("foo", query.OrderDirASC).String()
+	assert.Equal(t, "Invalid Column Name at ORDER BY in model `Comment` -- foo", e.Error())
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` ORDER BY `t`.`foo` ASC", q)
+}
+
 func TestQuerySelect_WhereIN(t *testing.T) {
 	sql, e := query.Select(&testassets.Comment{}).
 		Where(
@@ -108,7 +119,7 @@ func TestQuerySelect_InvalidFieldName(t *testing.T) {
 		).String()
 
 	require.NotNil(t, e)
-	assert.Equal(t, "WHERE(): INVALID COLUMN: `Comment`.`Foo`", e.Error())
+	assert.Equal(t, "Invalid Column Name at WHERE... in model `Comment` -- Foo", e.Error())
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Foo` = Bar", sql)
 
 }
@@ -151,10 +162,11 @@ func TestQuerySelect_EmptyWhereClause(t *testing.T) {
 
 	q := query.Select(&testassets.Comment{})
 	// TODO extra where clause
-	sql, e := q.Where().String()
-	require.NotNil(t, e)
-	assert.Equal(t, "EMPTY_WHERE_CLAUSE: `Comment`", e.Error())
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE ", sql)
+	wheres := []*query.WherePart{}
+	sql, e := q.Where(wheres...).String()
+	require.Nil(t, e)
+	// assert.Equal(t, "Empty where clause at WHERE in model `Comment` -- ", e.Error())
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t`", sql)
 
 	q = query.Select(&testassets.Comment{})
 	sql, e = q.Where(query.EQ("CommentID", 1)).String()
@@ -169,7 +181,7 @@ func TestQuerySelect_InvalidField(t *testing.T) {
 
 	assert.Equal(t, "SELECT `t`.`Foo` FROM `Comment` `t`", sql)
 	require.NotNil(t, e)
-	assert.Equal(t, "SELECT: INVALID COLUMN: `Comment`.`Foo`", e.Error())
+	assert.Equal(t, "Invalid Column Name at SELECT...Field in model `Comment` -- Foo", e.Error())
 }
 
 func TestWhereLike(t *testing.T) {
@@ -181,7 +193,7 @@ func TestWhereLike(t *testing.T) {
 func TestWhereLike_InvalidValue(t *testing.T) {
 	_, e := query.Select(&testassets.Comment{}).Where(query.Like("CommentID", "Foo%")).String()
 	require.NotNil(t, e)
-	assert.Equal(t, "LIKE: INVALID VALUE: `Comment`.`%d` => Foo%", e.Error())
+	assert.Equal(t, "Invalid value at WHERE...LIKE in model `Comment` -- `%d` value: Foo%", e.Error())
 }
 
 func TestWhereNotLike(t *testing.T) {
@@ -193,7 +205,7 @@ func TestWhereNotLike(t *testing.T) {
 func TestWhereNotLike_InvalidValue(t *testing.T) {
 	_, e := query.Select(&testassets.Comment{}).Where(query.NotLike("CommentID", "Foo%")).String()
 	require.NotNil(t, e)
-	assert.Equal(t, "NOT LIKE: INVALID VALUE: `Comment`.`%d` => Foo%", e.Error())
+	assert.Equal(t, "Invalid value at WHERE...NOT LIKE in model `Comment` -- `%d` value: Foo%", e.Error())
 }
 
 func TestUnion(t *testing.T) {
@@ -248,7 +260,7 @@ func TestInsert_InvalidFieldName(t *testing.T) {
 		Set("Foo", "Bar").String()
 
 	require.NotNil(t, e)
-	assert.Equal(t, "INSERT(): INVALID COLUMN: `Comment`.`Foo`", e.Error())
+	assert.Equal(t, "Invalid Column Name at INSERT...SET in model `Comment` -- Foo", e.Error())
 	assert.Equal(t, "INSERT INTO `Comment` ( `Foo` ) VALUES ( Bar )", sql)
 
 }
@@ -274,7 +286,7 @@ func TestSum_InvalidField(t *testing.T) {
 	_, e := query.Select(&testassets.Job{}).
 		Sum("Foo", "Foo").String()
 	require.NotNil(t, e)
-	assert.Equal(t, "Sum(): INVALID COLUMN: `Job`.`Foo`", e.Error())
+	assert.Equal(t, "Invalid Column Name at SELECT...Sum() in model `Job` -- Foo", e.Error())
 	// assert.Equal(t, "SELECT SUM(`t`.`Foo`) AS `Foo` FROM `Job` `t`", sql)
 }
 
