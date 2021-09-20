@@ -378,7 +378,8 @@ func genModelsMap() map[string]map[string]string {
 			continue
 		}
 
-		// fileNameNoExt := name[0 : len(name)-3]
+		modelName := name[0 : len(name)-3]
+		// fmt.Println("Model: ", fileNameNoExt)
 		fullPath := path.Join(modelsDir, name)
 		// fmt.Println(fullPath)
 
@@ -388,10 +389,10 @@ func genModelsMap() map[string]map[string]string {
 		}
 		k := 0
 
-		result[model.Name] = map[string]string{}
+		result[modelName] = map[string]string{}
 
 		for k < model.Fields.Len() {
-			result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
+			result[modelName][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
 			k++
 		}
 	}

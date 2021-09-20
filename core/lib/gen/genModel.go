@@ -153,15 +153,12 @@ func buildGoModel(packageName, p string, schemaName string, table *schema.Table)
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
-	fmt.Printf("Generating model for table %s\n", table.Name)
-
 	modelNode, e = buildModelNodeFromTable(packageName, table)
 	if e != nil {
 		fmt.Println("ERROR Building Model Node From Table ", table)
 		return
 	}
 
-	fmt.Println("GOT HERE")
 	outFile, e = buildFileFromModelNode(schemaName, table, modelNode)
 	if e != nil {
 		fmt.Println("ERROR Building File From Model Node ", table)

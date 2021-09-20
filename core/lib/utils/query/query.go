@@ -942,6 +942,11 @@ func PE() *WherePart {
 	)
 }
 
+// WhereAll adds a WHERE clause of `1=1` used for convenience
+// when conditionally adding WHERE clauses starting with a conjunction (AND/OR,etc)
+// separating them.
+// e.g. SELECT * FROM `Foo` WHERE 1=1
+//      SELECT * FROM `Foo` WHERE 1=1 AND FooID = 123;
 func WhereAll() *WherePart {
 	return newWherePart(
 		WhereTypeAll,

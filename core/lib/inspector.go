@@ -76,10 +76,10 @@ func ParseStruct2(filePath string) (*ParsedStruct, error) {
 
 							switch field.Type.(type) {
 							case *ast.ArrayType:
-								fmt.Println(structType.Fields)
+								// fmt.Println(structType.Fields)
 								at := field.Type.(*ast.ArrayType)
 								fieldType = "[]" + fmt.Sprint(at.Elt)
-								fmt.Println("ArrayType: ", at.Elt)
+								// fmt.Println("ArrayType: ", at.Elt)
 							case *ast.Ident:
 								i := field.Type.(*ast.Ident)
 								fieldType = i.Name

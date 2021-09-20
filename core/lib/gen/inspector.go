@@ -27,6 +27,20 @@ func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) 
 		return
 	}
 
+	// typeDecl := tree.Decls[0].(*ast.GenDecl)
+	// structDecl := typeDecl.Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
+	// fields := structDecl.Fields.List
+
+	// for k := range fields {
+	// 	typeExpr := fields[k].Type
+	// 	start := typeExpr.Pos() - 1
+	// 	end := typeExpr.End() - 1
+
+	// 	typeInSource := src[start:end]
+
+	// 	fmt.Println(typeInSource)
+	// }
+
 	ast.Inspect(tree, func(node ast.Node) bool {
 
 		// Check if this is a package
@@ -55,7 +69,10 @@ func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) 
 
 		// Declaration of our struct
 		if s, ok := node.(*ast.TypeSpec); ok {
-			modelNode.Name = s.Name.Name
+			if len(modelNode.Name) == 0 {
+				// fmt.Println("Type Name: ", s.Name.Name)
+				modelNode.Name = s.Name.Name
+			}
 		}
 
 		if s, ok := node.(*ast.StructType); !ok {
@@ -66,9 +83,15 @@ func buildGoStructFromFile(fileBytes []byte) (modelNode *lib.GoStruct, e error) 
 
 			for _, field := range s.Fields.List {
 
+				fieldName := field.Names[0].Name
+
+				if fieldName == "db" || fieldName == "isSingle" || fieldName == "q" {
+					continue
+				}
+
 				fieldType := src[field.Type.Pos()-1 : field.Type.End()-1]
 				nodeField := &lib.GoStructField{
-					Name:     field.Names[0].Name,
+					Name:     fieldName,
 					Tags:     []*lib.GoStructFieldTag{},
 					DataType: fieldType,
 					Comments: field.Comment.Text(),

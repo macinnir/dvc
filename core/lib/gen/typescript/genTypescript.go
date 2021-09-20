@@ -163,7 +163,7 @@ export type ` + ps.Name + ` = {
 	sort.Strings(columnNames)
 
 	for k := range columnNames {
-		fmt.Println(columnNames[k], " ==> ", ps.Fields[columnNames[k]])
+		// fmt.Println(columnNames[k], " ==> ", ps.Fields[columnNames[k]])
 		fieldType := schema.GoTypeToTypescriptString(ps.Fields[columnNames[k]])
 		// fmt.Println("FieldType: ", fieldType, ps.Fields[columnNames[k]])
 
