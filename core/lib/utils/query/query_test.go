@@ -614,3 +614,13 @@ func TestOrs(t *testing.T) {
 // 	assert.Nil(t, e)
 // 	assert.Equal(t, expected, q)
 // }
+
+func TestEscapeString(t *testing.T) {
+
+	result := query.EscapeString("I'm a string")
+	assert.Equal(t, `I\'m a string`, result)
+
+	result = query.EscapeString(`I"m a string`)
+	assert.Equal(t, `I\"m a string`, result)
+
+}
