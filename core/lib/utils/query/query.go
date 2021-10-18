@@ -294,7 +294,7 @@ func (q *Q) String() (string, error) {
 				val = "'" + val + "'"
 			} else {
 				if q.columnTypes[colName] == "%s" {
-					val = "'" + val + "'"
+					val = "'" + EscapeString(val) + "'"
 				}
 			}
 
@@ -321,7 +321,7 @@ func (q *Q) String() (string, error) {
 			val := fmt.Sprint(q.sets[colName])
 
 			if q.columnTypes[colName] == "%s" {
-				val = "'" + val + "'"
+				val = "'" + EscapeString(val) + "'"
 			}
 
 			cols = append(cols, q.col(string(colName)))
@@ -500,8 +500,9 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			case WhereTypeBetween:
 				list := []string{}
 				for l := range w.values {
+					// String
 					if column == "%s" {
-						list = append(list, "'"+fmt.Sprint(w.values[l])+"'")
+						list = append(list, "'"+EscapeString(fmt.Sprint(w.values[l]))+"'")
 					} else {
 						list = append(list, fmt.Sprint(w.values[l]))
 					}
@@ -510,8 +511,9 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			case WhereTypeIN, WhereTypeNotIN:
 				list := []string{}
 				for l := range w.values {
+					// String
 					if column == "%s" {
-						list = append(list, "'"+fmt.Sprint(w.values[l])+"'")
+						list = append(list, "'"+EscapeString(fmt.Sprint(w.values[l]))+"'")
 					} else {
 						list = append(list, fmt.Sprint(w.values[l]))
 					}
@@ -520,8 +522,9 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			case WhereTypeRaw:
 				sb.WriteString(fmt.Sprint(w.values[0]))
 			default:
+				// String
 				if column == "%s" {
-					sb.WriteString("'" + fmt.Sprint(w.values[0]) + "'")
+					sb.WriteString("'" + EscapeString(fmt.Sprint(w.values[0])) + "'")
 				} else {
 					sb.WriteString(fmt.Sprint(w.values[0]))
 				}

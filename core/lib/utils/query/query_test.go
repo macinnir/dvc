@@ -22,12 +22,12 @@ func TestQuerySelect(t *testing.T) {
 		Where(
 			query.GT("DateCreated", 2),
 			query.Or(),
-			query.EQ("Content", "foo"),
+			query.EQ("Content", "foo's"),
 			query.Or(),
 			query.EQ("Name", "bar"),
 		).String()
 	require.Nil(t, e)
-	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`DateCreated` > 2 OR `t`.`Content` = 'foo' OR `t`.`Name` = 'bar'", sql)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`DateCreated` > 2 OR `t`.`Content` = '"+`foo\'`+"s' OR `t`.`Name` = 'bar'", sql)
 
 	sql, e = query.Select(&testassets.Comment{}).
 		Where(
