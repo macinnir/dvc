@@ -626,6 +626,82 @@ func (ds *` + modelNode.Name + `DALSummer) Run() (float64, error) {
 	return sum, nil
 }
 
+// Minner
+type ` + modelNode.Name + `DALMinner struct {
+	db    db.IDB
+	q     *query.Q
+}
+
+func (r *` + modelNode.Name + `) Min(db db.IDB, col query.Column) *` + modelNode.Name + `DALMinner {
+	return &` + modelNode.Name + `DALMinner{
+		db:    db,
+		q:     query.Select(r).Sum(col, "c"),
+	}
+}
+
+func (ds *` + modelNode.Name + `DALMinner) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALMinner {
+	ds.q.Where(whereParts...)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALMinner) Run() (float64, error) {
+
+	sum := float64(0)
+	q, e := ds.q.String()
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.Query.String(): %w", e)
+	}
+
+	e = ds.db.Get(&sum, q)
+
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.Query(%s).Run(): %w", q, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DALMinner.Query(%s).Run()\n", q)
+
+	return sum, nil
+}
+
+// Maxer
+type ` + modelNode.Name + `DALMaxer struct {
+	db    db.IDB
+	q     *query.Q
+}
+
+func (r *` + modelNode.Name + `) Max(db db.IDB, col query.Column) *` + modelNode.Name + `DALMaxer {
+	return &` + modelNode.Name + `DALMaxer{
+		db:    db,
+		q:     query.Select(r).Sum(col, "c"),
+	}
+}
+
+func (ds *` + modelNode.Name + `DALMaxer) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALMaxer {
+	ds.q.Where(whereParts...)
+	return ds
+}
+
+func (ds *` + modelNode.Name + `DALMaxer) Run() (float64, error) {
+
+	sum := float64(0)
+	q, e := ds.q.String()
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.Query.String(): %w", e)
+	}
+
+	e = ds.db.Get(&sum, q)
+
+	if e != nil {
+		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.Query(%s).Run(): %w", q, e)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DALMaxer.Query(%s).Run()\n", q)
+
+	return sum, nil
+}
+
+
+
 type ` + modelNode.Name + `DALGetter struct {
 	db    	 db.IDB
 	q     	 *query.Q
