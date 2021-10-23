@@ -689,7 +689,8 @@ func GTOE(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// Mod MOD(`t`.`Field`, value) = remainder
+// Mod is applies modulo operation on column and value testing if it equals remainder
+// 	MOD(`t`.`Field`, value) = remainder
 func Mod(fieldName Column, value, remainder int64) *WherePart {
 	return newWherePart(
 		WhereTypeMod,
