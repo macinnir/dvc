@@ -624,3 +624,8 @@ func TestEscapeString(t *testing.T) {
 	assert.Equal(t, `I\"m a string`, result)
 
 }
+
+func ExampleMod() {
+	query.Mod("foo", 2, 1)
+	// Output: MOD(`t`.`foo`, 2) = 1
+}
