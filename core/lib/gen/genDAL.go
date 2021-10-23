@@ -391,6 +391,14 @@ func (r *{{.Table.Name}}DAL) Sum(shard int64, col query.Column) *models.{{.Table
 	return (&models.{{.Table.Name}}{}).Sum(r.db[shard], col)
 }
 
+func (r *{{.Table.Name}}DAL) Min(shard int64, col query.Column) *models.{{.Table.Name}}DALMinner { 
+	return (&models.{{.Table.Name}}{}).Min(r.db[shard], col)
+}
+
+func (r *{{.Table.Name}}DAL) Max(shard int64, col query.Column) *models.{{.Table.Name}}DALMaxer { 
+	return (&models.{{.Table.Name}}{}).Max(r.db[shard], col)
+}
+
 func (r *{{.Table.Name}}DAL) Get(shard int64) *models.{{.Table.Name}}DALGetter { 
 	return (&models.{{.Table.Name}}{}).Get(r.db[shard])
 }
