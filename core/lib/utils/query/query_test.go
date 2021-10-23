@@ -625,6 +625,20 @@ func TestEscapeString(t *testing.T) {
 
 }
 
+func TestMin(t *testing.T) {
+	q1, e1 := query.Select(&testassets.FiscalYear{}).Min(testassets.FiscalYear_Column_Year, "MinYear").Where(query.EQ(testassets.FiscalYear_Column_IsDeleted, 0)).String()
+
+	assert.Nil(t, e1)
+	assert.Equal(t, "SELECT COALESCE(MIN(`t`.`Year`), 0) AS `MinYear` FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0", q1)
+}
+
+func TestMax(t *testing.T) {
+	q1, e1 := query.Select(&testassets.FiscalYear{}).Max(testassets.FiscalYear_Column_Year, "MaxYear").Where(query.EQ(testassets.FiscalYear_Column_IsDeleted, 0)).String()
+
+	assert.Nil(t, e1)
+	assert.Equal(t, "SELECT COALESCE(MAX(`t`.`Year`), 0) AS `MaxYear` FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0", q1)
+}
+
 func ExampleMod() {
 	query.Mod("foo", 2, 1)
 	// Output: MOD(`t`.`foo`, 2) = 1

@@ -163,6 +163,9 @@ func (q *Q) Count(name Column, as string) *Q {
 	return q.FieldRaw("COUNT(`"+q.alias+"`.`"+string(name)+"`)", as)
 }
 
+// Sum creates a sum statement
+// 	q.Sum(query.Column("Foo"), "FooSummed")
+//	COALESCE(SUM(`t`.`Foo`), 0) AS `FooSummed`
 func (q *Q) Sum(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
@@ -173,7 +176,51 @@ func (q *Q) Sum(name Column, as string) *Q {
 	return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
 }
 
-// Where().Equals("a", "b")
+// Min creates a min statement
+// 	q.Min(query.Column("Foo"), "MinFoo")
+//	COALESCE(MIN(`t`.`Foo`), 0) AS `MinFoo`
+func (q *Q) Min(name Column, as string) *Q {
+
+	if _, ok := q.columnTypes[name]; !ok {
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Min()", string(name))
+		return q
+	}
+
+	return q.FieldRaw("COALESCE(MIN(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
+}
+
+// Max creates a max statement
+// 	q.Max(query.Column("Foo"), "MaxFoo")
+//	COALESCE(MAX(`t`.`Foo`), 0) AS `MaxFoo`
+func (q *Q) Max(name Column, as string) *Q {
+
+	if _, ok := q.columnTypes[name]; !ok {
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Max()", string(name))
+		return q
+	}
+
+	return q.FieldRaw("COALESCE(MAX(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
+}
+
+// Where creates or adds to an existing where clause
+//
+// 	- Simple
+// 	q.Where(query.EQ(query.Column("A"), "B"))
+// 	WHERE `t`.`B` = `t`.`B`
+//
+//	- Multiple Arguments
+// 	q.Where(query.EQ(query.Column("A"), "B"), query.And(), query.EQ(query.Column("C"), "D"))
+//	WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
+//
+//	- Daisy Chain
+// 	q.Where(query.EQ(query.Column("A"), "B")).Where(query.And()).Where(query.EQ(query.Column("C"), "D"))
+//	WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
+//
+//	- Separate lines
+// 	q.Where(query.EQ(query.Column("A"), "B"))
+// 	q.Where(query.And())
+// 	q.Where(query.EQ(query.Column("C"), "D"))
+//	WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
 func (q *Q) Where(args ...*WherePart) *Q {
 	// allow for multiple where calls in single query
 	if q.where == nil {
@@ -637,6 +684,16 @@ func EQ(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
+// EQF allows for one column to be equal to another
+// Example for a subselect
+//
+// query.Select(&models.UserGroupUser{}).Alias("ugu").FieldRaw("1", "n").Where(
+// 	query.EQF("UserID", "`u`.`UserID`"),
+// 	query.And(),
+// 	query.EQ("UserGroupID", groupID),
+// 	query.And(),
+// 	query.EQ("IsDeleted", 0),
+// ),
 func EQF(fieldName1, fieldName2 string) *WherePart {
 	return newWherePart(
 		WhereTypeEqualsField,
@@ -645,6 +702,7 @@ func EQF(fieldName1, fieldName2 string) *WherePart {
 	)
 }
 
+// NE is a not equals statement between a table column and a value
 func NE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeNotEquals,
@@ -653,7 +711,7 @@ func NE(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// Less Than
+// LT is a less than statement between a table column and a value
 func LT(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeLessThan,
@@ -662,7 +720,7 @@ func LT(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// Greater Than
+// GT is a greater than statement between a table column and a value
 func GT(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeGreaterThan,
@@ -671,7 +729,7 @@ func GT(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// Less Than Or Equal
+// LTE is a less than or equals (<=) statement between a table column and a value
 func LTOE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeLessThanOrEqualTo,
@@ -680,7 +738,7 @@ func LTOE(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// Greater Than Or Equal
+// LT is a greater than or equals statement (>=) between a table column and a value
 func GTOE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeGreaterThanOrEqualTo,
@@ -700,6 +758,7 @@ func Mod(fieldName Column, value, remainder int64) *WherePart {
 }
 
 // Modf MOD(value, `t`.`Field`) = remainder
+// Example: query.Mod("foo", 2, 1) -> `t`.`Foo` % 2 = 1
 func Modf(value int64, fieldName Column, remainder int64) *WherePart {
 	return newWherePart(
 		WhereTypeModF,
@@ -709,6 +768,7 @@ func Modf(value int64, fieldName Column, remainder int64) *WherePart {
 }
 
 // BitAnd `t`.`Field` & a = b
+// Example: query.BitAnd("foo", 2, 1) -> `t`.`Foo` & 2 = 1
 func BitAnd(fieldName Column, a, b int64) *WherePart {
 	return newWherePart(
 		WhereTypeBitAnd,
@@ -718,6 +778,7 @@ func BitAnd(fieldName Column, a, b int64) *WherePart {
 }
 
 // IN is an IN clause
+// Example: query.IN("col1", "foo", "bar", "baz")
 func IN(fieldName Column, values ...interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeIN,
@@ -726,7 +787,7 @@ func IN(fieldName Column, values ...interface{}) *WherePart {
 	)
 }
 
-// IN is an NOT IN clause
+// NOTIN is an NOT IN clause
 // Example: query.NOTIN("col1", "foo", "bar", "baz")
 // Example: queyr.NOTIN("col2", 1, 2, 3)
 func NOTIN(fieldName Column, values ...interface{}) *WherePart {
@@ -771,6 +832,8 @@ func INInt64(fieldName Column, values []int64) *WherePart {
 	return IN(fieldName, interfaces...)
 }
 
+// Between is a BETWEEN statement
+// Example: Between("")
 func Between(fieldName Column, from, to interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeBetween,
