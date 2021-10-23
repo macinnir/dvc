@@ -504,6 +504,16 @@ func (r *` + modelNode.Name + `DALSelector) Count(fieldName query.Column, fieldA
 	return r
 }
 
+func (r *` + modelNode.Name + `DALSelector) Min(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+	r.q.Min(fieldName, fieldAlias)
+	return r
+}
+
+func (r *` + modelNode.Name + `DALSelector) Max(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+	r.q.Max(fieldName, fieldAlias)
+	return r
+}
+
 func (r *` + modelNode.Name + `DALSelector) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALSelector {
 	r.q.Where(whereParts...)
 	return r
