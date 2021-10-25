@@ -635,7 +635,7 @@ type ` + modelNode.Name + `DALMinner struct {
 func (r *` + modelNode.Name + `) Min(db db.IDB, col query.Column) *` + modelNode.Name + `DALMinner {
 	return &` + modelNode.Name + `DALMinner{
 		db:    db,
-		q:     query.Select(r).Sum(col, "c"),
+		q:     query.Select(r).Min(col, "c"),
 	}
 }
 
@@ -672,7 +672,7 @@ type ` + modelNode.Name + `DALMaxer struct {
 func (r *` + modelNode.Name + `) Max(db db.IDB, col query.Column) *` + modelNode.Name + `DALMaxer {
 	return &` + modelNode.Name + `DALMaxer{
 		db:    db,
-		q:     query.Select(r).Sum(col, "c"),
+		q:     query.Select(r).Max(col, "c"),
 	}
 }
 
