@@ -646,13 +646,13 @@ func (ds *` + modelNode.Name + `DALMinner) Where(whereParts ...*query.WherePart)
 
 func (ds *` + modelNode.Name + `DALMinner) Run() (float64, error) {
 
-	sum := float64(0)
+	min := float64(0)
 	q, e := ds.q.String()
 	if e != nil {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&sum, q)
+	e = ds.db.Get(&min, q)
 
 	if e != nil {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.Query(%s).Run(): %w", q, e)
@@ -660,7 +660,7 @@ func (ds *` + modelNode.Name + `DALMinner) Run() (float64, error) {
 
 	fmt.Printf("` + modelNode.Name + `DALMinner.Query(%s).Run()\n", q)
 
-	return sum, nil
+	return min, nil
 }
 
 // Maxer
@@ -683,13 +683,13 @@ func (ds *` + modelNode.Name + `DALMaxer) Where(whereParts ...*query.WherePart) 
 
 func (ds *` + modelNode.Name + `DALMaxer) Run() (float64, error) {
 
-	sum := float64(0)
+	max := float64(0)
 	q, e := ds.q.String()
 	if e != nil {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&sum, q)
+	e = ds.db.Get(&max, q)
 
 	if e != nil {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.Query(%s).Run(): %w", q, e)
@@ -697,7 +697,7 @@ func (ds *` + modelNode.Name + `DALMaxer) Run() (float64, error) {
 
 	fmt.Printf("` + modelNode.Name + `DALMaxer.Query(%s).Run()\n", q)
 
-	return sum, nil
+	return max, nil
 }
 
 
