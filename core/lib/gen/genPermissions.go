@@ -3,6 +3,7 @@ package gen
 import (
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -12,14 +13,16 @@ import (
 	"github.com/macinnir/dvc/core/lib/fetcher"
 )
 
-func fetchAllPermissions(controllersDir string) (map[string]string, error) {
+func fetchAllPermissionsFromControllers(controllersDir string) (map[string]string, error) {
 
 	cf := fetcher.NewControllerFetcher()
-	permissionMap := LoadPermissionsFromJSON()
 	controllers, _, e := cf.FetchAll()
+
 	if e != nil {
 		return nil, e
 	}
+
+	permissionMap := LoadPermissionsFromJSON()
 
 	for k := range controllers {
 
@@ -37,12 +40,27 @@ func fetchAllPermissions(controllersDir string) (map[string]string, error) {
 
 // LoadPermissionsFromJSON loads a set of permissions from a JSON file
 func LoadPermissionsFromJSON() map[string]string {
+
 	permissionMap := map[string]string{}
-	fileBytes, e := ioutil.ReadFile(lib.PermissionsFile)
-	if e != nil {
-		panic(e)
+	var fileBytes []byte
+
+	// Core permissions
+	if _, e := os.Stat(lib.CorePermissionsFile); !os.IsNotExist(e) {
+		fileBytes, _ = ioutil.ReadFile(lib.CorePermissionsFile)
+		json.Unmarshal(fileBytes, &permissionMap)
 	}
-	json.Unmarshal(fileBytes, &permissionMap)
+
+	// User permissions
+	if _, e := os.Stat(lib.PermissionsFile); !os.IsNotExist(e) {
+		fileBytes, _ = ioutil.ReadFile(lib.PermissionsFile)
+		userPermissions := map[string]string{}
+		json.Unmarshal(fileBytes, &userPermissions)
+
+		for k := range userPermissions {
+			permissionMap[k] = userPermissions[k]
+		}
+	}
+
 	return permissionMap
 }
 
@@ -51,7 +69,7 @@ func GenTSPerms(config *lib.Config) (e error) {
 	lib.EnsureDir(config.TypescriptPermissionsPath)
 
 	var permissionMap map[string]string
-	permissionMap, e = fetchAllPermissions(config.Dirs.Controllers)
+	permissionMap, e = fetchAllPermissionsFromControllers(config.Dirs.Controllers)
 	if e != nil {
 		return
 	}
@@ -63,7 +81,7 @@ func GenTSPerms(config *lib.Config) (e error) {
 func GenGoPerms(config *lib.Config) (e error) {
 
 	var permissionMap map[string]string
-	permissionMap, e = fetchAllPermissions(config.Dirs.Controllers)
+	permissionMap, e = fetchAllPermissionsFromControllers(config.Dirs.Controllers)
 	if e != nil {
 		return
 	}

@@ -1,0 +1,8 @@
+☐ routes.json needs to include appdtos
+☐ routes.json needs to include app aggregates
+☐ routes.json needs to include app constants (not sure if this is an issue)
+
+# Future 
+☐ Generate API tests based on routes.json 
+☐ Generate nested DTOs and Aggregates in Typescript 
+☐ Core tables in dvci (e.g. core/schemas.json) merged with .dvc/schemas.json 

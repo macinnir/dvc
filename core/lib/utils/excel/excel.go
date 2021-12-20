@@ -15,6 +15,15 @@ func BuildExcelHeaders(sheet *xlsx.Sheet, headers []string) {
 	}
 }
 
+// func doBold(cell *xlsx.Cell) {
+// 	headerFont := xlsx.NewFont(12, "Verdana")
+// 	headerFont.Bold = true
+// 	headerFont.Underline = true
+// 	headerStyle := xlsx.NewStyle()
+// 	headerStyle.Font = *headerFont
+// 	cell.SetStyle(headerStyle)
+// }
+
 func AddCellString(row *xlsx.Row, value string) {
 	cell := row.AddCell()
 	cell.Value = value

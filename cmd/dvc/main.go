@@ -15,7 +15,7 @@ func main() {
 
 	cmd := &commands.Cmd{}
 
-	if len(os.Args) > 1 && os.Args[1] == "version" {
+	if len(os.Args) > 1 && os.Args[1] == "-v" {
 		fmt.Println(Version)
 		os.Exit(0)
 	}

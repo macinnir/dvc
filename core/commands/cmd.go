@@ -25,6 +25,7 @@ import (
 	"github.com/macinnir/dvc/core/commands/selectcmd"
 	"github.com/macinnir/dvc/core/commands/test"
 	"github.com/macinnir/dvc/core/commands/transfer"
+	"github.com/macinnir/dvc/core/commands/version"
 
 	"github.com/macinnir/dvc/core/lib"
 )
@@ -63,6 +64,7 @@ func makeCommands() {
 		transfer.CommandName:    transfer.Cmd,
 		schemas.CommandName:     schemas.Cmd,
 		connections.CommandName: connections.Cmd,
+		version.CommandName:     version.Cmd,
 	}
 }
 
@@ -86,6 +88,15 @@ func makeHelp() {
 		transfer.CommandName:    transfer.Help,
 		schemas.CommandName:     schemas.Help,
 		connections.CommandName: connections.Help,
+	}
+}
+
+func noConfigCommands(cmd string) bool {
+	switch cmd {
+	case version.CommandName:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -114,20 +125,20 @@ func (c *Cmd) Run(args []string) error {
 		return e
 	}
 
-	// Config
-	var config *lib.Config
-	config, e = lib.LoadConfig()
-	logger.Info("Loading config!")
-	if e != nil {
-		return e
-	}
-
 	// TODO flags
 	// Remove initial file path
 	args = args[1:]
 
 	if len(args) == 0 {
 		return ErrNoCommandSpecified
+	}
+
+	// Config
+	var config *lib.Config
+	config, e = lib.LoadConfig()
+	logger.Info("Loading config!")
+	if e != nil {
+		return e
 	}
 
 	command := args[0]

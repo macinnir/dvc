@@ -4,6 +4,7 @@ const (
 	DefaultShard        = 0
 	MetaDirectory       = ".dvc"
 	PermissionsFile     = ".dvc/permissions.json"
+	CorePermissionsFile = "core/permissions.json"
 	ConfigFilePath      = ".dvc/config.json"
 	SchemasFilePath     = ".dvc/schemas.json"
 	CoreSchemasFilePath = "core/schemas.json"
