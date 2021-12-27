@@ -10,7 +10,6 @@ import (
 
 const (
 	SchemaTypeMySQL      = "mysql"
-	SchemaTypeSQLite     = "sqlite"
 	SchemaTypePostgreSQL = "postgresql"
 	SchemaTypeSQLServer  = "sqlserver"
 )

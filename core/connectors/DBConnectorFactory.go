@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/macinnir/dvc/core/connectors/mysql"
-	"github.com/macinnir/dvc/core/connectors/sqlite"
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
@@ -15,8 +14,6 @@ func DBConnectorFactory(config *lib.ConfigDatabase) (connector IConnector, e err
 	switch config.Type {
 	case schema.SchemaTypeMySQL:
 		connector = mysql.NewMySQL(config)
-	case schema.SchemaTypeSQLite:
-		connector = sqlite.NewSqlite(config)
 	default:
 		e = errors.New("invalid database type")
 	}

@@ -29,11 +29,15 @@ func TestVersioner(t *testing.T) {
 		{input: "v1.2.3", versionType: "invalid type", e: errors.New("invalid version type"), output: ""},
 		{input: "v1.2.3-RC1", versionType: "rc", e: nil, output: "v1.2.3-RC2"},
 		{input: "1.2.3-RC1", versionType: "rc", e: nil, output: "1.2.3-RC2"},
+		{input: "1.2.3-rc1", versionType: "rc", e: nil, output: "1.2.3-RC2"},
 		{input: "1.2.3-RC2", versionType: "release", e: nil, output: "1.2.3"},
+		{input: "1.2.3-RC2", versionType: "", e: nil, output: "1.2.3-RC3"},
+		{input: "0.4.0-RC2-1-gfd4c000", versionType: "patch", e: nil, output: "0.4.0-RC3"},
 		{input: "v1.2.3", versionType: "rc", e: nil, output: "v1.3.0-RC1"},
 		{input: "1.2.3", versionType: "rc", e: nil, output: "1.3.0-RC1"},
 		{input: "1.2", versionType: "", e: errors.New("invalid format"), output: ""},
 		{input: "1234.1234.1234", versionType: "", e: nil, output: "1234.1234.1235"},
+		{input: "v1.8.58-5-g98e9b2b", versionType: "", e: nil, output: "v1.8.59"},
 	}
 
 	for k := range tests {

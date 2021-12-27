@@ -55,12 +55,29 @@ func NextVersion(inputVersion string, inputVersionType string) (string, error) {
 		inputVersion = inputVersion[1:]
 	}
 
+	inputVersion = strings.ToLower(inputVersion)
+
 	rcString := ""
-	if strings.Contains(inputVersion, "-RC") {
+	var rc int64 = 0
+	if strings.Contains(inputVersion, "-rc") {
 		// Grab the suffix
-		rcString = inputVersion[strings.Index(inputVersion, "-RC")+3:]
+		rcString = inputVersion[strings.Index(inputVersion, "-rc")+3:]
+
+		if strings.Contains(rcString, "-") {
+			parts := strings.Split(rcString, "-")
+			rcString = parts[0]
+		}
+
+		rc, _ = strconv.ParseInt(rcString, 10, 64)
+
 		// Remove the suffix
-		inputVersion = inputVersion[0:strings.Index(inputVersion, "-RC")]
+		inputVersion = inputVersion[0:strings.Index(inputVersion, "-rc")]
+	}
+
+	// Could be something like v1.8.58-5-g98e9b2b
+	if strings.Contains(inputVersion, "-") {
+		parts := strings.Split(inputVersion, "-")
+		inputVersion = parts[0]
 	}
 
 	r := regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -75,10 +92,12 @@ func NextVersion(inputVersion string, inputVersionType string) (string, error) {
 	minor, _ := strconv.ParseInt(parts[1], 10, 64)
 	patch, _ := strconv.ParseInt(parts[2], 10, 64)
 
-	var rc int64 = 0
-	if len(rcString) > 0 {
-		rc, _ = strconv.ParseInt(rcString, 10, 64)
+	// If an RC is found in the version, and this is not a release, iterate the RC
+	if rc > 0 && versionType != VersionTypeRelease {
+		versionType = VersionTypeRC
 	}
+
+	// fmt.Println("VersionType: ", versionType, "RC:", rc)
 
 	suffix := ""
 

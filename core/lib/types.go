@@ -6,8 +6,6 @@ type DatabaseType string
 const (
 	// DatabaseTypeMysql is the MySQL flavor of database
 	DatabaseTypeMysql DatabaseType = "mysql"
-	// DatabaseTypeSqlite is the Sqlite flavor of database
-	DatabaseTypeSqlite DatabaseType = "sqlite"
 )
 
 // Options are the available runtime flags
