@@ -55,13 +55,16 @@ func NextVersion(inputVersion string, inputVersionType string) (string, error) {
 		inputVersion = inputVersion[1:]
 	}
 
+	// normalize casing
 	inputVersion = strings.ToLower(inputVersion)
 
 	rcString := ""
 	var rc int64 = 0
-	if strings.Contains(inputVersion, "-rc") {
+
+	// v1.8.5-rc.1
+	if strings.Contains(inputVersion, "-rc.") {
 		// Grab the suffix
-		rcString = inputVersion[strings.Index(inputVersion, "-rc")+3:]
+		rcString = inputVersion[strings.Index(inputVersion, "-rc.")+4:]
 
 		if strings.Contains(rcString, "-") {
 			parts := strings.Split(rcString, "-")
@@ -71,7 +74,7 @@ func NextVersion(inputVersion string, inputVersionType string) (string, error) {
 		rc, _ = strconv.ParseInt(rcString, 10, 64)
 
 		// Remove the suffix
-		inputVersion = inputVersion[0:strings.Index(inputVersion, "-rc")]
+		inputVersion = inputVersion[0:strings.Index(inputVersion, "-rc.")]
 	}
 
 	// Could be something like v1.8.58-5-g98e9b2b
@@ -118,7 +121,7 @@ func NextVersion(inputVersion string, inputVersionType string) (string, error) {
 			patch = 0
 		}
 		rc++
-		suffix = fmt.Sprintf("-RC%d", rc)
+		suffix = fmt.Sprintf("-rc.%d", rc)
 	case VersionTypeRelease:
 		// All this does is remove the "RC"
 	}
