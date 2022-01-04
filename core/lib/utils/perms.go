@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"strings"
+
 	"github.com/macinnir/dvc/core/lib/utils/request"
 	"github.com/macinnir/dvc/core/lib/utils/types"
 )
@@ -12,7 +14,16 @@ const (
 	SuperUserID              = int64(1)
 	RequestPathUserIDArgName = "userID"
 	AsOwnerSuffix            = "AsOwner"
+	FeaturePermSeparator     = "_"
 )
+
+// ExtractPermParts extracts the parts of a permission into a featureName and a permissionName
+func ExtractFeatureFromPerm(perm Permission) string {
+	return string(perm)[0:strings.Index(string(perm), "_")]
+	// permString := string(perm)
+	// parts := strings.Split(permString, FeaturePermSeparator)
+	// return parts[0], parts[1]
+}
 
 func HasPerm(req *request.Request, user types.IUserContainer, perm Permission) bool {
 
@@ -21,16 +32,33 @@ func HasPerm(req *request.Request, user types.IUserContainer, perm Permission) b
 		return true
 	}
 
+	// Must be activated, not disabled and not locked
 	if !user.Activated() || user.Disabled() || user.Locked() {
 		return false
 	}
 
 	hasPerm := false
 
-	permissions := user.Permissions()
-	for k := range permissions {
-		if permissions[k] == string(perm) {
+	// Features
+	featureName := ExtractFeatureFromPerm(perm)
+
+	// Loop through user permissions
+	userPermissions := user.Permissions()
+	for k := range userPermissions {
+
+		// Exact match
+		if userPermissions[k] == string(perm) {
 			hasPerm = true
+			break
+		}
+
+		if userPermissions[k][len(userPermissions[k])-2:] == "_*" {
+			// if strings.Contains(userPermissions[k], "_*") {
+			userFeature := ExtractFeatureFromPerm(Permission(userPermissions[k]))
+			if userFeature == featureName {
+				hasPerm = true
+				break
+			}
 		}
 	}
 

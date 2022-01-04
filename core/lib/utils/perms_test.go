@@ -1,8 +1,9 @@
-package utils
+package utils_test
 
 import (
 	"testing"
 
+	"github.com/macinnir/dvc/core/lib/utils"
 	"github.com/macinnir/dvc/core/lib/utils/request"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,6 +14,7 @@ type testUser struct {
 	disabled    bool
 	locked      bool
 	permissions []string
+	account     int64
 }
 
 func (tu *testUser) ID() int64 {
@@ -35,12 +37,16 @@ func (tu *testUser) Permissions() []string {
 	return tu.permissions
 }
 
+func (tu *testUser) Account() int64 {
+	return tu.account
+}
+
 func TestHasPerm(t *testing.T) {
 	req := &request.Request{
 		Method: "GET",
 		Path:   "/foo/2/bar",
 		Headers: map[string]string{
-			RequestPathUserIDArgName: "1",
+			utils.RequestPathUserIDArgName: "1",
 		},
 		Params:     map[string]string{},
 		Body:       "",
@@ -52,10 +58,39 @@ func TestHasPerm(t *testing.T) {
 		activated:   true,
 		disabled:    false,
 		locked:      false,
-		permissions: []string{"somePermission"},
+		permissions: []string{"someFeature_somePermission"},
 	}
 
-	assert.True(t, HasPerm(req, tu, "somePermission"))
+	assert.True(t, utils.HasPerm(req, tu, "someFeature_somePermission"))
+}
+
+func TestHasPermAsSuperuser(t *testing.T) {
+
+	req := &request.Request{
+		Method: "GET",
+		Path:   "/some/feature",
+	}
+
+	tu := &testUser{
+		id:        utils.SuperUserID,
+		activated: true,
+	}
+
+	assert.True(t, utils.HasPerm(req, tu, "someFeature_somePermission"), "Super user requires no permissions")
+}
+
+func TestHasPermByFeature(t *testing.T) {
+	req := &request.Request{
+		Method: "GET",
+		Path:   "/some/feature",
+	}
+
+	tu := &testUser{
+		activated:   true,
+		permissions: []string{"someFeature_*"},
+	}
+
+	assert.True(t, utils.HasPerm(req, tu, "someFeature_somePermission"))
 }
 
 func TestHasPermAsOwner(t *testing.T) {
@@ -64,7 +99,7 @@ func TestHasPermAsOwner(t *testing.T) {
 		Path:    "/foo/2/bar",
 		Headers: map[string]string{},
 		Params: map[string]string{
-			RequestPathUserIDArgName: "2",
+			utils.RequestPathUserIDArgName: "2",
 		},
 		UserID:     2,
 		Body:       "",
@@ -76,10 +111,10 @@ func TestHasPermAsOwner(t *testing.T) {
 		activated:   true,
 		disabled:    false,
 		locked:      false,
-		permissions: []string{"somePermissionAsOwner"},
+		permissions: []string{"someFeature_somePermissionAsOwner"},
 	}
 
-	assert.True(t, HasPerm(req, tu, "somePermissionAsOwner"))
+	assert.True(t, utils.HasPerm(req, tu, "someFeature_somePermissionAsOwner"))
 }
 
 func TestHasPermAsNotOwner(t *testing.T) {
@@ -88,7 +123,7 @@ func TestHasPermAsNotOwner(t *testing.T) {
 		Path:    "/foo/3/bar",
 		Headers: map[string]string{},
 		Params: map[string]string{
-			RequestPathUserIDArgName: "3",
+			utils.RequestPathUserIDArgName: "3",
 		},
 		UserID:     2,
 		Body:       "",
@@ -100,10 +135,10 @@ func TestHasPermAsNotOwner(t *testing.T) {
 		activated:   true,
 		disabled:    false,
 		locked:      false,
-		permissions: []string{"somePermissionAsOwner"},
+		permissions: []string{"someFeature_somePermissionAsOwner"},
 	}
 
-	assert.False(t, HasPerm(req, tu, "somePermissionAsOwner"))
+	assert.False(t, utils.HasPerm(req, tu, "someFeature_somePermissionAsOwner"))
 }
 
 // 11.9 ns/op 0 B/op 0 allocs/op
@@ -112,7 +147,7 @@ func BenchmarkHasPerm(b *testing.B) {
 		Method: "GET",
 		Path:   "/foo/2/bar",
 		Headers: map[string]string{
-			RequestPathUserIDArgName: "1",
+			utils.RequestPathUserIDArgName: "1",
 		},
 		Params:     map[string]string{},
 		Body:       "",
@@ -124,12 +159,12 @@ func BenchmarkHasPerm(b *testing.B) {
 		activated:   true,
 		disabled:    false,
 		locked:      false,
-		permissions: []string{"somePermission"},
+		permissions: []string{"someFeature_somePermission"},
 	}
 
 	for n := 0; n < b.N; n++ {
 		// fmt.Println("running", n)
-		HasPerm(req, tu, "somePermission")
+		utils.HasPerm(req, tu, "someFeature_somePermission")
 	}
 }
 
@@ -140,7 +175,7 @@ func BenchmarkHasPermAsOwner(b *testing.B) {
 		Path:    "/foo/2/bar",
 		Headers: map[string]string{},
 		Params: map[string]string{
-			RequestPathUserIDArgName: "2",
+			utils.RequestPathUserIDArgName: "2",
 		},
 		UserID:     2,
 		Body:       "",
@@ -152,15 +187,17 @@ func BenchmarkHasPermAsOwner(b *testing.B) {
 		activated:   true,
 		disabled:    false,
 		locked:      false,
-		permissions: []string{"somePermissionAsOwner"},
+		permissions: []string{"someFeature_somePermissionAsOwner"},
 	}
 
 	for n := 0; n < b.N; n++ {
-		HasPerm(req, tu, "somePermissionAsOwner")
+		utils.HasPerm(req, tu, "someFeature_somePermissionAsOwner")
 	}
 }
 
 // 31.3 ns/op 0 B/op 0 allocs/op
+// 108  ns/op 1 B/op 1 allocs/op
+// 38.2 ns/op 0 B/op 0 allocs/op -- Remove strings.Split
 // go test -benchmem -run=^$ -bench ^(BenchmarkHasPermAsNotOwner)$ github.com/macinnir/dvc/core/lib/utils -v
 func BenchmarkHasPermAsNotOwner(b *testing.B) {
 	req := &request.Request{
@@ -168,7 +205,7 @@ func BenchmarkHasPermAsNotOwner(b *testing.B) {
 		Path:    "/foo/3/bar",
 		Headers: map[string]string{},
 		Params: map[string]string{
-			RequestPathUserIDArgName: "3",
+			utils.RequestPathUserIDArgName: "3",
 		},
 		UserID:     2,
 		Body:       "",
@@ -180,11 +217,11 @@ func BenchmarkHasPermAsNotOwner(b *testing.B) {
 		activated:   true,
 		disabled:    false,
 		locked:      false,
-		permissions: []string{"somePermissionAsOwner"},
+		permissions: []string{"someFeature_somePermissionAsOwner"},
 	}
 
 	for n := 0; n < b.N; n++ {
-		HasPerm(req, tu, "somePermissionAsOwner")
+		utils.HasPerm(req, tu, "someFeature_somePermissionAsOwner")
 	}
 
 }
