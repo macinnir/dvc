@@ -227,6 +227,9 @@ func buildFileFromModelNode(schemaName string, table *schema.Table, modelNode *l
 		b.WriteString(modelNode.Imports.ToString() + "\n")
 	}
 
+	hasAccountID := false
+	hasUserID := false
+
 	b.WriteString(`
 const (
 
@@ -240,6 +243,12 @@ const (
 `)
 	for _, f := range *modelNode.Fields {
 		b.WriteString("\t" + modelNode.Name + "_Column_" + f.Name + " query.Column = \"" + f.Name + "\"\n")
+		if f.Name == "AccountID" {
+			hasAccountID = true
+		}
+		if f.Name == "UserID" {
+			hasUserID = true
+		}
 	}
 
 	b.WriteString(`
@@ -309,6 +318,24 @@ var (
 	}
 	b.WriteString("}\n")
 
+	if hasAccountID {
+		b.WriteString(
+			`
+// Account satisifies the IAccountable interface
+func (c *` + modelNode.Name + `) Account() int64 { 
+	return c.AccountID
+}
+`)
+	}
+	if hasUserID {
+		b.WriteString(
+			`
+// User satisifies the IUserable interface
+func (c *` + modelNode.Name + `) User() int64 { 
+	return c.UserID
+}
+`)
+	}
 	b.WriteString(`
 
 // ` + modelNode.Name + `_TableName is the name of the table
