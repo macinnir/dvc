@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"sort"
+	"strings"
 )
 
 const (
@@ -115,7 +116,8 @@ func (c SortedColumns) Swap(i, j int) {
 
 // Less is part of sort.Interface. We use count as the value to sort by
 func (c SortedColumns) Less(i, j int) bool {
-	return c[i].Position < c[j].Position
+	return strings.Compare(c[i].Name, c[j].Name) < 0
+	// return c[i].Position < c[j].Position
 }
 
 // ToSortedColumns returns SortedColumns
@@ -148,13 +150,14 @@ func (c SortedTables) Swap(i, j int) {
 
 // Less is part of sort.Interface. We use count as the value to sort by
 func (c SortedTables) Less(i, j int) bool {
-	return c[i].Name < c[j].Name
+	// return c[i].Name < c[j].Name
+	return strings.Compare(c[i].Name, c[j].Name) < 0
 }
 
 // Column represents a column in a table
 type Column struct {
-	Name         string `json:"column"`
-	Position     int    `json:"position"`
+	Name string `json:"column"`
+	// Position     int    `json:"position"`
 	Default      string `json:"default"`
 	IsNullable   bool   `json:"isNullable"`
 	IsUnsigned   bool   `json:"isUnsigned"`

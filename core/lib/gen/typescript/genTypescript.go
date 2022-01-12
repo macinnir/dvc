@@ -139,6 +139,8 @@ func GenerateTypesriptDTOs(config *lib.Config) {
 }
 
 // GenerateTypescriptType returns a string for a type in typescript
+// TODO need a map of all types so that import paths can be used for struct and array types
+// TODO test for struct types (apart from array types)
 func GenerateTypescriptDTO(filePath string) (string, error) {
 
 	ps, _ := lib.ParseStruct2(filePath)
@@ -163,7 +165,12 @@ export type ` + ps.Name + ` = {
 	sort.Strings(columnNames)
 
 	for k := range columnNames {
-		// fmt.Println(columnNames[k], " ==> ", ps.Fields[columnNames[k]])
+		// if filePath == "app/definitions/dtos/UpdateQuoteDTO.go" && (columnNames[k] == "Sales" || columnNames[k] == "Customers" || columnNames[k] == "Item") {
+		// 	// fmt.Println(filePath)
+		// 	fmt.Println(columnNames[k], " ==> ", ps.Fields[columnNames[k]])
+		// }
+
+		// TODO if the field type is a struct (or an array of structs) it needs to be imported
 		fieldType := schema.GoTypeToTypescriptString(ps.Fields[columnNames[k]])
 		// fmt.Println("FieldType: ", fieldType, ps.Fields[columnNames[k]])
 

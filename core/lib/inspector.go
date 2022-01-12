@@ -31,6 +31,9 @@ type ParsedStruct struct {
 	Fields map[string]string
 }
 
+// Reflection: https://stackoverflow.com/questions/20170275/how-to-find-the-type-of-an-object-in-go
+//
+
 func ParseStruct2(filePath string) (*ParsedStruct, error) {
 
 	p := &ParsedStruct{
@@ -77,8 +80,14 @@ func ParseStruct2(filePath string) (*ParsedStruct, error) {
 							switch field.Type.(type) {
 							case *ast.ArrayType:
 								// fmt.Println(structType.Fields)
-								at := field.Type.(*ast.ArrayType)
-								fieldType = "[]" + fmt.Sprint(at.Elt)
+								// at := field.Type.(*ast.ArrayType)
+								// fieldType = "[]" + fmt.Sprint(at.Elt)
+								typeExpr := field.Type
+
+								// Fetch Type from scource code
+								typeInSource := src[typeExpr.Pos()-1 : typeExpr.End()-1]
+								// fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
+								fieldType = typeInSource
 								// fmt.Println("ArrayType: ", at.Elt)
 							case *ast.Ident:
 								i := field.Type.(*ast.Ident)

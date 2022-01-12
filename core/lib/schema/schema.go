@@ -170,6 +170,10 @@ func GoTypeToTypescriptString(goDataType string) (fieldType string) {
 
 	isArray := len(goDataType) > 0 && goDataType[0:1] == "["
 
+	// if isArray {
+	// 	fmt.Println("goDataType: ", goDataType[1:])
+	// }
+
 	switch goDataType {
 	case "string", "null.String":
 		fieldType = "string"

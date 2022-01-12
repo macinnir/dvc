@@ -201,7 +201,7 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 	query := fmt.Sprintf(`
 		SELECT
 			COLUMN_NAME,
-			ORDINAL_POSITION,
+			-- ORDINAL_POSITION,
 			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
 			CASE IS_NULLABLE
 				WHEN 'YES' THEN 1
@@ -235,7 +235,7 @@ func (ss *MySQL) FetchTableColumns(server *schema.Server, databaseName string, t
 		column := schema.Column{}
 		if e = rows.Scan(
 			&column.Name,
-			&column.Position,
+			// &column.Position,
 			&column.Default,
 			&column.IsNullable,
 			&column.DataType,
