@@ -133,14 +133,6 @@ func (c *Cmd) Run(args []string) error {
 		return ErrNoCommandSpecified
 	}
 
-	// Config
-	var config *lib.Config
-	config, e = lib.LoadConfig()
-	logger.Info("Loading config!")
-	if e != nil {
-		return e
-	}
-
 	command := args[0]
 
 	args = args[1:]
@@ -159,6 +151,16 @@ func (c *Cmd) Run(args []string) error {
 
 	if _, ok := commands[command]; !ok {
 		return ErrInvalidCommand
+	}
+
+	// Config
+	var config *lib.Config
+	if command != "version" {
+		config, e = lib.LoadConfig()
+		logger.Info("Loading config!")
+		if e != nil {
+			return e
+		}
 	}
 
 	e = commands[command](logger, config, args)
