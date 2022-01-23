@@ -77,22 +77,22 @@ func ParseStruct2(filePath string) (*ParsedStruct, error) {
 
 							fieldType := ""
 
-							switch field.Type.(type) {
-							case *ast.ArrayType:
-								// fmt.Println(structType.Fields)
-								// at := field.Type.(*ast.ArrayType)
-								// fieldType = "[]" + fmt.Sprint(at.Elt)
-								typeExpr := field.Type
+							// switch field.Type.(type) {
+							// case *ast.ArrayType:
+							// fmt.Println(structType.Fields)
+							// at := field.Type.(*ast.ArrayType)
+							// fieldType = "[]" + fmt.Sprint(at.Elt)
+							typeExpr := field.Type
 
-								// Fetch Type from scource code
-								typeInSource := src[typeExpr.Pos()-1 : typeExpr.End()-1]
-								// fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
-								fieldType = typeInSource
-								// fmt.Println("ArrayType: ", at.Elt)
-							case *ast.Ident:
-								i := field.Type.(*ast.Ident)
-								fieldType = i.Name
-							}
+							// Fetch Type from scource code
+							typeInSource := src[typeExpr.Pos()-1 : typeExpr.End()-1]
+							// fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
+							fieldType = typeInSource
+							// fmt.Println("ArrayType: ", at.Elt)
+							// case *ast.Ident:
+							// 	i := field.Type.(*ast.Ident)
+							// 	fieldType = i.Name
+							// }
 
 							for _, name := range field.Names {
 								// fmt.Printf("\tField: name=%s type=%s\n", name.Name, fieldType)

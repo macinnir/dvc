@@ -14,6 +14,7 @@ const (
 	TablesCacheFilePath = ".dvc/tables-cache.json"
 	RoutesFilePath      = ".dvc/routes.json"
 	ModelsDir           = "models"
+	ModelsGenDir        = "gen/definitions/models"
 	IntegrationsDir     = "integrations"
 	DALsDir             = "dals"
 	// Generated Go file containing constants for all route permissions

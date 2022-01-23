@@ -33,9 +33,17 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 	fmt.Println("Generating models...")
 
 	if clean {
+
+		tableMap := map[string]struct{}{}
 		for k := range schemaList.Schemas {
-			CleanGoModels("gen/definitions/models", schemaList.Schemas[k])
+			schema := schemaList.Schemas[k]
+			for l := range schema.Tables {
+				tableMap[schema.Tables[l].Name] = struct{}{}
+			}
 		}
+
+		CleanGoModels(lib.ModelsGenDir, tableMap)
+
 	}
 
 	var tablesCache cache.TablesCache
@@ -883,7 +891,7 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 // }
 
 // CleanGoModels removes model files that are not found in the database.Tables map
-func CleanGoModels(dir string, database *schema.Schema) (e error) {
+func CleanGoModels(dir string, tables map[string]struct{}) (e error) {
 
 	lib.EnsureDir(dir)
 
@@ -902,7 +910,7 @@ func CleanGoModels(dir string, database *schema.Schema) (e error) {
 
 	for _, name := range dirFileNames {
 		fileNameNoExt := name[0 : len(name)-3]
-		if _, ok := database.Tables[fileNameNoExt]; !ok {
+		if _, ok := tables[fileNameNoExt]; !ok {
 			fullFilePath := path.Join(dir, name)
 			// log.Printf("Removing %s\n", fullFilePath)
 			result := lib.ReadCliInput(reader, fmt.Sprintf("Delete unused model `%s` (Y/n)?", fileNameNoExt))

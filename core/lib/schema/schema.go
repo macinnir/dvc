@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/macinnir/dvc/core/lib"
 )
@@ -128,7 +129,7 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 		fieldType = "int64"
 	case "tinyint":
 		fieldType = "int"
-	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set":
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "date", "datetime":
 		fieldType = "string"
 	case "decimal":
 		fieldType = "float64"
@@ -164,28 +165,151 @@ func DataTypeToTypescriptString(dbDataType string) (fieldType string) {
 	return
 }
 
-func GoTypeToTypescriptString(goDataType string) (fieldType string) {
+func ExtractBaseGoType(goDataType string) string {
+	for {
+		if goDataType[0:1] == "*" {
+			goDataType = goDataType[1:]
+			continue
+		}
 
-	fieldType = "number"
+		if len(goDataType) > 4 && goDataType[0:4] == "map[" {
+			goDataType = goDataType[strings.Index(goDataType, "]")+1:]
+			continue
+		}
 
-	isArray := len(goDataType) > 0 && goDataType[0:1] == "["
+		if len(goDataType) > 2 && goDataType[0:2] == "[]" {
+			goDataType = goDataType[2:]
+			continue
+		}
 
-	// if isArray {
-	// 	fmt.Println("goDataType: ", goDataType[1:])
-	// }
+		// if len(goDataType) > 7 && goDataType[0:7] == "models." {
+		// 	goDataType = goDataType[7:]
+		// 	continue
+		// }
 
+		break
+	}
+
+	return goDataType
+}
+
+func IsGoTypeBaseType(goDataType string) bool {
+	switch goDataType {
+	case "byte", "interface{}", "bytes.Buffer", "string", "null.String", "int", "int64", "float64", "bool":
+		return true
+	default:
+		return false
+	}
+}
+
+func GoBaseTypeToBaseTypescriptType(goDataType string) string {
 	switch goDataType {
 	case "string", "null.String":
-		fieldType = "string"
+		return "string"
+	case "int", "int64", "float64":
+		return "number"
 	case "bool":
-		fieldType = "boolean"
+		return "boolean"
+	default:
+		if goDataType[0:1] == "*" {
+			goDataType = goDataType[1:]
+		}
+
+		return goDataType
+	}
+}
+
+func GoBaseTypeToBaseTypescriptDefault(goDataType string) string {
+	switch goDataType {
+	case "[]byte", "interface{}", "bytes.Buffer":
+		return "null"
+	case "string", "null.String":
+		return "''"
+	case "int", "int64", "float64":
+		return "0"
+	case "bool":
+		return "false"
+	default:
+		return "null"
+	}
+}
+
+func GoTypeToTypescriptString(goDataType string) string {
+
+	if len(goDataType) > 3 && goDataType[0:4] == "map[" {
+
+		// Remove the map[ prefix
+		goDataType = goDataType[4:]
+
+		// key type
+		keyType := goDataType[0:strings.Index(goDataType, "]")]
+
+		// Remove the key
+		goDataType = goDataType[len(keyType)+1:]
+
+		return fmt.Sprintf("{ [key: %s]: %s }", GoBaseTypeToBaseTypescriptType(keyType), GoBaseTypeToBaseTypescriptType(goDataType))
 	}
 
-	if isArray {
-		fieldType += "[]"
+	if len(goDataType) > 7 && goDataType[0:7] == "models." {
+		return goDataType[7:]
 	}
 
-	return
+	if len(goDataType) > 8 && goDataType[0:8] == "*models." {
+		return goDataType[8:]
+	}
+
+	if (len(goDataType) >= 13 && goDataType[0:13] == "*bytes.Buffer") ||
+		(len(goDataType) >= 12 && goDataType[0:12] == "bytes.Buffer") ||
+		(len(goDataType) >= 11 && goDataType[0:11] == "interface{}") ||
+		(len(goDataType) >= 6 && goDataType[0:6] == "[]byte") {
+		return "any"
+	}
+
+	if len(goDataType) > 2 && goDataType[0:2] == "[]" {
+		return GoBaseTypeToBaseTypescriptType(goDataType[2:]) + "[]"
+	}
+
+	return GoBaseTypeToBaseTypescriptType(goDataType)
+}
+
+func GoTypeToTypescriptDefault(goDataType string) (fieldType string) {
+
+	if len(goDataType) > 3 && goDataType[0:4] == "map[" {
+
+		if goDataType[0:11] == "map[string]" {
+			return "{}"
+		}
+
+		return "[]"
+	}
+
+	if len(goDataType) >= 6 && goDataType[0:6] == "[]byte" {
+		return "null"
+	}
+
+	if len(goDataType) > 2 && goDataType[0:2] == "[]" {
+		return "[]"
+	}
+
+	baseType := ExtractBaseGoType(goDataType)
+
+	if len(baseType) >= 13 && baseType[0:13] == "*bytes.Buffer" {
+		return "null"
+	}
+
+	if len(baseType) >= 12 && baseType[0:12] == "bytes.Buffer" {
+		return "null"
+	}
+
+	if len(baseType) > 7 && baseType[0:7] == "models." {
+		return "new" + baseType[7:] + "()"
+	}
+
+	if !IsGoTypeBaseType(baseType) {
+		return "new" + baseType + "()"
+	}
+
+	return GoBaseTypeToBaseTypescriptDefault(goDataType)
 }
 
 // TODO move to mysql specific
@@ -197,26 +321,6 @@ func DataTypeToTypescriptDefault(dataType string) (fieldType string) {
 	switch dataType {
 	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
 		fieldType = "''"
-	}
-
-	return
-}
-
-// TODO move to mysql specific
-// TODO make column types constants in mysql
-func GoTypeToTypescriptDefault(goDataType string) (fieldType string) {
-
-	fieldType = "0"
-
-	if len(goDataType) > 0 && goDataType[0:1] == "[" {
-		return "[]"
-	}
-
-	switch goDataType {
-	case "string", "null.String":
-		fieldType = "''"
-	case "bool":
-		fieldType = "false"
 	}
 
 	return

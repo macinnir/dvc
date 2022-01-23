@@ -151,6 +151,33 @@ func GenerateTypescriptDTO(filePath string) (string, error) {
  *
  * ` + ps.Name + `
  */
+`)
+
+	imports := [][]string{}
+	for k := range ps.Fields {
+
+		baseType := schema.ExtractBaseGoType(ps.Fields[k])
+
+		if !schema.IsGoTypeBaseType(baseType) {
+			if len(baseType) > 10 && baseType[0:10] == "constants." {
+				baseType = baseType[10:]
+			} else if len(baseType) > 7 && baseType[0:7] == "models." {
+				baseType = baseType[7:]
+				imports = append(imports, []string{baseType, "gen/models/" + baseType})
+
+			} else {
+				imports = append(imports, []string{baseType, "./" + baseType})
+			}
+		}
+	}
+
+	if len(imports) > 0 {
+		for k := range imports {
+			sb.WriteString(fmt.Sprintf("import { %s, new%s } from '%s';\n", imports[k][0], imports[k][0], imports[k][1]))
+		}
+	}
+
+	sb.WriteString(`
 export type ` + ps.Name + ` = {
 
 `)
