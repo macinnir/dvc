@@ -154,6 +154,7 @@ func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocu
 			methods = append(methods, Method{
 				Code:      method,
 				Documents: Documents,
+				LineNo:    int(decl.Recv.Pos()),
 			})
 
 		}
@@ -176,6 +177,7 @@ func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocu
 type Method struct {
 	Code      string
 	Documents []string
+	LineNo    int
 }
 
 // Lines return a a slice of documentation and code

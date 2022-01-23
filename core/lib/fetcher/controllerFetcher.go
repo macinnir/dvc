@@ -140,6 +140,8 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 			return
 		}
 
+		route.FileName = filePath
+
 		controller.Routes = append(controller.Routes, route)
 	}
 
@@ -236,6 +238,11 @@ func parseControllerMethod(
 		controller.PermCount++
 		route.Permission = controller.Name + "_" + route.Name
 	}
+
+	// TODO coming back to this
+
+	// route.LineNo = method.LineNo
+	route.ControllerName = controller.Name
 
 	return route
 }

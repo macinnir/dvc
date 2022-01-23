@@ -156,11 +156,25 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controlle
 
 	ioutil.WriteFile("gen/routes.go", []byte(final), 0777)
 
+	// DTOS
+	dtos := genDTOSMap("core/definitions/dtos")
+	appDTOs := genDTOSMap("app/definitions/dtos")
+	for dtoName := range appDTOs {
+		dtos[dtoName] = appDTOs[dtoName]
+	}
+
+	// Aggregates
+	aggregates := genAggregatesMap("core/definitions/aggregates")
+	appAggregates := genAggregatesMap("app/definitions/aggregates")
+	for aggregateName := range appAggregates {
+		aggregates[aggregateName] = appAggregates[aggregateName]
+	}
+
 	routesContainer := &lib.RoutesJSONContainer{
 		Routes:     map[string]*lib.ControllerRoute{},
-		DTOs:       genDTOSMap(),
+		DTOs:       dtos,
 		Models:     genModelsMap(),
-		Aggregates: genAggregatesMap(),
+		Aggregates: aggregates,
 		Constants:  genConstantsMap(),
 	}
 
@@ -303,11 +317,9 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 
 }
 
-func genDTOSMap() map[string]map[string]string {
+func genDTOSMap(dir string) map[string]map[string]string {
 
-	dtosDir := "core/definitions/dtos"
-
-	dirHandle, err := os.Open(dtosDir)
+	dirHandle, err := os.Open(dir)
 
 	if err != nil {
 		panic(err)
@@ -331,7 +343,7 @@ func genDTOSMap() map[string]map[string]string {
 			continue
 		}
 
-		fullPath := path.Join(dtosDir, name)
+		fullPath := path.Join(dir, name)
 
 		model, e := gen.InspectFile(fullPath)
 		if e != nil {
@@ -400,11 +412,9 @@ func genModelsMap() map[string]map[string]string {
 	return result
 }
 
-func genAggregatesMap() map[string]map[string]string {
+func genAggregatesMap(dir string) map[string]map[string]string {
 
-	modelsDir := "core/definitions/aggregates"
-
-	dirHandle, err := os.Open(modelsDir)
+	dirHandle, err := os.Open(dir)
 
 	if err != nil {
 		panic(err)
@@ -429,7 +439,7 @@ func genAggregatesMap() map[string]map[string]string {
 		}
 
 		// fileNameNoExt := name[0 : len(name)-3]
-		fullPath := path.Join(modelsDir, name)
+		fullPath := path.Join(dir, name)
 		// fmt.Println(fullPath)
 
 		fileBytes, e := ioutil.ReadFile(fullPath)
@@ -483,9 +493,10 @@ func genAggregatesMap() map[string]map[string]string {
 				} else {
 					// This is an embedded type
 					if strings.Contains(parts[0], ".") {
-						sParts := strings.Split(parts[0], ".")
-						fieldName = sParts[1]
+						// sParts := strings.Split(parts[0], ".")
+						// fieldName = sParts[1]
 						fieldType = parts[0]
+						fieldName = "#embedded" + fmt.Sprint(k)
 					}
 
 					// fmt.Println(">>>> " + strings.TrimSpace(parts[0]))

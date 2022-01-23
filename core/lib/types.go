@@ -92,6 +92,9 @@ type ControllerRoute struct {
 	ResponseFormat string                 `json:"ResponseFormat"`
 	ResponseCode   int                    `json:"ResponseCode"`
 	Permission     string                 `json:"Permission"`
+	ControllerName string                 `json:"ControllerName"`
+	FileName       string                 `json:"FileName"`
+	LineNo         int                    `json:"LineNo"`
 }
 
 // ControllerRouteParam represents a param inside a controller route
