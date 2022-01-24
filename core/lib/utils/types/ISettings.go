@@ -6,6 +6,10 @@ type SettingsManager struct {
 	settings map[string]string
 }
 
+func NewSettingsManager(settings map[string]string) *SettingsManager {
+	return &SettingsManager{settings}
+}
+
 // String returns the string value of a setting. If that setting is not found it returns defaultValue.
 func (sm *SettingsManager) String(name, defaultValue string) string {
 
