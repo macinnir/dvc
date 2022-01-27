@@ -13,6 +13,6 @@ type IUserContainer interface {
 	Locked() bool
 	// Permissions returns a slice of permission names
 	Permissions() []string
-	// Settings returns the settings implementation for a user
-	Settings() *SettingsManager
+	// SettingMgr returns the settings implementation for a user
+	SettingMgr() *SettingsManager
 }
