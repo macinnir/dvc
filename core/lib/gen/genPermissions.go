@@ -90,7 +90,7 @@ func GenGoPerms(config *lib.Config) (e error) {
 	return
 }
 
-func BuildSettingsGoFile(permissionMap map[string]string) {
+func BuildPermissionsGoFile(permissionMap map[string]string) {
 
 	permissions := make([]string, 0, len(permissionMap))
 
@@ -163,26 +163,26 @@ func BuildSettingsGoFile(permissionMap map[string]string) {
 	ioutil.WriteFile(permissionsFilePath, permissionsFileBytes, 0777)
 }
 
-// BuildTypescriptSettings returns a formatted typescript file of setting constants
-func BuildTypescriptSettings(settingsMap map[string]string) string {
+// BuildTypescriptPermissions returns a formatted typescript file of permission constants
+func BuildTypescriptPermissions(permissionMap map[string]string) string {
 
-	settings := make([]string, 0, len(settingsMap))
-	for k := range settingsMap {
+	permissions := make([]string, 0, len(permissionMap))
+	for k := range permissionMap {
 		if len(k) == 0 {
 			continue
 		}
-		settings = append(settings, k)
+		permissions = append(permissions, k)
 	}
 
-	sort.Strings(settings)
+	sort.Strings(permissions)
 
-	settingsFile := "// Generated Code; DO NOT EDIT.\n\n"
-	for k := range settings {
-		setting := strings.TrimSpace(settings[k])
-		settingTitle := string(unicode.ToUpper(rune(setting[0]))) + setting[1:]
-		settingsFile += "// " + settingTitle + " -- " + settingsMap[setting] + "\n"
-		settingsFile += "export const " + settingTitle + "Setting = \"" + setting + "\";\n"
+	permissionsFile := "// Generated Code; DO NOT EDIT.\n\n"
+	for k := range permissions {
+		permission := strings.TrimSpace(permissions[k])
+		permTitle := string(unicode.ToUpper(rune(permission[0]))) + permission[1:]
+		permissionsFile += "// " + permTitle + " -- " + permissionMap[permission] + "\n"
+		permissionsFile += "export const " + permTitle + "Permission = \"" + permission + "\";\n"
 	}
 
-	return settingsFile
+	return permissionsFile
 }
