@@ -5,6 +5,8 @@ const (
 	MetaDirectory       = ".dvc"
 	PermissionsFile     = ".dvc/permissions.json"
 	CorePermissionsFile = "core/permissions.json"
+	SettingsFile        = ".dvc/settings.json"
+	CoreSettingsFile    = "core/settings.json"
 	ConfigFilePath      = ".dvc/config.json"
 	SchemasFilePath     = ".dvc/schemas.json"
 	CoreSchemasFilePath = "core/schemas.json"
