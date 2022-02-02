@@ -63,6 +63,7 @@ func TestGoTypeToTypescriptString(t *testing.T) {
 		{"map[float64]string", "{ [key: number]: string }"},
 		{"map[string]string", "{ [key: string]: string }"},
 		{"[]*Foo", "Foo[]"},
+		{"[]*models.Foo", "Foo[]"},
 		{"*Foo", "Foo"},
 		{"map[int64]*Foo", "{ [key: number]: Foo }"},
 		{"*models.Foo", "Foo"},

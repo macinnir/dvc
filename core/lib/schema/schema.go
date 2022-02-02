@@ -258,6 +258,14 @@ func GoTypeToTypescriptString(goDataType string) string {
 		return goDataType[8:]
 	}
 
+	if len(goDataType) > 9 && goDataType[0:9] == "[]models." {
+		return goDataType[9:] + "[]"
+	}
+
+	if len(goDataType) > 10 && goDataType[0:10] == "[]*models." {
+		return goDataType[10:] + "[]"
+	}
+
 	if (len(goDataType) >= 13 && goDataType[0:13] == "*bytes.Buffer") ||
 		(len(goDataType) >= 12 && goDataType[0:12] == "bytes.Buffer") ||
 		(len(goDataType) >= 11 && goDataType[0:11] == "interface{}") ||
