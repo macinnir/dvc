@@ -14,6 +14,12 @@ build:
 install: 
 	cd cmd/dvc; go install -ldflags "-X main.Version=${version}"
 
+tag: 
+	./scripts/tag.sh $(versionType)
+
+version: tag
+
+
 ## Vet the code 
 vet: 
 	go vet ./...
