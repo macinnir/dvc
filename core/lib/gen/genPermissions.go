@@ -22,7 +22,7 @@ func fetchAllPermissionsFromControllers(controllersDir string) (map[string]strin
 		return nil, e
 	}
 
-	permissionMap := LoadPermissionsFromJSON()
+	permissionMap := LoadPermissionsFromJSON(lib.CorePermissionsFile)
 
 	for k := range controllers {
 
@@ -39,13 +39,13 @@ func fetchAllPermissionsFromControllers(controllersDir string) (map[string]strin
 }
 
 // LoadPermissionsFromJSON loads a set of permissions from a JSON file
-func LoadPermissionsFromJSON() map[string]string {
+func LoadPermissionsFromJSON(filePath string) map[string]string {
 
 	permissionMap := map[string]string{}
 	var fileBytes []byte
 
 	// Core permissions
-	if _, e := os.Stat(lib.CorePermissionsFile); !os.IsNotExist(e) {
+	if _, e := os.Stat(filePath); !os.IsNotExist(e) {
 		fileBytes, _ = ioutil.ReadFile(lib.CorePermissionsFile)
 		json.Unmarshal(fileBytes, &permissionMap)
 	}

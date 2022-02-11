@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/macinnir/dvc/core/lib"
-	"github.com/macinnir/dvc/core/lib/fetcher"
 	"github.com/macinnir/dvc/core/lib/gen"
 )
 
@@ -58,9 +58,33 @@ func NewControllers(s *app.App, r request.IResponseLogger) *Controllers {
 
 }
 
-// GenRoutes generates a list of routes from a directory of controller files
-func GenRoutesAndPermissions(config *lib.Config) error {
+func LoadRoutes(config *lib.Config) (*lib.RoutesJSONContainer, error) {
 
+	var e error
+
+	if _, e = os.Stat(lib.RoutesFilePath); os.IsNotExist(e) {
+		return nil, errors.New("Routes file does not exist at path" + lib.RoutesFilePath)
+	}
+
+	routes := &lib.RoutesJSONContainer{}
+
+	var fileBytes []byte
+
+	if fileBytes, e = ioutil.ReadFile(lib.RoutesFilePath); e != nil {
+		return nil, e
+	}
+
+	if e = json.Unmarshal(fileBytes, routes); e != nil {
+		return nil, e
+	}
+
+	return routes, nil
+}
+
+// GenRoutes generates a list of routes from a directory of controller files
+func GenRoutesAndPermissions(controllers []*lib.Controller, dirs []string, config *lib.Config) error {
+
+	var e error
 	imports := []string{
 		path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
 		// path.Join(config.BasePackage, config.Dirs.Aggregates),
@@ -77,9 +101,6 @@ func GenRoutesAndPermissions(config *lib.Config) error {
 
 	hasBodyImports := false
 	packageUsesPermission := false
-
-	cf := fetcher.NewControllerFetcher()
-	controllers, dirs, e := cf.FetchAll()
 
 	if e != nil {
 		return e

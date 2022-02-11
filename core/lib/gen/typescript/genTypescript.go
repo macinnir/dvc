@@ -2,31 +2,35 @@ package typescript
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
 // GenerateTypescriptModels returns a string for a typscript types file
-func GenerateTypescriptModels(config *lib.Config) error {
+func GenerateTypescriptModels(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
+	fmt.Println("Generating typescript models!")
 	lib.EnsureDir(config.TypescriptModelsPath)
 
 	var e error
 	var files []os.FileInfo
 
-	fmt.Println("Checking for files in ", config.TypescriptModelsPath)
+	// fmt.Println("Checking for files in ", config.TypescriptModelsPath)
 
 	if files, e = ioutil.ReadDir(config.TypescriptModelsPath); e != nil {
 		return e
 	}
 
 	for k := range files {
+
 		if files[k].IsDir() {
 			continue
 		}
@@ -38,30 +42,20 @@ func GenerateTypescriptModels(config *lib.Config) error {
 		os.Remove(path.Join(config.TypescriptModelsPath, files[k].Name()))
 	}
 
-	var schemaList *schema.SchemaList
+	var str string
 
-	if schemaList, e = schema.LoadLocalSchemas(); e != nil {
-		return e
-	}
+	for name := range routes.Models {
 
-	for k := range schemaList.Schemas {
+		model := routes.Models[name]
 
-		database := schemaList.Schemas[k]
+		if str, e = GenerateTypescriptModel(name, model); e != nil {
+			return e
+		}
 
-		for k := range database.Tables {
+		fullFilePath := path.Join(config.TypescriptModelsPath, name+".ts")
 
-			table := database.Tables[k]
-
-			var str string
-
-			if str, e = GenerateTypescriptModel(table); e != nil {
-				return e
-			}
-
-			if e = ioutil.WriteFile(path.Join(config.TypescriptModelsPath, table.Name+".ts"), []byte(str), 0777); e != nil {
-				return e
-			}
-
+		if e = ioutil.WriteFile(fullFilePath, []byte(str), 0777); e != nil {
+			return e
 		}
 	}
 
@@ -69,43 +63,33 @@ func GenerateTypescriptModels(config *lib.Config) error {
 }
 
 // GenerateTypescriptType returns a string for a type in typescript
-func GenerateTypescriptModel(table *schema.Table) (string, error) {
+func GenerateTypescriptModel(name string, columns map[string]string) (string, error) {
 
 	var sb strings.Builder
-	sb.WriteString(`/**
- * Generated Code; DO NOT EDIT
- * 
- * ` + table.Name + `
- */
-export type ` + table.Name + ` = {
+	TSFileHeader(&sb, name)
+	ImportStrings(&sb, columns)
+	columnNames := ColumnMapToNames(columns)
+
+	sb.WriteString(`
+export type ` + name + ` = {
 
 `)
 
-	columnNames := make([]string, len(table.Columns))
-	n := 0
-	for columnName := range table.Columns {
-		columnNames[n] = columnName
-		n++
-	}
-
-	sort.Strings(columnNames)
-
 	for k := range columnNames {
-		fieldType := schema.DataTypeToTypescriptString(table.Columns[columnNames[k]].DataType)
-		if table.Columns[columnNames[k]].MaxLength > 0 {
-			sb.WriteString("\t// " + columnNames[k] + " " + table.Columns[columnNames[k]].DataType + "(" + fmt.Sprint(table.Columns[columnNames[k]].MaxLength) + ")\n")
-		} else {
-			sb.WriteString("\t// " + columnNames[k] + " " + table.Columns[columnNames[k]].DataType + "\n")
-		}
+		dataType := columns[columnNames[k]]
+		fieldType := schema.GoBaseTypeToBaseTypescriptType(dataType)
+		sb.WriteString("\t// " + columnNames[k] + " " + dataType + "\n")
 		sb.WriteString("\t" + columnNames[k] + ": " + fieldType + ";\n\n")
 	}
 
-	sb.WriteString("}\n\n")
+	sb.WriteString(`}
 
-	sb.WriteString("// new" + table.Name + " is a factory method for new " + table.Name + " objects\n")
-	sb.WriteString("export const new" + table.Name + " = () : " + table.Name + " => ({\n")
+// new` + name + ` is a factory method for creating new ` + name + ` objects
+export const new` + name + ` = () : ` + name + ` => ({ 
+`)
+
 	for k := range columnNames {
-		defaultVal := schema.DataTypeToTypescriptDefault(table.Columns[columnNames[k]].DataType)
+		defaultVal := schema.GoBaseTypeToBaseTypescriptDefault(columns[columnNames[k]])
 		sb.WriteString("\t" + columnNames[k] + ": " + defaultVal + ",\n")
 	}
 	sb.WriteString("});\n\n")
@@ -113,107 +97,310 @@ export type ` + table.Name + ` = {
 	return sb.String(), nil
 }
 
-func GenerateTypesriptDTOs(config *lib.Config) {
+func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
-	dtoPaths := []string{}
-
-	files, _ := ioutil.ReadDir("core/definitions/dtos")
-	for k := range files {
-		dtoPaths = append(dtoPaths, "core/definitions/dtos/"+files[k].Name())
+	for name := range routes.DTOs {
+		str, _ := GenerateTypescriptDTO(name, routes.DTOs[name])
+		fullFilePath := path.Join(config.TypescriptDTOsPath, name+".ts")
+		// fmt.Println("Generating DTO", name, " => ", fullFilePath)
+		ioutil.WriteFile(fullFilePath, []byte(str), 0777)
 	}
 
-	files, _ = ioutil.ReadDir("app/definitions/dtos")
-	for k := range files {
-		dtoPaths = append(dtoPaths, "app/definitions/dtos/"+files[k].Name())
-	}
-
-	lib.EnsureDir(config.TypescriptDTOsPath)
-
-	for k := range dtoPaths {
-		str, _ := GenerateTypescriptDTO(dtoPaths[k])
-		basePath := path.Base(dtoPaths[k])
-		dest := path.Join(config.TypescriptDTOsPath, basePath[0:len(basePath)-3]+".ts")
-		// fmt.Println("Generating: ", dtoPaths[k], " ==> ", dest)
-		ioutil.WriteFile(dest, []byte(str), 0777)
-	}
+	return nil
 }
 
 // GenerateTypescriptType returns a string for a type in typescript
 // TODO need a map of all types so that import paths can be used for struct and array types
 // TODO test for struct types (apart from array types)
-func GenerateTypescriptDTO(filePath string) (string, error) {
+func GenerateTypescriptDTO(name string, columns map[string]string) (string, error) {
 
-	ps, _ := lib.ParseStruct2(filePath)
+	// ps, _ := lib.ParseStruct2(filePath)
 
 	var sb strings.Builder
-	sb.WriteString(`/**
- * Generated Code; DO NOT EDIT
- *
- * ` + ps.Name + `
- */
-`)
+	TSFileHeader(&sb, name)
+	ImportStrings(&sb, columns)
 
-	imports := [][]string{}
-	for k := range ps.Fields {
-
-		baseType := schema.ExtractBaseGoType(ps.Fields[k])
-
-		if !schema.IsGoTypeBaseType(baseType) {
-			if len(baseType) > 10 && baseType[0:10] == "constants." {
-				baseType = baseType[10:]
-			} else if len(baseType) > 7 && baseType[0:7] == "models." {
-				baseType = baseType[7:]
-				imports = append(imports, []string{baseType, "gen/models/" + baseType})
-
-			} else {
-				imports = append(imports, []string{baseType, "./" + baseType})
-			}
-		}
-	}
-
-	if len(imports) > 0 {
-		for k := range imports {
-			sb.WriteString(fmt.Sprintf("import { %s, new%s } from '%s';\n", imports[k][0], imports[k][0], imports[k][1]))
-		}
-	}
+	columnNames := ColumnMapToNames(columns)
 
 	sb.WriteString(`
-export type ` + ps.Name + ` = {
+export type ` + name + ` = {
 
 `)
 
-	columnNames := make([]string, len(ps.Fields))
-	n := 0
-	for columnName := range ps.Fields {
-		columnNames[n] = columnName
-		n++
-	}
-
-	sort.Strings(columnNames)
-
 	for k := range columnNames {
+
+		dataType := columns[columnNames[k]]
+
 		// if filePath == "app/definitions/dtos/UpdateQuoteDTO.go" && (columnNames[k] == "Sales" || columnNames[k] == "Customers" || columnNames[k] == "Item") {
 		// 	// fmt.Println(filePath)
 		// 	fmt.Println(columnNames[k], " ==> ", ps.Fields[columnNames[k]])
 		// }
 
 		// TODO if the field type is a struct (or an array of structs) it needs to be imported
-		fieldType := schema.GoTypeToTypescriptString(ps.Fields[columnNames[k]])
+		fieldType := schema.GoTypeToTypescriptString(dataType)
 		// fmt.Println("FieldType: ", fieldType, ps.Fields[columnNames[k]])
 
-		sb.WriteString("\t// " + columnNames[k] + " " + ps.Fields[columnNames[k]] + "\n")
+		sb.WriteString("\t// " + columnNames[k] + " " + dataType + "\n")
 		sb.WriteString("\t" + columnNames[k] + ": " + fieldType + ";\n\n")
 	}
 
 	sb.WriteString("}\n\n")
 
-	sb.WriteString("// new" + ps.Name + " is a factory method for new " + ps.Name + " objects\n")
-	sb.WriteString("export const new" + ps.Name + " = () : " + ps.Name + " => ({\n")
+	sb.WriteString("// new" + name + " is a factory method for new " + name + " objects\n")
+	sb.WriteString("export const new" + name + " = () : " + name + " => ({\n")
 	for k := range columnNames {
-		defaultVal := schema.GoTypeToTypescriptDefault(ps.Fields[columnNames[k]])
+		dataType := columns[columnNames[k]]
+		defaultVal := schema.GoTypeToTypescriptDefault(dataType)
 		sb.WriteString("\t" + columnNames[k] + ": " + defaultVal + ",\n")
 	}
 	sb.WriteString("});\n\n")
 
 	return sb.String(), nil
+}
+
+func NewTypescriptGenerator(config *lib.Config, routes *lib.RoutesJSONContainer) *TypescriptGenerator {
+	return &TypescriptGenerator{
+		routes,
+		config,
+	}
+}
+
+func (tg *TypescriptGenerator) GenerateTypesriptAggregates() error {
+
+	lib.EnsureDir(tg.config.TypescriptAggregatesPath)
+
+	// Clean out any old files
+	files, e := ioutil.ReadDir(tg.config.TypescriptAggregatesPath)
+
+	if e != nil {
+		return e
+	}
+
+	for k := range files {
+		os.Remove(path.Join(tg.config.TypescriptAggregatesPath, files[k].Name()))
+	}
+
+	for name := range tg.routes.Aggregates {
+		str, e := tg.GenerateTypescriptAggregate(name)
+		if e != nil {
+			fmt.Println("ERROR:", e.Error())
+			return e
+		}
+		dest := path.Join(tg.config.TypescriptAggregatesPath, name+".ts")
+		ioutil.WriteFile(dest, []byte(str), 0777)
+	}
+
+	return nil
+}
+
+type TypescriptGenerator struct {
+	routes *lib.RoutesJSONContainer
+	config *lib.Config
+}
+
+// GenerateTypescriptAggregate returns a string for a type in typescript
+func (tg *TypescriptGenerator) GenerateTypescriptAggregate(name string) (string, error) {
+
+	columns := tg.routes.Aggregates[name]
+
+	var sb strings.Builder
+
+	TSFileHeader(&sb, name)
+
+	ImportStrings(&sb, columns)
+
+	sb.WriteString(`
+export type ` + name + ` = `)
+
+	inherits := InheritStrings(&sb, columns)
+
+	if len(inherits) > 0 {
+		sb.WriteString(strings.Join(inherits, " & ") + " & ")
+	}
+
+	sb.WriteString(`{
+
+`)
+
+	tg.GenerateTypescriptFields(&sb, name)
+
+	sb.WriteString("}\n\n")
+
+	sb.WriteString("// new" + name + " is a factory method for new " + name + " objects\n")
+	sb.WriteString("export const new" + name + " = () : " + name + " => ({\n")
+
+	tg.GenerateTypescriptDefaults(&sb, name)
+
+	sb.WriteString("});\n\n")
+
+	return sb.String(), nil
+}
+
+func (tg *TypescriptGenerator) ExtractColumns(goType string) map[string]string {
+
+	if goType[0:1] == "*" {
+		goType = goType[1:]
+	}
+
+	// fmt.Println("GoType", goType)
+	// if goType == "CustomerAggregate" {
+	// 	fmt.Println(goType, " --> ", goType[len(goType)-9:])
+	// }
+
+	if len(goType) > 3 && goType[len(goType)-3:] == "DTO" {
+		return tg.routes.DTOs[goType]
+	}
+
+	if len(goType) > 9 && goType[len(goType)-9:] == "Aggregate" {
+		cols := tg.routes.Aggregates[goType]
+		// fmt.Println("Got here", goType, len(cols))
+		// if !ok {
+		// 	fmt.Println("Nope")
+		// }
+		return cols
+
+	}
+
+	return tg.routes.Models[goType]
+}
+
+func (tg *TypescriptGenerator) GenerateTypescriptFields(sb io.Writer, objectName string) {
+
+	columns := tg.ExtractColumns(objectName)
+
+	columnNames := ColumnMapToNames(columns)
+
+	for k := range columnNames {
+
+		name := columnNames[k]
+
+		// Uppercase fields only
+		if !unicode.IsUpper(rune(name[0])) {
+			continue
+		}
+
+		goType := columns[columnNames[k]]
+		fieldType := schema.GoTypeToTypescriptString(goType)
+
+		if len(name) > 9 && name[0:9] == "#embedded" {
+			// tg.GenerateTypescriptFields(sb, fieldType)
+			continue
+		}
+
+		fmt.Fprintf(sb, "\t// %s %s\n", columnNames[k], columns[columnNames[k]])
+		fmt.Fprintf(sb, "\t%s: %s;\n\n", columnNames[k], fieldType)
+	}
+}
+
+func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectName string) {
+
+	columns := tg.ExtractColumns(objectName)
+
+	columnNames := ColumnMapToNames(columns)
+
+	for k := range columnNames {
+		name := columnNames[k]
+		goType := columns[columnNames[k]]
+		fieldType := schema.GoTypeToTypescriptString(goType)
+
+		if len(name) > 9 && name[0:9] == "#embedded" {
+			fmt.Fprintf(sb, "\t..."+schema.GoTypeToTypescriptDefault(fieldType)+",\n")
+			// tg.GenerateTypescriptDefaults(sb, fieldType)
+			continue
+		}
+
+		if !unicode.IsUpper(rune(name[0])) {
+			continue
+		}
+
+		defaultVal := schema.GoTypeToTypescriptDefault(columns[columnNames[k]])
+		fmt.Fprintf(sb, "\t"+columnNames[k]+": "+defaultVal+",\n")
+	}
+
+}
+
+func ImportString(sb io.Writer, parts []string) {
+
+	fmt.Fprintf(sb, "import { %s", parts[1])
+
+	// If it starts as an array, do not include the import
+	if parts[0][0:1] != "[" {
+		fmt.Fprintf(sb, ", new%s", parts[1])
+	}
+
+	fmt.Fprintf(sb, " } from '%s';\n", parts[2])
+
+}
+
+func ImportStrings(sb io.Writer, columns map[string]string) {
+
+	imported := map[string]struct{}{}
+
+	// imports := [][]string{}
+	for name := range columns {
+
+		if !unicode.IsUpper(rune(name[0])) && name[0:1] != "#" {
+			continue
+		}
+
+		dataType := columns[name]
+
+		baseType := schema.ExtractBaseGoType(dataType)
+
+		if !schema.IsGoTypeBaseType(baseType) {
+
+			if len(baseType) > 10 && baseType[0:10] == "constants." {
+				continue
+			}
+
+			if _, ok := imported[baseType]; ok {
+				continue
+			}
+
+			imported[baseType] = struct{}{}
+
+			if len(baseType) > 7 && baseType[0:7] == "models." {
+				ImportString(sb, []string{dataType, baseType[7:], "gen/models/" + baseType[7:]})
+			} else if len(baseType) > 5 && baseType[0:5] == "dtos." {
+				ImportString(sb, []string{dataType, baseType[5:], "gen/dtos/" + baseType[5:]})
+			} else {
+				ImportString(sb, []string{dataType, baseType, "./" + baseType})
+			}
+		}
+	}
+}
+
+func InheritStrings(sb io.Writer, columns map[string]string) []string {
+
+	imports := []string{}
+	for name := range columns {
+
+		if len(name) > 9 && name[0:9] == "#embedded" {
+			imports = append(imports, schema.GoTypeToTypescriptString(columns[name]))
+		}
+	}
+
+	return imports
+}
+
+func ColumnMapToNames(columns map[string]string) []string {
+	k := 0
+	columnNames := make([]string, len(columns))
+	for columnName := range columns {
+		columnNames[k] = columnName
+		k++
+	}
+
+	sort.Strings(columnNames)
+
+	return columnNames
+}
+
+func TSFileHeader(sb io.Writer, name string) {
+	fmt.Fprintf(sb, `/**
+ * Generated Code; DO NOT EDIT
+ *
+ * `+name+`
+ */
+`)
 }

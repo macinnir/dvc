@@ -67,10 +67,28 @@ func TestGoTypeToTypescriptString(t *testing.T) {
 		{"*Foo", "Foo"},
 		{"map[int64]*Foo", "{ [key: number]: Foo }"},
 		{"*models.Foo", "Foo"},
+
+		{"*dtos.Foo", "Foo"},
+		{"dtos.Foo", "Foo"},
+		{"[]dtos.Foo", "Foo[]"},
+		{"[]*dtos.Foo", "Foo[]"},
+
+		{"*appdtos.Foo", "Foo"},
+		{"appdtos.Foo", "Foo"},
+		{"[]appdtos.Foo", "Foo[]"},
+		{"[]*appdtos.Foo", "Foo[]"},
+
+		{"*aggregates.Foo", "Foo"},
+		{"aggregates.Foo", "Foo"},
+		{"[]aggregates.Foo", "Foo[]"},
+		{"[]*aggregates.Foo", "Foo[]"},
+
 		{"bytes.Buffer", "any"},
 		{"*bytes.Buffer", "any"},
 		{"interface{}", "any"},
 		{"[]byte", "any"},
+
+		{"[][]string", "string[][]"},
 	}
 
 	for k := range tests {
@@ -110,6 +128,16 @@ func TestGoTypeToTypescriptDefault(t *testing.T) {
 		{"*bytes.Buffer", "null"},
 		{"interface{}", "null"},
 		{"[]byte", "null"},
+
+		{"*dtos.Foo", "newFoo()"},
+		{"dtos.Foo", "newFoo()"},
+		{"[]dtos.Foo", "[]"},
+		{"[]*dtos.Foo", "[]"},
+
+		{"*appdtos.Foo", "newFoo()"},
+		{"appdtos.Foo", "newFoo()"},
+		{"[]appdtos.Foo", "[]"},
+		{"[]*appdtos.Foo", "[]"},
 	}
 
 	for k := range tests {

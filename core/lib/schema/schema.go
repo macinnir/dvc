@@ -195,7 +195,7 @@ func ExtractBaseGoType(goDataType string) string {
 
 func IsGoTypeBaseType(goDataType string) bool {
 	switch goDataType {
-	case "byte", "interface{}", "bytes.Buffer", "string", "null.String", "int", "int64", "float64", "bool":
+	case "byte", "interface{}", "bytes.Buffer", "string", "null.String", "null.Float", "int", "int64", "float64", "bool":
 		return true
 	default:
 		return false
@@ -203,10 +203,16 @@ func IsGoTypeBaseType(goDataType string) bool {
 }
 
 func GoBaseTypeToBaseTypescriptType(goDataType string) string {
+
+	if strings.Contains(goDataType, ".") && goDataType != "null.String" && goDataType != "null.Float" {
+		parts := strings.Split(goDataType, ".")
+		goDataType = parts[len(parts)-1]
+	}
+
 	switch goDataType {
 	case "string", "null.String":
 		return "string"
-	case "int", "int64", "float64":
+	case "int", "int64", "float64", "null.Float":
 		return "number"
 	case "bool":
 		return "boolean"
@@ -225,7 +231,7 @@ func GoBaseTypeToBaseTypescriptDefault(goDataType string) string {
 		return "null"
 	case "string", "null.String":
 		return "''"
-	case "int", "int64", "float64":
+	case "int", "int64", "float64", "null.Float":
 		return "0"
 	case "bool":
 		return "false"
@@ -234,22 +240,65 @@ func GoBaseTypeToBaseTypescriptDefault(goDataType string) string {
 	}
 }
 
+func ParseMapTypeToTypescriptString(goDataType string) string {
+
+	// Remove the map[ prefix
+	goDataType = goDataType[4:]
+
+	// key type
+	keyType := goDataType[0:strings.Index(goDataType, "]")]
+
+	// Remove the key
+	goDataType = goDataType[len(keyType)+1:]
+
+	return fmt.Sprintf("{ [key: %s]: %s }", GoBaseTypeToBaseTypescriptType(keyType), GoBaseTypeToBaseTypescriptType(goDataType))
+}
+
 func GoTypeToTypescriptString(goDataType string) string {
 
-	if len(goDataType) > 3 && goDataType[0:4] == "map[" {
-
-		// Remove the map[ prefix
-		goDataType = goDataType[4:]
-
-		// key type
-		keyType := goDataType[0:strings.Index(goDataType, "]")]
-
-		// Remove the key
-		goDataType = goDataType[len(keyType)+1:]
-
-		return fmt.Sprintf("{ [key: %s]: %s }", GoBaseTypeToBaseTypescriptType(keyType), GoBaseTypeToBaseTypescriptType(goDataType))
+	if len(goDataType) > 4 && goDataType[0:4] == "map[" {
+		return ParseMapTypeToTypescriptString(goDataType)
 	}
 
+	if len(goDataType) > 6 && goDataType[0:6] == "[]map[" {
+		return ParseMapTypeToTypescriptString(goDataType[2:]) + "[]"
+	}
+
+	// DTOs
+	if len(goDataType) > 5 && goDataType[0:5] == "dtos." {
+		return goDataType[5:]
+	}
+
+	if len(goDataType) > 6 && goDataType[0:6] == "*dtos." {
+		return goDataType[6:]
+	}
+
+	if len(goDataType) > 7 && goDataType[0:7] == "[]dtos." {
+		return goDataType[7:] + "[]"
+	}
+
+	if len(goDataType) > 8 && goDataType[0:8] == "[]*dtos." {
+		return goDataType[8:] + "[]"
+	}
+
+	// APPDTOs
+	if len(goDataType) > 8 && goDataType[0:8] == "appdtos." {
+		return goDataType[8:]
+	}
+
+	if len(goDataType) > 9 && goDataType[0:9] == "*appdtos." {
+		return goDataType[9:]
+	}
+
+	if len(goDataType) > 10 && goDataType[0:10] == "[]appdtos." {
+		return goDataType[10:] + "[]"
+	}
+
+	if len(goDataType) > 11 && goDataType[0:11] == "[]*appdtos." {
+		return goDataType[11:] + "[]"
+	}
+
+	// Models
 	if len(goDataType) > 7 && goDataType[0:7] == "models." {
 		return goDataType[7:]
 	}
@@ -266,11 +315,32 @@ func GoTypeToTypescriptString(goDataType string) string {
 		return goDataType[10:] + "[]"
 	}
 
+	// Aggregates
+	if len(goDataType) > 11 && goDataType[0:11] == "aggregates." {
+		return goDataType[11:]
+	}
+
+	if len(goDataType) > 12 && goDataType[0:12] == "*aggregates." {
+		return goDataType[12:]
+	}
+
+	if len(goDataType) > 13 && goDataType[0:13] == "[]aggregates." {
+		return goDataType[13:] + "[]"
+	}
+
+	if len(goDataType) > 14 && goDataType[0:14] == "[]*aggregates." {
+		return goDataType[14:] + "[]"
+	}
+
 	if (len(goDataType) >= 13 && goDataType[0:13] == "*bytes.Buffer") ||
 		(len(goDataType) >= 12 && goDataType[0:12] == "bytes.Buffer") ||
 		(len(goDataType) >= 11 && goDataType[0:11] == "interface{}") ||
 		(len(goDataType) >= 6 && goDataType[0:6] == "[]byte") {
 		return "any"
+	}
+
+	if len(goDataType) > 4 && goDataType[:4] == "[][]" {
+		return GoBaseTypeToBaseTypescriptType(goDataType[4:]) + "[][]"
 	}
 
 	if len(goDataType) > 2 && goDataType[0:2] == "[]" {
@@ -311,6 +381,22 @@ func GoTypeToTypescriptDefault(goDataType string) (fieldType string) {
 
 	if len(baseType) > 7 && baseType[0:7] == "models." {
 		return "new" + baseType[7:] + "()"
+	}
+
+	if len(baseType) > 5 && baseType[0:5] == "dtos." {
+		return "new" + baseType[5:] + "()"
+	}
+
+	if len(baseType) > 6 && baseType[0:6] == "*dtos." {
+		return "new" + baseType[6:] + "()"
+	}
+
+	if len(baseType) > 8 && baseType[0:8] == "appdtos." {
+		return "new" + baseType[8:] + "()"
+	}
+
+	if len(baseType) > 9 && baseType[0:9] == "*appdtos." {
+		return "new" + baseType[9:] + "()"
 	}
 
 	if !IsGoTypeBaseType(baseType) {

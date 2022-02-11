@@ -2,9 +2,9 @@ package gen
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/fetcher"
 	"github.com/macinnir/dvc/core/lib/gen"
 	"github.com/macinnir/dvc/core/lib/gen/routes"
 	"github.com/macinnir/dvc/core/lib/gen/typescript"
@@ -45,18 +45,50 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		gen.GenInterfaces("core/services", "gen/definitions/services")
 		gen.GenInterfaces("app/services", "gen/definitions/services")
 	case "routes":
-		if e := routes.GenRoutesAndPermissions(config); e != nil {
+		cf := fetcher.NewControllerFetcher()
+		controllers, dirs, e := cf.FetchAll()
+		if e != nil {
 			return e
 		}
+
+		if e := routes.GenRoutesAndPermissions(controllers, dirs, config); e != nil {
+			return e
+		}
+
+		if e := routes.GenTSRoutes(controllers, config); e != nil {
+			return e
+		}
+
 	case "ts":
 
-		if e := typescript.GenerateTypescriptModels(config); e != nil {
+		var e error
+		var r *lib.RoutesJSONContainer
+
+		r, e = routes.LoadRoutes(config)
+
+		if e != nil {
 			return e
 		}
 
-	case "tsdtos":
-		fmt.Println("Generating Typescript DTOs")
-		typescript.GenerateTypesriptDTOs(config)
+		if e = typescript.GenerateTypescriptModels(config, r); e != nil {
+			return e
+		}
+		if e = typescript.GenerateTypesriptDTOs(config, r); e != nil {
+			return e
+		}
+
+		tg := typescript.NewTypescriptGenerator(config, r)
+
+		if e = tg.GenerateTypesriptAggregates(); e != nil {
+			return e
+		}
+
+	// case "tsdtos":
+	// 	fmt.Println("Generating Typescript DTOs")
+	// 	typescript.GenerateTypesriptDTOs(config)
+	// case "tsaggregates":
+	// 	fmt.Println("Generating Typescript Aggregates")
+	// 	typescript.GenerateTypesriptAggregates(config)
 	case "tsperms":
 		if e := gen.GenTSPerms(config); e != nil {
 			return e

@@ -52,6 +52,8 @@ func ParseStruct2(filePath string) (*ParsedStruct, error) {
 		return nil, err
 	}
 
+	fieldNo := 0
+
 	for _, node := range f.Decls {
 		switch node.(type) {
 
@@ -86,7 +88,7 @@ func ParseStruct2(filePath string) (*ParsedStruct, error) {
 
 							// Fetch Type from scource code
 							typeInSource := src[typeExpr.Pos()-1 : typeExpr.End()-1]
-							// fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
+							fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
 							fieldType = typeInSource
 							// fmt.Println("ArrayType: ", at.Elt)
 							// case *ast.Ident:
@@ -94,10 +96,14 @@ func ParseStruct2(filePath string) (*ParsedStruct, error) {
 							// 	fieldType = i.Name
 							// }
 
-							for _, name := range field.Names {
-								// fmt.Printf("\tField: name=%s type=%s\n", name.Name, fieldType)
-								p.Fields[name.Name] = fieldType
+							if len(field.Names) > 0 {
+								for _, name := range field.Names {
+									fmt.Printf("\tField: name=%s type=%s\n", name.Name, fieldType)
+									p.Fields[name.Name] = fieldType
 
+								}
+							} else {
+								p.Fields[fmt.Sprintf("#embedded%d", fieldNo)] = fieldType
 							}
 
 						}

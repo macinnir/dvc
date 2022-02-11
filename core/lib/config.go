@@ -38,6 +38,7 @@ type Config struct {
 	TypescriptDTOsPath        string            `json:"TypescriptDTOsPath"`
 	TypescriptAggregatesPath  string            `json:"TypescriptAggregatesPath"`
 	TypescriptPermissionsPath string            `json:"TypescriptPermissionsPath"`
+	TypescriptRoutesPath      string            `json:"TypescriptRoutesPath"`
 	Packages                  struct {
 		Cache    string `json:"cache"`
 		Models   string `json:"models"`
