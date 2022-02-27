@@ -55,8 +55,15 @@ func GenTSRoutes(controllers []*lib.Controller, config *lib.Config) error {
 type TSRouteGenerator struct {
 	imports    map[string]struct{}
 	controller *lib.Controller
-	rootRoute  *lib.ControllerRoute
-	itemRoute  *lib.ControllerRoute
+
+	// rootRoute is the base route for getting this object type
+	rootRoute *lib.ControllerRoute
+	itemRoute *lib.ControllerRoute
+}
+
+// routeName returns a camelCase version of the name of the route
+func routeName(route *lib.ControllerRoute) string {
+	return strings.ToLower(route.Name[0:1]) + route.Name[1:]
 }
 
 func NewTSRouteGenerator(c *lib.Controller) *TSRouteGenerator {
@@ -71,13 +78,24 @@ func (t *TSRouteGenerator) genTSRoutesFromController(controller *lib.Controller)
 
 	// Identify root route (if any)
 	for k := range controller.Routes {
-		if strings.Count(controller.Routes[k].Path, "/") == 1 && controller.Routes[k].Method == "GET" {
+
+		routePath := controller.Routes[k].Path
+
+		// /admin
+		if len(routePath) > 6 && routePath[0:6] == "/admin" {
+			routePath = routePath[6:]
+		}
+
+		// e.g. GET /widgets
+		if strings.Count(routePath, "/") == 1 && controller.Routes[k].Method == "GET" {
 			t.rootRoute = controller.Routes[k]
 		}
 
-		if strings.Count(controller.Routes[k].Path, "/") == 2 && controller.Routes[k].Method == "GET" && len(controller.Routes[k].Params) > 0 {
+		// e.g. GET /widgets/1
+		if strings.Count(routePath, "/") == 2 && controller.Routes[k].Method == "GET" && len(controller.Routes[k].Params) > 0 {
 			t.itemRoute = controller.Routes[k]
 		}
+
 	}
 
 	// fmt.Println("Generating TSRoute from ", controller.Name)
@@ -91,11 +109,14 @@ func (t *TSRouteGenerator) genTSRoutesFromController(controller *lib.Controller)
  `)
 
 	s.WriteString(`
-import axios from 'axios'; 
-import { useQuery, useMutation, queryCache } from 'react-query';
+import axios from 'axios';
 `)
 
 	var rest strings.Builder
+
+	hasUseQuery := false
+	hasUseMutation := false
+	hasQueryCache := false
 
 	for _, route := range controller.Routes {
 
@@ -113,16 +134,43 @@ import { useQuery, useMutation, queryCache } from 'react-query';
 		if route.Method == "GET" {
 			rest.WriteString(`
 ` + t.genUseTSRoute(route))
+			hasUseQuery = true
 		}
 		if route.Method == "PUT" || route.Method == "POST" || route.Method == "DELETE" {
+
+			var mutation string
+			mutation, hasQueryCache = t.genUseMutationTSRoute(route)
 			rest.WriteString(`
-` + t.genUseMutationTSRoute(route))
+` + mutation)
+			hasUseMutation = true
 		}
 		rest.WriteString(`
 `)
 
 	}
 
+	if hasUseQuery || hasUseMutation {
+		s.WriteString(`import { `)
+
+		if hasUseQuery {
+			s.WriteString(`useQuery`)
+		}
+
+		if hasUseMutation && hasUseQuery {
+			s.WriteString(", ")
+		}
+
+		if hasUseMutation {
+			s.WriteString("useMutation")
+		}
+
+		if hasQueryCache {
+			s.WriteString(", queryCache")
+		}
+
+		s.WriteString(` } from 'react-query';
+`)
+	}
 	var imports = []string{}
 	for k := range t.imports {
 		if len(k) == 0 {
@@ -155,7 +203,7 @@ func (t *TSRouteGenerator) genTSRoute(controller *lib.Controller, route *lib.Con
 
 	var str strings.Builder
 
-	var tsRouteName = strings.ToLower(route.Name[0:1]) + route.Name[1:]
+	var tsRouteName = routeName(route)
 
 	hasBody := false
 
@@ -164,10 +212,6 @@ func (t *TSRouteGenerator) genTSRoute(controller *lib.Controller, route *lib.Con
 	argIndex := 0
 
 	args := []string{}
-
-	if route.Name == "GetUserFromID" {
-		fmt.Println("GetUserFromID: Params", len(route.Params))
-	}
 
 	// Start with Params
 	if len(route.Params) > 0 {
@@ -343,7 +387,7 @@ func (t *TSRouteGenerator) genUseTSRoute(route *lib.ControllerRoute) string {
 		}
 	}
 
-	str.WriteString(`) => useQuery(["` + strings.ToLower(route.Name[0:1]) + route.Name[1:] + `"`)
+	str.WriteString(`) => useQuery(["` + routeName(route) + `"`)
 
 	if len(argNames) > 0 {
 		str.WriteString(`, ` + strings.Join(argNames, ", "))
@@ -352,7 +396,7 @@ func (t *TSRouteGenerator) genUseTSRoute(route *lib.ControllerRoute) string {
 	if len(argNames) > 0 {
 		str.WriteString(`, ` + strings.Join(argNamesWithTypes, ", "))
 	}
-	str.WriteString(`) => ` + strings.ToLower(route.Name[0:1]) + route.Name[1:] + `(`)
+	str.WriteString(`) => ` + routeName(route) + `(`)
 	if len(argNames) > 0 {
 		str.WriteString(strings.Join(argNames, ","))
 	}
@@ -361,18 +405,21 @@ func (t *TSRouteGenerator) genUseTSRoute(route *lib.ControllerRoute) string {
 	return str.String()
 }
 
-func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) string {
+// bool - hasQueryCache
+func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) (string, bool) {
 
 	var str strings.Builder
 
 	var tsRouteName = "use" + route.Name
 
-	str.WriteString(`export const ` + tsRouteName + ` = () => useMutation(` + strings.ToLower(route.Name[0:1]) + route.Name[1:])
+	str.WriteString(`export const ` + tsRouteName + ` = () => useMutation(` + routeName(route))
 
+	hasQueryCache := false
 	if t.rootRoute != nil {
+		hasQueryCache = true
 		str.WriteString(`, {
 	onSuccess: (data, variables) => { 
-		queryCache.invalidateQueries(["` + strings.ToLower(t.rootRoute.Name[0:1]) + t.rootRoute.Name[1:] + `"]);`)
+		queryCache.invalidateQueries(["` + routeName(t.rootRoute) + `"]);`)
 
 		if t.itemRoute != nil && len(route.Params) > 0 {
 			// if route.Name == "UpdateUserGroup" {
@@ -388,7 +435,7 @@ func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) str
 
 			if containsParam {
 				str.WriteString(`
-		queryCache.invalidateQueries(["` + strings.ToLower(t.itemRoute.Name[0:1]) + t.itemRoute.Name[1:] + `", variables.` + t.itemRoute.Params[0].Name + `]);`)
+		queryCache.invalidateQueries(["` + routeName(t.itemRoute) + `", variables.` + t.itemRoute.Params[0].Name + `]);`)
 			}
 		}
 		str.WriteString(`
@@ -400,7 +447,7 @@ func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) str
 		str.WriteString(`);`)
 	}
 
-	return str.String()
+	return str.String(), hasQueryCache
 }
 
 func (t *TSRouteGenerator) AddImport(importType string) {

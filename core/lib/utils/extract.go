@@ -54,6 +54,19 @@ func ExtractIDs(objLen int, fn func(index int) int64) []int64 {
 	return ids
 }
 
+func ExtractIndex(objLen int, fn func(index int) int64) map[int64]int {
+
+	m := map[int64]int{}
+
+	for k := 0; k < objLen; k++ {
+		if _, ok := m[fn(k)]; !ok {
+			m[fn(k)] = k
+		}
+	}
+
+	return m
+}
+
 func SumFloat(objLen int, fn func(index int) float64) float64 {
 	var total float64 = 0
 	for k := 0; k < objLen; k++ {

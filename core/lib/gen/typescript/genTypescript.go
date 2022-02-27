@@ -99,6 +99,8 @@ export const new` + name + ` = () : ` + name + ` => ({
 
 func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
+	lib.EnsureDir(config.TypescriptDTOsPath)
+
 	for name := range routes.DTOs {
 		str, _ := GenerateTypescriptDTO(name, routes.DTOs[name])
 		fullFilePath := path.Join(config.TypescriptDTOsPath, name+".ts")
