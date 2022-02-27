@@ -5,6 +5,7 @@ import (
 
 	"github.com/macinnir/dvc/core/lib/utils"
 	"github.com/macinnir/dvc/core/lib/utils/request"
+	"github.com/macinnir/dvc/core/lib/utils/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,6 +40,10 @@ func (tu *testUser) Permissions() []string {
 
 func (tu *testUser) Account() int64 {
 	return tu.account
+}
+
+func (tu *testUser) SettingMgr() *types.SettingsManager {
+	return nil
 }
 
 func TestHasPerm(t *testing.T) {
