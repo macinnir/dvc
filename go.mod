@@ -7,11 +7,12 @@ require (
 	github.com/fatih/color v1.12.0 // indirect
 	github.com/fatih/structtag v1.2.0
 	github.com/go-errors/errors v1.4.0
-	github.com/go-sql-driver/mysql v1.4.1
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/martian v2.1.0+incompatible
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
+	github.com/jmoiron/sqlx v1.3.4
 	github.com/rs/xid v1.2.1
 	github.com/speps/go-hashids v2.0.0+incompatible
 	github.com/speps/go-hashids/v2 v2.0.1
