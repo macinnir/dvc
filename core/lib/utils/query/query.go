@@ -65,8 +65,58 @@ func (q OrderDir) String() string {
 	}
 }
 
+type FieldType int
+
+const (
+	FieldTypeBasic FieldType = iota
+	FieldTypeRaw
+	FieldTypeCount
+	FieldTypeSum
+	FieldTypeMin
+	FieldTypeMax
+)
+
+type Field struct {
+	FieldType FieldType
+	Name      string
+	As        string
+	Raw       string
+}
+
+// NewField creates a new field.
+// 	NewField(FieldTypeBasic, "Foo")
+// 	NewField(FieldTypeBasic, "Foo", "Bar") <-- `Foo` AS `Bar`
+func NewField(fieldType FieldType, name string, opts ...string) *Field {
+
+	as := ""
+
+	if len(opts) > 0 {
+		as = opts[0]
+	}
+
+	return &Field{
+		FieldType: fieldType,
+		Name:      name,
+		As:        as,
+		Raw:       "",
+	}
+}
+
+// NewRawField creates a new field.
+// 	NewRawField("`t`.`Foo` AS `Bar`)
+func NewRawField(raw string) *Field {
+
+	return &Field{
+		FieldType: FieldTypeRaw,
+		Name:      "",
+		As:        "",
+		Raw:       raw,
+	}
+}
+
 type Q struct {
-	fields      []string
+	fields      []*Field
+	noAlias     []int
 	alias       string
 	raw         string
 	model       IModel
@@ -84,7 +134,8 @@ type Q struct {
 
 func Query(model IModel) *Q {
 	return &Q{
-		fields:      []string{},
+		fields:      []*Field{},
+		noAlias:     []int{},
 		model:       model,
 		orderBy:     [][]string{},
 		setSorter:   []Column{},
@@ -93,6 +144,31 @@ func Query(model IModel) *Q {
 		alias:       "t",
 		errors:      []string{},
 		inst:        0,
+	}
+}
+
+func (q *Q) FromFieldToString(field *Field) string {
+
+	as := ""
+
+	if len(field.As) > 0 {
+		as = " AS `" + field.As + "`"
+	}
+
+	switch field.FieldType {
+	case FieldTypeCount:
+		return "COUNT(`" + q.alias + "`.`" + string(field.Name) + "`)" + as
+	case FieldTypeSum:
+		return "COALESCE(SUM(`" + q.alias + "`.`" + string(field.Name) + "`), 0)" + as
+	case FieldTypeMin:
+		return "COALESCE(MIN(`" + q.alias + "`.`" + string(field.Name) + "`), 0)" + as
+	case FieldTypeMax:
+		return "COALESCE(MAX(`" + q.alias + "`.`" + string(field.Name) + "`), 0)" + as
+	case FieldTypeRaw:
+		return field.Raw
+	// FieldTypeBasic
+	default:
+		return "`" + q.alias + "`.`" + string(field.Name) + "`" + as
 	}
 }
 
@@ -112,7 +188,13 @@ func (q *Q) OrderBy(col Column, dir OrderDir) *Q {
 	return q
 }
 
-func (q *Q) Fields(fields ...string) *Q {
+// Fields injects fields as raw strings into the field clause of the query
+// 	sql, e := query.Select(&testassets.Job{}).
+// 		Fields(
+// 			NewField(FieldTypeBasic, "JobID"),
+// 			NewField(FieldTypeBasic, "Name", "Foo"),
+// 		)
+func (q *Q) Fields(fields ...*Field) *Q {
 	q.fields = fields
 	return q
 }
@@ -129,7 +211,7 @@ func (q *Q) Field(name Column) *Q {
 		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Field", string(name))
 	}
 
-	q.fields = append(q.fields, "`"+q.alias+"`.`"+string(name)+"`")
+	q.fields = append(q.fields, NewField(FieldTypeBasic, string(name)))
 
 	return q
 }
@@ -141,14 +223,14 @@ func (q *Q) FieldAs(name Column, as string) *Q {
 		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Field...as", string(name))
 	}
 
-	q.fields = append(q.fields, "`"+q.alias+"`.`"+string(name)+"` AS `"+as+"`")
+	q.fields = append(q.fields, NewField(FieldTypeBasic, string(name), as))
 
 	return q
 }
 
 // FieldRaw allows for an arbitrary string (e.g. "NOW()") to be included in the select columns
 func (q *Q) FieldRaw(fieldStr, as string) *Q {
-	q.fields = append(q.fields, fieldStr+" AS "+"`"+as+"`")
+	q.fields = append(q.fields, NewRawField(fieldStr+" AS "+"`"+as+"`"))
 
 	return q
 }
@@ -160,7 +242,10 @@ func (q *Q) Count(name Column, as string) *Q {
 		return q
 	}
 
-	return q.FieldRaw("COUNT(`"+q.alias+"`.`"+string(name)+"`)", as)
+	q.fields = append(q.fields, NewField(FieldTypeCount, string(name), as))
+	return q
+
+	// return q.FieldRaw("COUNT(`"+q.alias+"`.`"+string(name)+"`)", as)
 }
 
 // Sum creates a sum statement
@@ -173,7 +258,10 @@ func (q *Q) Sum(name Column, as string) *Q {
 		return q
 	}
 
-	return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
+	q.fields = append(q.fields, NewField(FieldTypeSum, string(name), as))
+	return q
+
+	// return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
 }
 
 // Min creates a min statement
@@ -186,7 +274,10 @@ func (q *Q) Min(name Column, as string) *Q {
 		return q
 	}
 
-	return q.FieldRaw("COALESCE(MIN(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
+	q.fields = append(q.fields, NewField(FieldTypeMin, string(name), as))
+	return q
+
+	// return q.FieldRaw("COALESCE(MIN(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
 }
 
 // Max creates a max statement
@@ -199,7 +290,10 @@ func (q *Q) Max(name Column, as string) *Q {
 		return q
 	}
 
-	return q.FieldRaw("COALESCE(MAX(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
+	q.fields = append(q.fields, NewField(FieldTypeMax, string(name), as))
+	return q
+
+	// return q.FieldRaw("COALESCE(MAX(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
 }
 
 // Where creates or adds to an existing where clause
@@ -294,12 +388,20 @@ func (q *Q) String() (string, error) {
 		return sb.String(), nil
 	case QueryTypeSelect:
 
-		fields := "`" + q.alias + "`.*"
+		sb.WriteString("SELECT ")
 
 		if len(q.fields) > 0 {
-			fields = strings.Join(q.fields, ", ")
+			for k := range q.fields {
+				sb.WriteString(q.FromFieldToString(q.fields[k]))
+				if k < len(q.fields)-1 {
+					sb.WriteString(", ")
+				}
+			}
+		} else {
+			sb.WriteString("`" + q.alias + "`.*")
 		}
-		sb.WriteString("SELECT " + fields + " FROM")
+
+		sb.WriteString(" FROM")
 		// sql += fmt.Sprintf("SEsLECT %s FROM", fields)
 	case QueryTypeInsert:
 		sb.WriteString("INSERT INTO")

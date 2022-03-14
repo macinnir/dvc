@@ -307,8 +307,8 @@ func TestSelectFields2(t *testing.T) {
 func TestSelectFields3(t *testing.T) {
 	sql, e := query.Select(&testassets.Job{}).
 		Fields(
-			"`t`.`JobID`",
-			"`t`.`JobID` AS `foo`",
+			query.NewField(query.FieldTypeBasic, "JobID"),
+			query.NewField(query.FieldTypeBasic, "JobID", "foo"),
 		).
 		Where(
 			query.EQ("IsDeleted", 0),
@@ -331,6 +331,20 @@ func TestSelectAlias(t *testing.T) {
 			query.And(),
 			query.Between("AwardDate", 1, 2),
 		).
+		String()
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT COUNT(`j`.`JobID`) AS `ProjectsQuoted` FROM `Job` `j` WHERE `j`.`IsDeleted` = 0 AND `j`.`AwardDate` BETWEEN 1 AND 2", sql)
+}
+
+func TestCountAlias(t *testing.T) {
+	sql, e := query.Select(&testassets.Job{}).
+		Count("JobID", "ProjectsQuoted").
+		Where(
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
+		).
+		Alias("j").
 		String()
 	require.Nil(t, e)
 	assert.Equal(t, "SELECT COUNT(`j`.`JobID`) AS `ProjectsQuoted` FROM `Job` `j` WHERE `j`.`IsDeleted` = 0 AND `j`.`AwardDate` BETWEEN 1 AND 2", sql)
@@ -639,7 +653,8 @@ func TestMax(t *testing.T) {
 	assert.Equal(t, "SELECT COALESCE(MAX(`t`.`Year`), 0) AS `MaxYear` FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0", q1)
 }
 
-func ExampleMod() {
+func ExampleMod(t *testing.T) {
 	query.Mod("foo", 2, 1)
+
 	// Output: MOD(`t`.`foo`, 2) = 1
 }
