@@ -16,4 +16,5 @@ type IDB interface {
 	ExecMany(stmts []string, chunkSize int) (e error)
 	Host() string // The host name (from config)
 	Name() string // The name of the database (from config)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
 }

@@ -28,7 +28,7 @@ type MySQL struct {
 }
 
 // New returns a new MySQL object
-func New(config *Config, log log.ILog) IDB {
+func NewMySQL(config *Config, log log.ILog) IDB {
 	m := &MySQL{
 		config: config,
 		log:    log,
@@ -79,6 +79,10 @@ func (m *MySQL) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // The args are for any placeholder parameters in the query.
 func (m *MySQL) Exec(query string, args ...interface{}) (sql.Result, error) {
 	return m.db.Exec(query, args...)
+}
+
+func (m *MySQL) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return m.db.Query(query, args...)
 }
 
 // Get using this DB.
