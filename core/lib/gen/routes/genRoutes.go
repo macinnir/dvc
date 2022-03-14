@@ -25,7 +25,7 @@ import (
 	for k := range dirs {
 		tpl += "\t\"" + path.Join(config.BasePackage, dirs[k]) + "\"\n"
 	}
-	tpl += `	"` + config.BasePackage + `/app"
+	tpl += `	"` + config.BasePackage + `/gen/definitions"
 
 	"github.com/macinnir/dvc/core/lib/utils/request"
 )
@@ -42,7 +42,7 @@ type Controllers struct {
 	tpl += `}
 
 // NewControllers bootstraps all of the controller modules 
-func NewControllers(s *app.App, r request.IResponseLogger) *Controllers { 
+func NewControllers(s *definitions.App, r request.IResponseLogger) *Controllers { 
 	return &Controllers{
 `
 

@@ -197,10 +197,9 @@ func GenServicesBootstrap(config *lib.Config) error {
 package definitions 
 
 import (
-	"` + path.Join(config.BasePackage, "core") + `"
-	"` + path.Join(config.BasePackage, "gen/dal") + `"
-	"` + path.Join(config.BasePackage, "core/integrations") + `"
-	i "` + path.Join(config.BasePackage, "core/definitions/integrations") + `"
+	"log"
+	"os"
+	"` + path.Join(config.BasePackage, "core/app") + `" 
 `
 
 	for k := range packages {
@@ -208,6 +207,12 @@ import (
 	}
 
 	tpl += `)
+
+// App is a container for the services layer down
+type App struct { 
+	*app.BaseApp 
+	Services *Services 
+}
 
 // Services is a container for all services 
 type Services struct {
@@ -218,15 +223,36 @@ type Services struct {
 	}
 	tpl += `}
 
-// App is a container for the services layer down
-type App struct { 
-	Config *core.Config
-	DAL *dal.DAL
-	Services *Services
-	Integrations *integrations.Integrations 
-	Log i.ILog
-	APILog i.IAuthLog
-}
+// InitAppFromCLI initializes the application (presumably from the command line)
+func InitAppFromCLI(appName, version, commitHash, buildDate, clientVersion string) *App { 
+	
+	if len(appName) == 0 { 
+		log.Fatal("App name cannot be empty") 
+	}
+
+	args := os.Args
+	configFilePath := "config.json"
+	if len(args) > 1 { 
+		configFilePath = args[1] 
+	}
+
+	baseApp, coreRepos, authLog := app.NewBaseApp(configFilePath, appName, version, commitHash, buildDate, clientVersion) 
+
+	app := &App { 
+		BaseApp: baseApp, 
+	}
+
+	app.Services = &Services {`
+	for k := range packages {
+		packageName := path.Base(packages[k])
+		tpl += "\n\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(app.DAL, app.Config, app.Integrations, authLog, coreRepos, app.Cache),"
+	}
+	tpl += `
+	}
+
+	return app
+} 
+
 
 // Finish cleans up any connections from the app
 func (a *App) Finish() {
@@ -324,15 +350,15 @@ func GenInterfaces(srcDir, destDir string) error {
 
 	}
 
-	for k := range existingInterfaceMap {
-		if _, ok := addedInterfaceMap[k]; !ok {
-			fullPath := path.Join(destDir, "I"+k+".go")
-			// if e = os.Remove(fullPath); e != nil {
-			// 	return fmt.Errorf("remove file %s: %e", fullPath, e)
-			// }
-			fmt.Println("Removed interface at ", fullPath)
-		}
-	}
+	// for k := range existingInterfaceMap {
+	// 	if _, ok := addedInterfaceMap[k]; !ok {
+	// 		fullPath := path.Join(destDir, "I"+k+".go")
+	// 		// if e = os.Remove(fullPath); e != nil {
+	// 		// 	return fmt.Errorf("remove file %s: %e", fullPath, e)
+	// 		// }
+	// 		fmt.Println("Removed interface at ", fullPath)
+	// 	}
+	// }
 
 	fmt.Printf("Generated %d interfaces to %s in %f seconds\n", generatedInterfaces, destDir, time.Since(start).Seconds())
 

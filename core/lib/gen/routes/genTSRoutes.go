@@ -261,10 +261,6 @@ func (t *TSRouteGenerator) genTSRoute(controller *lib.Controller, route *lib.Con
 
 	str.WriteString(`) => await axios.` + strings.ToLower(route.Method))
 
-	if route.Name == "ExportPolicies" {
-		fmt.Println("ExportPolicies: ", route.ResponseType, "Format:", route.ResponseFormat)
-	}
-
 	var responseType = "any"
 	var isBlob = false
 	if len(route.ResponseType) > 0 {
@@ -277,10 +273,6 @@ func (t *TSRouteGenerator) genTSRoute(controller *lib.Controller, route *lib.Con
 	}
 
 	if len(responseType) > 0 {
-		if tsRouteName == "getUserSession" {
-
-			fmt.Println("getUserSession: ", route.ResponseType, responseType)
-		}
 
 		str.WriteString(`<` + responseType + `>`)
 

@@ -17,7 +17,6 @@ import (
 // GenerateTypescriptModels returns a string for a typscript types file
 func GenerateTypescriptModels(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
-	fmt.Println("Generating typescript models!")
 	lib.EnsureDir(config.TypescriptModelsPath)
 
 	var e error
