@@ -529,25 +529,25 @@ func (r *` + modelNode.Name + `DALSelector) Alias(alias string) *` + modelNode.N
 	return r
 }
 
-func (r *` + modelNode.Name + `DALSelector) Sum(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-	r.q.Sum(fieldName, fieldAlias)
-	return r
-}
+// func (r *` + modelNode.Name + `DALSelector) Sum(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+// 	r.q.Sum(fieldName, fieldAlias)
+// 	return r
+// }
 
-func (r *` + modelNode.Name + `DALSelector) Count(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-	r.q.Count(fieldName, fieldAlias)
-	return r
-}
+// func (r *` + modelNode.Name + `DALSelector) Count(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+// 	r.q.Count(fieldName, fieldAlias)
+// 	return r
+// }
 
-func (r *` + modelNode.Name + `DALSelector) Min(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-	r.q.Min(fieldName, fieldAlias)
-	return r
-}
+// func (r *` + modelNode.Name + `DALSelector) Min(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+// 	r.q.Min(fieldName, fieldAlias)
+// 	return r
+// }
 
-func (r *` + modelNode.Name + `DALSelector) Max(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-	r.q.Max(fieldName, fieldAlias)
-	return r
-}
+// func (r *` + modelNode.Name + `DALSelector) Max(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
+// 	r.q.Max(fieldName, fieldAlias)
+// 	return r
+// }
 
 func (r *` + modelNode.Name + `DALSelector) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALSelector {
 	r.q.Where(whereParts...)
@@ -566,18 +566,47 @@ func (r *` + modelNode.Name + `DALSelector) OrderBy(col query.Column, dir query.
 
 func (r *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, error) {
 	model := []*` + modelNode.Name + `{}
+`)
+
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`	r.q.Field("` + f.Name + `")
+`)
+	}
+	b.WriteString(`
 	q, e := r.q.String()
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query.String(): %w", e)
 	}
 
-	e = r.db.Select(&model, q)
+	var rows *sql.Rows 
+	rows, e = r.db.Query(q) 
 
 	if e != nil {
-		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query(%s).Run(): %w", q, e)
+		if e == sql.ErrNoRows { 
+			return nil, nil 
+		}
+		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Run(%s): %w", q, e)
 	}
 
-	fmt.Printf("` + modelNode.Name + `DAL.Query(%s).Run()\n", q)
+	defer rows.Close() 
+	for rows.Next() { 
+		m := &` + modelNode.Name + `{}
+		if e = rows.Scan(
+`)
+
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`			&m.` + f.Name + `,
+`)
+	}
+
+	b.WriteString(`		); e != nil { 
+			return nil, fmt.Errorf("` + modelNode.Name + `DALSelector(%s).Run(): %w", q, e)
+		}
+
+		model = append(model, m)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DALSelector(%s).Run()\n", q)
 
 	return model, nil
 }
@@ -767,18 +796,45 @@ func (ds *` + modelNode.Name + `DALGetter) OrderBy(col query.Column, dir query.O
 func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error) {
 
 	model := &` + modelNode.Name + `{}
+
+	`)
+
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`	ds.q.Field("` + f.Name + `")
+`)
+	}
+	b.WriteString(`
 	q, e := ds.q.String()
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(model, q)
+	var rows *sql.Rows 
+	rows, e = ds.db.Query(q) 
 
 	if e != nil {
 		if e == sql.ErrNoRows { 
 			return nil, nil 
 		}
 		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Run(%s): %w", q, e)
+	}
+
+	defer rows.Close() 
+	
+	if ok := rows.Next(); !ok { 
+		return nil, nil
+	}
+
+	if e = rows.Scan(
+`)
+
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`		&model.` + f.Name + `,
+`)
+	}
+
+	b.WriteString(`	); e != nil { 
+		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter(%s).Run(): %w", q, e)
 	}
 
 	fmt.Printf("` + modelNode.Name + `DALGetter.Get(%s).Run()\n", q)

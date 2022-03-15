@@ -384,6 +384,40 @@ func TestSelectExists(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestSelectNotExists(t *testing.T) {
+
+	actual, e := query.Select(&testassets.Job{}).
+		Count("JobID", "ProjectsQuoted").
+		Sum("TotalPrice", "SalesVolume").
+		Where(
+			query.NotExists(
+				query.Select(&testassets.JobSales{}).
+					Alias("js").
+					FieldRaw("1", "n").
+					Where(
+						query.EQF("JobID", "`t`.`JobID`"),
+						query.And(),
+						query.EQ("IsDeleted", 0),
+						query.And(),
+						query.EQ("UserID", 1),
+					),
+			),
+
+			//"SELECT 1 FROM `JobSales` `js` WHERE `js`.`JobID` = `j`.`JobID` AND `js`.`IsDeleted` = 0 AND `js`.`UserID` = 1"
+			query.And(),
+			query.EQ("IsDeleted", 0),
+			query.And(),
+			query.Between("AwardDate", 1, 2),
+		).String()
+
+	require.Nil(t, e)
+	expected := "SELECT COUNT(`t`.`JobID`) AS `ProjectsQuoted`, COALESCE(SUM(`t`.`TotalPrice`), 0) AS `SalesVolume` FROM `Job` `t` WHERE"
+	expected += " NOT EXISTS ( SELECT 1 AS `n` FROM `JobSales` `js` WHERE `js`.`JobID` = `t`.`JobID` AND `js`.`IsDeleted` = 0 AND `js`.`UserID` = 1 )"
+	expected += " AND `t`.`IsDeleted` = 0 AND `t`.`AwardDate` BETWEEN 1 AND 2"
+
+	assert.Equal(t, expected, actual)
+}
+
 func TestWhereTypeAll(t *testing.T) {
 	q, e := query.Select(&testassets.Job{}).Where(query.WhereAll()).String()
 	require.Nil(t, e)

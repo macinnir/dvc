@@ -602,6 +602,8 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			sb.WriteString(" NOT IN ")
 		case WhereTypeExists:
 			sb.WriteString("EXISTS")
+		case WhereTypeNotExists:
+			sb.WriteString("NOT EXISTS")
 		case WhereTypeBetween:
 			sb.WriteString(" BETWEEN ")
 		case WhereTypeAnd:
@@ -629,7 +631,7 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			sb.WriteString(" NOT LIKE ")
 		}
 
-		if w.whereType != WhereTypeExists && !isConj && len(w.values) > 0 {
+		if w.whereType != WhereTypeExists && w.whereType != WhereTypeNotExists && !isConj && len(w.values) > 0 {
 
 			switch w.whereType {
 			case WhereTypeEqualsField:
@@ -680,7 +682,7 @@ func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WhereP
 			}
 		}
 
-		if w.whereType == WhereTypeExists {
+		if w.whereType == WhereTypeExists || w.whereType == WhereTypeNotExists {
 			sb.WriteString(" ( " + fmt.Sprint(w.values[0]) + " )")
 		}
 
@@ -717,6 +719,7 @@ const (
 	WhereTypeIN
 	WhereTypeNotIN
 	WhereTypeExists
+	WhereTypeNotExists
 	WhereTypeAnd
 	WhereTypeOr
 	WhereTypeParenthesisEnd
@@ -1124,11 +1127,27 @@ func WhereAll() *WherePart {
 	)
 }
 
+// Exists is a where clause for the SQL EXISTS statement
 func Exists(clause *Q) *WherePart {
 	clauseString, e := clause.String()
 
 	w := newWherePart(
 		WhereTypeExists,
+		"",
+		[]interface{}{clauseString},
+	)
+	if e != nil {
+		w.e = e
+	}
+	return w
+}
+
+// Exists is a where clause for the SQL EXISTS statement
+func NotExists(clause *Q) *WherePart {
+	clauseString, e := clause.String()
+
+	w := newWherePart(
+		WhereTypeNotExists,
 		"",
 		[]interface{}{clauseString},
 	)
