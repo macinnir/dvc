@@ -568,11 +568,15 @@ func (r *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, er
 	model := []*` + modelNode.Name + `{}
 `)
 
+	b.WriteString(`	r.q.Fields(
+`)
 	for _, f := range *modelNode.Fields {
-		b.WriteString(`	r.q.Field("` + f.Name + `")
+		b.WriteString(`	query.NewField(query.FieldTypeBasic, ` + modelNode.Name + `_Column_` + f.Name + `),
 `)
 	}
 	b.WriteString(`
+	)
+
 	q, e := r.q.String()
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Query.String(): %w", e)
@@ -585,7 +589,7 @@ func (r *` + modelNode.Name + `DALSelector) Run() ([]*` + modelNode.Name + `, er
 		if e == sql.ErrNoRows { 
 			return nil, nil 
 		}
-		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Run(%s): %w", q, e)
+		return nil, fmt.Errorf("` + modelNode.Name + `DALSelector.Run(%s): %w", q, e)
 	}
 
 	defer rows.Close() 
@@ -798,12 +802,14 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 	model := &` + modelNode.Name + `{}
 
 	`)
-
+	b.WriteString(`	ds.q.Fields(
+`)
 	for _, f := range *modelNode.Fields {
-		b.WriteString(`	ds.q.Field("` + f.Name + `")
+		b.WriteString(`	query.NewField(query.FieldTypeBasic, ` + modelNode.Name + `_Column_` + f.Name + `),
 `)
 	}
 	b.WriteString(`
+	)
 	q, e := ds.q.String()
 	if e != nil {
 		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Query.String(): %w", e)

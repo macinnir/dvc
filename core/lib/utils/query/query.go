@@ -78,7 +78,7 @@ const (
 
 type Field struct {
 	FieldType FieldType
-	Name      string
+	Name      Column
 	As        string
 	Raw       string
 }
@@ -86,7 +86,7 @@ type Field struct {
 // NewField creates a new field.
 // 	NewField(FieldTypeBasic, "Foo")
 // 	NewField(FieldTypeBasic, "Foo", "Bar") <-- `Foo` AS `Bar`
-func NewField(fieldType FieldType, name string, opts ...string) *Field {
+func NewField(fieldType FieldType, column Column, opts ...string) *Field {
 
 	as := ""
 
@@ -96,7 +96,7 @@ func NewField(fieldType FieldType, name string, opts ...string) *Field {
 
 	return &Field{
 		FieldType: fieldType,
-		Name:      name,
+		Name:      column,
 		As:        as,
 		Raw:       "",
 	}
@@ -211,7 +211,7 @@ func (q *Q) Field(name Column) *Q {
 		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Field", string(name))
 	}
 
-	q.fields = append(q.fields, NewField(FieldTypeBasic, string(name)))
+	q.fields = append(q.fields, NewField(FieldTypeBasic, name))
 
 	return q
 }
@@ -223,7 +223,7 @@ func (q *Q) FieldAs(name Column, as string) *Q {
 		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Field...as", string(name))
 	}
 
-	q.fields = append(q.fields, NewField(FieldTypeBasic, string(name), as))
+	q.fields = append(q.fields, NewField(FieldTypeBasic, name, as))
 
 	return q
 }
@@ -235,6 +235,9 @@ func (q *Q) FieldRaw(fieldStr, as string) *Q {
 	return q
 }
 
+// Count creates a count statement
+// 	q.Count(query.Column("Foo"), "FooCounted")
+// 	COALESCE(COUNT(`t`.`Foo`), 0) AS `FooCounted`
 func (q *Q) Count(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
@@ -242,7 +245,7 @@ func (q *Q) Count(name Column, as string) *Q {
 		return q
 	}
 
-	q.fields = append(q.fields, NewField(FieldTypeCount, string(name), as))
+	q.fields = append(q.fields, NewField(FieldTypeCount, name, as))
 	return q
 
 	// return q.FieldRaw("COUNT(`"+q.alias+"`.`"+string(name)+"`)", as)
@@ -258,7 +261,7 @@ func (q *Q) Sum(name Column, as string) *Q {
 		return q
 	}
 
-	q.fields = append(q.fields, NewField(FieldTypeSum, string(name), as))
+	q.fields = append(q.fields, NewField(FieldTypeSum, name, as))
 	return q
 
 	// return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
@@ -274,7 +277,7 @@ func (q *Q) Min(name Column, as string) *Q {
 		return q
 	}
 
-	q.fields = append(q.fields, NewField(FieldTypeMin, string(name), as))
+	q.fields = append(q.fields, NewField(FieldTypeMin, name, as))
 	return q
 
 	// return q.FieldRaw("COALESCE(MIN(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
@@ -290,7 +293,7 @@ func (q *Q) Max(name Column, as string) *Q {
 		return q
 	}
 
-	q.fields = append(q.fields, NewField(FieldTypeMax, string(name), as))
+	q.fields = append(q.fields, NewField(FieldTypeMax, name, as))
 	return q
 
 	// return q.FieldRaw("COALESCE(MAX(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
