@@ -82,6 +82,12 @@ func TestQuerySelect(t *testing.T) {
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
 }
 
+func TestQuerySelect_LimitPage(t *testing.T) {
+	sql, e := query.Select(&testassets.Comment{}).LimitPage(10, 5).String()
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` LIMIT 10 OFFSET 50", sql, "LimitPage() should have an offset that multiplies the limit by the page")
+}
+
 func TestQuerySelect_InvalidOrderByColumn(t *testing.T) {
 
 	q, e := query.Select(&testassets.Comment{}).OrderBy("CommentID", query.OrderDirASC).String()

@@ -183,6 +183,12 @@ func (q *Q) Limit(limit, offset int64) *Q {
 	return q
 }
 
+func (q *Q) LimitPage(limit, page int64) *Q {
+	q.limit = limit
+	q.offset = limit * page
+	return q
+}
+
 func (q *Q) OrderBy(col Column, dir OrderDir) *Q {
 	q.orderBy = append(q.orderBy, []string{string(col), dir.String()})
 	return q
