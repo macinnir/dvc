@@ -56,11 +56,12 @@ const (
 
 // RoutesJSONContainer is a container for JSON Routes
 type RoutesJSONContainer struct {
-	Routes     map[string]*ControllerRoute  `json:"routes"`
-	DTOs       map[string]map[string]string `json:"dtos"`
-	Models     map[string]map[string]string `json:"models"`
-	Aggregates map[string]map[string]string `json:"aggregates"`
-	Constants  map[string][]string          `json:"constants"`
+	Routes      map[string]*ControllerRoute  `json:"routes"`
+	DTOs        map[string]map[string]string `json:"dtos"`
+	Models      map[string]map[string]string `json:"models"`
+	Aggregates  map[string]map[string]string `json:"aggregates"`
+	Constants   map[string][]string          `json:"constants"`
+	Permissions map[string]string            `json:"permissions"`
 }
 
 // Controller represents a REST controller

@@ -152,6 +152,8 @@ func TestExtractBaseGoType(t *testing.T) {
 		GoType   string
 		BaseType string
 	}{
+		{"", ""},
+		{"*", ""},
 		{"int64", "int64"},
 		{"int", "int"},
 		{"float64", "float64"},

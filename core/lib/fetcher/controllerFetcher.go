@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/fetcher/queryparser"
 )
 
 const (
@@ -136,7 +137,7 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 		routeSignature := route.Method + " " + route.Path
 		if _, ok := cf.routeMap[routeSignature]; ok {
-			e = fmt.Errorf("Duplicate route signature `%s` for method `%s`.`%s`", routeSignature, controller.Name, route.Name)
+			e = fmt.Errorf("duplicate route signature `%s` for method `%s`.`%s`", routeSignature, controller.Name, route.Name)
 			return
 		}
 
@@ -225,7 +226,7 @@ func parseControllerMethod(
 		// @route
 		if len(doc) > 9 && doc[0:9] == "// "+RouteTagRoute {
 
-			if e = parseRouteString(route, doc); e != nil {
+			if e = queryparser.ParseRouteString(route, doc); e != nil {
 				log.Fatalf("method `%s.%s`: `%s`", controller.Name, route.Name, e.Error())
 			}
 
@@ -253,8 +254,6 @@ func extractControllerNameFromFileName(path string) string {
 
 	// Must be aleast 14 chars (e.g. AController.go)
 
-	// fmt.Println("Extracting controller name", fileName)
-
 	if
 	// 14 chars
 	len(fileName) < 14 ||
@@ -268,128 +267,4 @@ func extractControllerNameFromFileName(path string) string {
 	}
 
 	return fileName[:len(fileName)-13]
-}
-
-func parseRouteString(route *lib.ControllerRoute, routeString string) error {
-
-	lineParts := strings.Split(routeString, " ")
-	if len(lineParts) < 4 {
-		return fmt.Errorf("invalid route comment `%s`", routeString)
-	}
-	route.Method = lineParts[2]
-	route.Raw = lineParts[3]
-
-	route.Path, route.Queries = extractQueriesFromRoutePath(route.Raw)
-
-	params, _ := extractParamsFromRoutePath(route.Path)
-	route.Params = append(route.Params, params...)
-	return nil
-}
-
-func extractParamsFromRoutePath(routePath string) (params []lib.ControllerRouteParam, e error) {
-
-	params = []lib.ControllerRouteParam{}
-
-	// Params
-	if strings.Contains(routePath, "{") {
-
-		routeParts := strings.Split(routePath, "{")
-
-		for _, p := range routeParts[1:] {
-
-			if !strings.Contains(p, "}") || !strings.Contains(p, ":") {
-				continue
-			}
-
-			param := extractParamFromString(p)
-
-			params = append(params, param)
-		}
-	}
-
-	return
-}
-
-func extractParamFromString(paramString string) (param lib.ControllerRouteParam) {
-
-	// Incase there are parts after the param, split on the closing bracket
-	pParts := strings.Split(paramString, "}")
-	paramString = pParts[0]
-
-	paramParts := strings.Split(paramString, ":")
-
-	param = lib.ControllerRouteParam{
-		Name:    paramParts[0],
-		Pattern: paramParts[1],
-	}
-
-	param.Type = matchPatternToDataType(param.Pattern)
-	return
-}
-
-func matchPatternToDataType(pattern string) string {
-	if pattern == "[0-9]" || pattern == "[0-9]+" {
-		return "int64"
-	}
-
-	return "string"
-}
-
-func extractQueriesFromRoutePath(routePath string) (string, []lib.ControllerRouteQuery) {
-
-	queries := []lib.ControllerRouteQuery{}
-
-	if !strings.Contains(routePath, "?") {
-		return routePath, queries
-	}
-
-	subParts := strings.Split(routePath, "?")
-	routePath = subParts[0]
-	queryStrings := strings.Split(subParts[1], "&")
-
-	for _, query := range queryStrings {
-
-		if !strings.Contains(query, "=") {
-			continue
-		}
-
-		queryParts := strings.Split(query, "=")
-
-		o := lib.ControllerRouteQuery{
-			Name:     queryParts[0],
-			ValueRaw: queryParts[1],
-		}
-
-		if strings.Contains(o.ValueRaw, ":") {
-			queryValueParts := strings.Split(o.ValueRaw, ":")
-			// Remove the starting "{"
-			o.VariableName = queryValueParts[0][1:]
-
-			// Remove the ending "}"
-			o.Pattern = strings.Join(queryValueParts[1:], ":")
-			o.Pattern = o.Pattern[0 : len(o.Pattern)-1]
-
-			// Check if the value isn't a constant value
-			if o.Pattern == "[0-9]" || o.Pattern == "[0-9]+" {
-				o.Type = "int64"
-			} else {
-				o.Type = "string"
-			}
-		} else {
-			// Try to parse the value as an int64
-			// e.g. param=123
-
-			o.VariableName = o.Name
-
-			if _, e := strconv.ParseInt(o.ValueRaw, 10, 64); e != nil {
-				o.Type = "string"
-			} else {
-				o.Type = "int64"
-			}
-		}
-
-		queries = append(queries, o)
-	}
-
-	return routePath, queries
 }

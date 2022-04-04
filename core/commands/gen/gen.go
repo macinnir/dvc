@@ -83,6 +83,8 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
+		routes.GenAPIDocs(config, r)
+
 	// case "tsdtos":
 	// 	fmt.Println("Generating Typescript DTOs")
 	// 	typescript.GenerateTypesriptDTOs(config)

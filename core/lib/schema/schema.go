@@ -166,7 +166,17 @@ func DataTypeToTypescriptString(dbDataType string) (fieldType string) {
 }
 
 func ExtractBaseGoType(goDataType string) string {
+
+	if len(goDataType) == 0 {
+		return ""
+	}
+
 	for {
+
+		if len(goDataType) == 0 {
+			break
+		}
+
 		if goDataType[0:1] == "*" {
 			goDataType = goDataType[1:]
 			continue

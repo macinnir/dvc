@@ -230,8 +230,6 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 
 	for _, route := range controller.Routes {
 
-		// fmt.Println("Route: " + route.Name)
-
 		// Method comments
 		s = append(s, fmt.Sprintf("\t// %s.%s.%s", strings.Title(controller.Package), controller.Name, route.Name))
 		s = append(s, fmt.Sprintf("\t// %s %s", route.Method, route.Raw))
@@ -287,8 +285,13 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 		if len(route.Params) > 0 {
 			for _, param := range route.Params {
 				s = append(s, fmt.Sprintf("\t\t// URL Param %s", param.Name))
+				s = append(s, fmt.Sprintf("\t\t// %s", param.Pattern))
 				if param.Type == "int64" {
-					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", 0)\n", param.Name, param.Name))
+					defaultValue := "0"
+					if param.Pattern == "-?[0-9]+" {
+						defaultValue = "-1"
+					}
+					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", %s)\n", param.Name, param.Name, defaultValue))
 				} else {
 					s = append(s, fmt.Sprintf("\t\t%s := req.Arg(\"%s\", \"\")\n", param.Name, param.Name))
 				}
@@ -300,8 +303,14 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 		if len(route.Queries) > 0 {
 			for _, query := range route.Queries {
 				s = append(s, fmt.Sprintf("\t\t// Query Arg %s", query.VariableName))
+				s = append(s, fmt.Sprintf("\t\t// %s", query.Pattern))
+
 				if query.Type == "int64" {
-					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", 0)\n", query.VariableName, query.VariableName))
+					defaultValue := "0"
+					if query.Pattern == "-?[0-9]+" {
+						defaultValue = "-1"
+					}
+					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", %s)\n", query.VariableName, query.VariableName, defaultValue))
 				} else {
 					s = append(s, fmt.Sprintf("\t\t%s := req.Arg(\"%s\", \"\")\n", query.VariableName, query.VariableName))
 				}
@@ -412,9 +421,7 @@ func genModelsMap() map[string]map[string]string {
 		}
 
 		modelName := name[0 : len(name)-3]
-		// fmt.Println("Model: ", fileNameNoExt)
 		fullPath := path.Join(modelsDir, name)
-		// fmt.Println(fullPath)
 
 		model, e := gen.InspectFile(fullPath)
 		if e != nil {

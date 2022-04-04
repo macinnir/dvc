@@ -13,7 +13,7 @@ import (
 	"github.com/macinnir/dvc/core/lib/fetcher"
 )
 
-func fetchAllPermissionsFromControllers(controllersDir string) (map[string]string, error) {
+func FetchAllPermissionsFromControllers(controllersDir string) (map[string]string, error) {
 
 	cf := fetcher.NewControllerFetcher()
 	controllers, _, e := cf.FetchAll()
@@ -22,7 +22,7 @@ func fetchAllPermissionsFromControllers(controllersDir string) (map[string]strin
 		return nil, e
 	}
 
-	permissionMap := LoadPermissionsFromJSON(lib.CorePermissionsFile)
+	permissionMap := LoadPermissionsFromJSON()
 
 	for k := range controllers {
 
@@ -39,13 +39,13 @@ func fetchAllPermissionsFromControllers(controllersDir string) (map[string]strin
 }
 
 // LoadPermissionsFromJSON loads a set of permissions from a JSON file
-func LoadPermissionsFromJSON(filePath string) map[string]string {
+func LoadPermissionsFromJSON() map[string]string {
 
 	permissionMap := map[string]string{}
 	var fileBytes []byte
 
 	// Core permissions
-	if _, e := os.Stat(filePath); !os.IsNotExist(e) {
+	if _, e := os.Stat(lib.CorePermissionsFile); !os.IsNotExist(e) {
 		fileBytes, _ = ioutil.ReadFile(lib.CorePermissionsFile)
 		json.Unmarshal(fileBytes, &permissionMap)
 	}
@@ -69,7 +69,7 @@ func GenTSPerms(config *lib.Config) (e error) {
 	lib.EnsureDir(config.TypescriptPermissionsPath)
 
 	var permissionMap map[string]string
-	permissionMap, e = fetchAllPermissionsFromControllers(config.Dirs.Controllers)
+	permissionMap, e = FetchAllPermissionsFromControllers(config.Dirs.Controllers)
 	if e != nil {
 		return
 	}
@@ -81,7 +81,7 @@ func GenTSPerms(config *lib.Config) (e error) {
 func GenGoPerms(config *lib.Config) (e error) {
 
 	var permissionMap map[string]string
-	permissionMap, e = fetchAllPermissionsFromControllers(config.Dirs.Controllers)
+	permissionMap, e = FetchAllPermissionsFromControllers(config.Dirs.Controllers)
 	if e != nil {
 		return
 	}
