@@ -312,7 +312,111 @@ func objectToTable(routes *lib.RoutesJSONContainer, obj string) string {
 
 	// }
 
-	return ""
+}
+
+func goTypeToSwiftType(goType string) string {
+
+	switch goType {
+	case "int":
+		return "Int"
+	case "int64":
+		return "Int64"
+	case "null.String", "string":
+		return "String"
+	case "float64", "null.Float":
+		return "Float64"
+	}
+
+	isArray := false
+	if len(goType) > 2 && goType[0:2] == "[]" {
+		isArray = true
+	}
+
+	goType = cleanObject(goType)
+
+	if isArray {
+		return "[" + goType + "]"
+	}
+
+	return goType
+}
+
+func baseObjectToSwiftSource(routes *lib.RoutesJSONContainer, obj map[string]string) string {
+
+	var names = []string{}
+	for name := range obj {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	var sb strings.Builder
+
+	for k := range names {
+
+		var name = names[k]
+		value := obj[name]
+		// simpleType := schema.ExtractBaseGoType(value)
+
+		if len(name) > 9 && name[0:9] == "#embedded" {
+			sb.WriteString(objectToSwiftSource(routes, value))
+			continue
+		}
+
+		sb.WriteString(`
+	var ` + name + ` : ` + goTypeToSwiftType(value))
+		// if isComplexObject(simpleType) {
+		// 	sb.WriteString(`<a href="#type-` + cleanObject(simpleType) + `">` + value + `</a>`)
+		// } else {
+		// 	sb.WriteString(value)
+		// }
+
+		// sb.WriteString(`</span></td></tr>`)
+	}
+
+	return sb.String()
+}
+
+func objectToSwiftSource(routes *lib.RoutesJSONContainer, obj string) string {
+
+	// struct Account : Decodable {
+	//    var AccountID: Int64
+	//    var CreatedBy: Int64
+	//    var DateCreated: Int64
+	//    var IsDeleted: Int
+	//    var MaxUserCount: Int64
+	//    var OwnerID: Int64
+	//    var Title: String
+	//    var UserCount: Int64
+	// }
+
+	var baseType = getBaseType(obj)
+	var objName = cleanObject(obj)
+
+	fmt.Println("objectToTable:" + baseType + " -> " + objName)
+	var objType = map[string]string{}
+
+	switch baseType {
+	case "dto":
+		if _, ok := routes.DTOs[objName]; !ok {
+			return ""
+		}
+		objType = routes.DTOs[objName]
+
+	case "model":
+		if _, ok := routes.Models[objName]; !ok {
+			return ""
+		}
+		objType = routes.Models[objName]
+
+	case "aggregate":
+		if _, ok := routes.Aggregates[objName]; !ok {
+			return ""
+		}
+		objType = routes.Aggregates[objName]
+	}
+
+	return baseObjectToSwiftSource(routes, objType)
 
 }
 
@@ -434,6 +538,8 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 			<div id="main-right">
 	`)
 
+	var usages = map[string]map[string]struct{}{}
+
 	for k := range controllerNames {
 		sb.WriteString(`
 				<div id="controller-` + controllerNames[k] + `" class="controller-container">
@@ -530,6 +636,7 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 			}
 
 			if len(route.BodyType) > 0 {
+
 				sb.WriteString(`
 							<h4>Body</h4>
 							<div class="endpoint-body">
@@ -539,6 +646,12 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 
 				bodyType := cleanObject(route.BodyType)
 
+				if _, ok := usages[bodyType]; !ok {
+					usages[bodyType] = map[string]struct{}{}
+				}
+
+				usages[bodyType][route.Name] = struct{}{}
+
 				sb.WriteString(`</div>
 								<div class="endpoint-body-footer"><a href="#type-` + bodyType + `">` + bodyType + `</a></div>
 							</div>`)
@@ -547,6 +660,11 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 			if len(route.ResponseType) > 0 {
 
 				var responseType = cleanObject(route.ResponseType)
+				if _, ok := usages[responseType]; !ok {
+					usages[responseType] = map[string]struct{}{}
+				}
+
+				usages[responseType][route.Name] = struct{}{}
 
 				sb.WriteString(`
 								<h4>Response</h4>
@@ -606,6 +724,36 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 									</tbody>
 								</table>		
 							</div>
+							
+							
+							<a class="btn btn-primary" data-bs-toggle="collapse" href="#collapse-type-source-` + name + `-swift">Swift</a>
+							`)
+
+		if _, ok := usages[name]; ok {
+
+			routeNames := []string{}
+
+			for routeName := range usages[name] {
+				routeNames = append(routeNames, routeName)
+			}
+
+			sort.Strings(routeNames)
+
+			sb.WriteString(`<strong>Used In:</strong>&nbsp;`)
+
+			for l := range routeNames {
+				sb.WriteString(`<a href="#route-` + routeNames[l] + `">` + routeNames[l] + `</a>&nbsp;`)
+			}
+		}
+
+		sb.WriteString(`
+
+							<div class="collapse" id="collapse-type-source-` + name + `-swift">
+	 							<a class="btn" onclick="copyContentToClipboard('collapse-type-source-` + name + `-swift-inner')">Copy Swift Code</a>
+	 							<div class="source-code" id="collapse-type-source-` + name + `-swift-inner">struct ` + name + ` : Codable {` + objectToSwiftSource(routes, rawName) + `
+}</div>
+							</div>
+	
 							<div class="type-footer">
 									
 								<div class="type-footer-left">
@@ -814,8 +962,8 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 	sb.WriteString(`
 						
 
-			<!-- /#main-right -->
-			</div>
+		<!-- /#main-right -->
+		</div>
 
 		<script type="application/javascript">
 
@@ -824,6 +972,11 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 				navigator.clipboard.writeText(content)
 			}
 	
+			function copyContentToClipboard(id) { 
+				var copyText = document.getElementById(id);
+				navigator.clipboard.writeText(copyText.innerText); 
+			}
+
 			console.log('Running this!!'); 
 			// window.scrollTo(0, 10000);
 		</script>
