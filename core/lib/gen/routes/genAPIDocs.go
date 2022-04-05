@@ -258,6 +258,7 @@ func objectToString(routes *lib.RoutesJSONContainer, obj string, embedded bool, 
 
 	case "model":
 		if _, ok := routes.Models[objName]; !ok {
+			fmt.Println("Can't find model:", obj)
 			return ""
 		}
 
@@ -282,8 +283,6 @@ func objectToTable(routes *lib.RoutesJSONContainer, obj string) string {
 
 	var baseType = getBaseType(obj)
 	var objName = cleanObject(obj)
-
-	fmt.Println("objectToTable:" + baseType + " -> " + objName)
 	var objType = map[string]string{}
 
 	switch baseType {
@@ -321,8 +320,10 @@ func goTypeToSwiftType(goType string) string {
 		return "Int"
 	case "int64":
 		return "Int64"
-	case "null.String", "string":
+	case "string":
 		return "String"
+	case "null.String":
+		return "String?"
 	case "float64", "null.Float":
 		return "Float64"
 	}
@@ -393,7 +394,6 @@ func objectToSwiftSource(routes *lib.RoutesJSONContainer, obj string) string {
 	var baseType = getBaseType(obj)
 	var objName = cleanObject(obj)
 
-	fmt.Println("objectToTable:" + baseType + " -> " + objName)
 	var objType = map[string]string{}
 
 	switch baseType {
@@ -725,9 +725,30 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 								</table>		
 							</div>
 							
+							<div class="collapse" id="collapse-type-source-` + name + `-swift">
+							<div class="source-code" id="collapse-type-source-` + name + `-swift-inner">struct ` + name + ` : Codable {` + objectToSwiftSource(routes, rawName) + `
+}</div>
+							</div>
 							
-							<a class="btn btn-primary" data-bs-toggle="collapse" href="#collapse-type-source-` + name + `-swift">Swift</a>
-							`)
+							<div class="type-footer">
+							
+								<div class="type-footer-left">
+									Swift: 
+									<a data-bs-toggle="collapse" href="#collapse-type-source-` + name + `-swift">
+										Show 
+									</a> |
+									<a href="javascript:void(0);" onclick="copyContentToClipboard('collapse-type-source-` + name + `-swift-inner')">
+										Copy
+									</a>
+									&nbsp; | &nbsp;
+									<a href="javascript:void(0);" onclick="copyHashToClipboard('#type-` + name + `')">
+										Copy Link
+									</a>
+								</div>
+
+								<div class="type-footer-right">File: </div>
+
+							</div>`)
 
 		if _, ok := usages[name]; ok {
 
@@ -739,32 +760,17 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 
 			sort.Strings(routeNames)
 
-			sb.WriteString(`<strong>Used In:</strong>&nbsp;`)
+			sb.WriteString(`<div class="type-used-in"><strong>Used In:</strong>&nbsp;`)
 
 			for l := range routeNames {
-				sb.WriteString(`<a href="#route-` + routeNames[l] + `">` + routeNames[l] + `</a>&nbsp;`)
+				sb.WriteString(`<a href="#route-` + routeNames[l] + `">` + routeNames[l] + `</a>`)
+				if l < len(routeNames)-1 {
+					sb.WriteString("&nbsp;|&nbsp;")
+				}
 			}
+			sb.WriteString(`</div>`)
 		}
-
 		sb.WriteString(`
-
-							<div class="collapse" id="collapse-type-source-` + name + `-swift">
-	 							<a class="btn" onclick="copyContentToClipboard('collapse-type-source-` + name + `-swift-inner')">Copy Swift Code</a>
-	 							<div class="source-code" id="collapse-type-source-` + name + `-swift-inner">struct ` + name + ` : Codable {` + objectToSwiftSource(routes, rawName) + `
-}</div>
-							</div>
-	
-							<div class="type-footer">
-									
-								<div class="type-footer-left">
-									<a href="javascript:void(0);" onclick="copyHashToClipboard('#type-` + name + `')">
-										Copy Link
-									</a>
-								</div>
-
-								<div class="type-footer-right">File: </div>
-
-							</div>
 						</div>
 
 		`)
@@ -1271,8 +1277,6 @@ func htmlHeader() string {
 		}
 
 		#types-container { 
-			border: solid 1px #ccc; 
-			border-radius: 5px; 
 			margin-bottom: 20px; 
 		}
 
@@ -1318,6 +1322,11 @@ func htmlHeader() string {
 
 		.type-footer-right { 
 			text-align: right; 
+		}
+
+		.type-used-in { 
+			font-size: 10px; 
+			padding: 10px; 
 		}
 
 
