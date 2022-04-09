@@ -720,7 +720,7 @@ func (r *{{.Table.Name}}DAL) FromID(shard int64, {{.PrimaryKey | toArgName}} {{.
 func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s []{{.IDType}}) ([]*models.{{.Table.Name}}, error) {
 
 	// No records 
-	if len({{.PrimaryKey | toArgName}}s) == 0 {
+	if len(habitDayIDs) == 0 {
 		return []*models.{{.Table.Name}}{}, nil 
 	}
 
@@ -781,7 +781,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 	return collection, nil 
 }
 
-{{if or (eq $col.GoType "int64") (eq $col.GoType "int")}}
+{{if not $col.IsString}}
 // ManyFrom{{$col.Name}}s returns a slice of {{$.Table.Name}} models from {{$col.Name}}s
 func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | toArgName}}s []{{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) ([]*models.{{$.Table.Name}}, error) {
 		
@@ -1145,9 +1145,9 @@ func isUpdateColumn(column *schema.Column) bool {
 		return false
 	}
 
-	if column.Name == "IsDeleted" {
-		return false
-	}
+	// if column.Name == "IsDeleted" {
+	// 	return false
+	// }
 
 	if column.Name == "DateCreated" {
 		return false

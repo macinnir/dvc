@@ -99,18 +99,7 @@ func (c *FiscalYear) Table_SchemaName() string {
 
 // FromID returns a FromID query statement
 func (c *FiscalYear) FromID(db db.IDB, id int64) (query.IModel, error) {
-	q, _ := query.Select(c).Where(query.EQ(FiscalYear_Column_FiscalYearID, id)).String()
-	var e error
-
 	model := &FiscalYear{}
-
-	if e = db.Get(model, q); e != nil {
-		if e == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, e
-	}
-
 	return model, nil
 }
 
@@ -193,17 +182,18 @@ func (c *FiscalYear) Delete(db db.IDB) error {
 
 func (r *FiscalYear) Raw(db db.IDB, queryRaw string) ([]*FiscalYear, error) {
 
-	var e error
+	// var e error
 	model := []*FiscalYear{}
-	e = db.Select(&model, queryRaw)
-
-	if e != nil {
-		return nil, fmt.Errorf("FiscalYear.Query(%s).Run(): %w", queryRaw, e)
-	}
-
-	fmt.Printf("FiscalYear.Query(%s).Run()\n", queryRaw)
-
 	return model, nil
+	// e = db.Select(&model, queryRaw)
+
+	// if e != nil {
+	// 	return nil, fmt.Errorf("FiscalYear.Query(%s).Run(): %w", queryRaw, e)
+	// }
+
+	// fmt.Printf("FiscalYear.Query(%s).Run()\n", queryRaw)
+
+	// return model, nil
 }
 
 type FiscalYearDALSelector struct {
@@ -251,20 +241,21 @@ func (r *FiscalYearDALSelector) OrderBy(col query.Column, dir query.OrderDir) *F
 
 func (r *FiscalYearDALSelector) Run() ([]*FiscalYear, error) {
 	model := []*FiscalYear{}
-	q, e := r.q.String()
-	if e != nil {
-		return nil, fmt.Errorf("FiscalYearDAL.Query.String(): %w", e)
-	}
-
-	e = r.db.Select(&model, q)
-
-	if e != nil {
-		return nil, fmt.Errorf("FiscalYearDAL.Query(%s).Run(): %w", q, e)
-	}
-
-	fmt.Printf("FiscalYearDAL.Query(%s).Run()\n", q)
-
 	return model, nil
+	// q, e := r.q.String()
+	// if e != nil {
+	// 	return nil, fmt.Errorf("FiscalYearDAL.Query.String(): %w", e)
+	// }
+
+	// e = r.db.Select(&model, q)
+
+	// if e != nil {
+	// 	return nil, fmt.Errorf("FiscalYearDAL.Query(%s).Run(): %w", q, e)
+	// }
+
+	// fmt.Printf("FiscalYearDAL.Query(%s).Run()\n", q)
+
+	// return model, nil
 }
 
 // Counter
@@ -292,21 +283,22 @@ func (ds *FiscalYearDALCounter) Where(whereParts ...*query.WherePart) *FiscalYea
 
 func (ds *FiscalYearDALCounter) Run() (int64, error) {
 
-	count := int64(0)
-	q, e := ds.q.String()
-	if e != nil {
-		return 0, fmt.Errorf("FiscalYearDALCounter.Query.String(): %w", e)
-	}
+	return 0, nil
+	// count := int64(0)
+	// q, e := ds.q.String()
+	// if e != nil {
+	// 	return 0, fmt.Errorf("FiscalYearDALCounter.Query.String(): %w", e)
+	// }
 
-	e = ds.db.Get(&count, q)
+	// e = ds.db.Get(&count, q)
 
-	if e != nil {
-		return 0, fmt.Errorf("FiscalYearDALCounter.Query(%s).Run(): %w", q, e)
-	}
+	// if e != nil {
+	// 	return 0, fmt.Errorf("FiscalYearDALCounter.Query(%s).Run(): %w", q, e)
+	// }
 
-	fmt.Printf("FiscalYearDALCounter.Query(%s).Run()\n", q)
+	// fmt.Printf("FiscalYearDALCounter.Query(%s).Run()\n", q)
 
-	return count, nil
+	// return count, nil
 }
 
 // Summer
@@ -328,22 +320,22 @@ func (ds *FiscalYearDALSummer) Where(whereParts ...*query.WherePart) *FiscalYear
 }
 
 func (ds *FiscalYearDALSummer) Run() (float64, error) {
+	return 0, nil
+	// sum := float64(0)
+	// q, e := ds.q.String()
+	// if e != nil {
+	// 	return 0, fmt.Errorf("FiscalYearDALSummer.Query.String(): %w", e)
+	// }
 
-	sum := float64(0)
-	q, e := ds.q.String()
-	if e != nil {
-		return 0, fmt.Errorf("FiscalYearDALSummer.Query.String(): %w", e)
-	}
+	// e = ds.db.Get(&sum, q)
 
-	e = ds.db.Get(&sum, q)
+	// if e != nil {
+	// 	return 0, fmt.Errorf("FiscalYearDALSummer.Query(%s).Run(): %w", q, e)
+	// }
 
-	if e != nil {
-		return 0, fmt.Errorf("FiscalYearDALSummer.Query(%s).Run(): %w", q, e)
-	}
+	// fmt.Printf("FiscalYearDALSummer.Query(%s).Run()\n", q)
 
-	fmt.Printf("FiscalYearDALSummer.Query(%s).Run()\n", q)
-
-	return sum, nil
+	// return sum, nil
 }
 
 type FiscalYearDALGetter struct {
@@ -376,21 +368,22 @@ func (ds *FiscalYearDALGetter) OrderBy(col query.Column, dir query.OrderDir) *Fi
 func (ds *FiscalYearDALGetter) Run() (*FiscalYear, error) {
 
 	model := &FiscalYear{}
-	q, e := ds.q.String()
-	if e != nil {
-		return nil, fmt.Errorf("FiscalYearDALGetter.Query.String(): %w", e)
-	}
-
-	e = ds.db.Get(model, q)
-
-	if e != nil {
-		if e == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("FiscalYearDALGetter.Run(%s): %w", q, e)
-	}
-
-	fmt.Printf("FiscalYearDALGetter.Get(%s).Run()\n", q)
-
 	return model, nil
+	// q, e := ds.q.String()
+	// if e != nil {
+	// 	return nil, fmt.Errorf("FiscalYearDALGetter.Query.String(): %w", e)
+	// }
+
+	// e = ds.db.Get(model, q)
+
+	// if e != nil {
+	// 	if e == sql.ErrNoRows {
+	// 		return nil, nil
+	// 	}
+	// 	return nil, fmt.Errorf("FiscalYearDALGetter.Run(%s): %w", q, e)
+	// }
+
+	// fmt.Printf("FiscalYearDALGetter.Get(%s).Run()\n", q)
+
+	// return model, nil
 }

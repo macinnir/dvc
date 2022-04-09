@@ -164,6 +164,23 @@ func TestQuery_INInt64(t *testing.T) {
 
 }
 
+func TestQuery_INInt(t *testing.T) {
+
+	args := []int{1, 2, 3}
+
+	sql, e := query.Select(&testassets.Comment{}).
+		Where(
+			query.INInt(
+				"CommentID",
+				args,
+			),
+		).String()
+
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`CommentID` IN ( 1, 2, 3 )", sql)
+
+}
+
 func TestQuerySelect_EmptyWhereClause(t *testing.T) {
 
 	q := query.Select(&testassets.Comment{})

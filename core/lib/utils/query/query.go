@@ -946,6 +946,18 @@ func INInt64(fieldName Column, values []int64) *WherePart {
 	return IN(fieldName, interfaces...)
 }
 
+// INInt is a helper function for converting a slice of string arguments into
+// a slice of interface arguments, passed into an IN clause and returned
+func INInt(fieldName Column, values []int) *WherePart {
+	interfaces := make([]interface{}, len(values))
+
+	for k := range values {
+		interfaces[k] = values[k]
+	}
+
+	return IN(fieldName, interfaces...)
+}
+
 // Between is a BETWEEN statement
 // Example: Between("")
 func Between(fieldName Column, from, to interface{}) *WherePart {

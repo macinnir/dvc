@@ -83,7 +83,7 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 			tablesCache.Models[tableKey] = tableHash
 
 			// TODO verbose flag
-			// fmt.Printf("Generating model `%s`\n", table.Name)
+			fmt.Printf("Generating model `%s`\n", table.Name)
 			e = GenerateGoModel(config.BasePackage, "gen/definitions/models", schemaName, table)
 			if e != nil {
 				return e
@@ -103,7 +103,7 @@ func GenerateGoModel(packageName, dir string, schemaName string, table *schema.T
 
 	lib.EnsureDir(dir)
 
-	p := path.Join(dir, table.Name+".go")
+	fullPath := path.Join(dir, table.Name+".go")
 
 	// if lib.FileExists(p) {
 	// 	lib.Infof("Updating `%s`", g.Options, table.Name)
@@ -111,8 +111,9 @@ func GenerateGoModel(packageName, dir string, schemaName string, table *schema.T
 	// 	return
 	// }
 
-	// lib.Infof("Creating `%s`", g.Options, table.Name)s
-	e = buildGoModel(packageName, p, schemaName, table)
+	fmt.Println("Creating", table.Name)
+	// lib.Infof("Creating `%s`", g.Options, table.Name)
+	e = buildGoModel(packageName, fullPath, schemaName, table)
 	return
 }
 
@@ -157,23 +158,26 @@ func InspectFile(filePath string) (s *lib.GoStruct, e error) {
 // 	return
 // }
 
-func buildGoModel(packageName, p string, schemaName string, table *schema.Table) (e error) {
+func buildGoModel(packageName, fullPath string, schemaName string, table *schema.Table) (e error) {
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
+	fmt.Println("buildModelNodeFromTable")
 	modelNode, e = buildModelNodeFromTable(packageName, table)
 	if e != nil {
 		fmt.Println("ERROR Building Model Node From Table ", table)
 		return
 	}
 
+	fmt.Println("buildFileFromModelNode")
 	outFile, e = buildFileFromModelNode(schemaName, table, modelNode)
 	if e != nil {
 		fmt.Println("ERROR Building File From Model Node ", table)
 		return
 	}
 
-	e = ioutil.WriteFile(p, outFile, 0644)
+	fmt.Println("Writing file to", fullPath)
+	e = ioutil.WriteFile(fullPath, outFile, 0644)
 	return
 }
 
@@ -387,19 +391,42 @@ func (c *` + modelNode.Name + `) Table_SchemaName() string {
 
 // FromID returns a FromID query statement
 func (c *` + modelNode.Name + `) FromID(db db.IDB, id int64) (query.IModel, error) {
-	q, _ := query.Select(c).Where(query.EQ(` + modelNode.Name + "_Column_" + primaryKey + `, id)).String()
-	var e error 
+	
+	sel := query.Select(c)
 
-	model := &` + modelNode.Name + `{}
+	`)
+	b.WriteString(`	sel.Fields(
+`)
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`	query.NewField(query.FieldTypeBasic, ` + modelNode.Name + `_Column_` + f.Name + `),
+`)
+	}
+	b.WriteString(`
+	)
+	q, e := sel.String()
+	if e != nil {
+		return nil, fmt.Errorf("` + modelNode.Name + `.FromID.Query.String(): %w", e)
+	}
 
-	if e = db.Get(model, q); e != nil {
-		if e == sql.ErrNoRows { 
-			return nil, nil
-		}
-		return nil, e 
-	} 
+	row := db.QueryRow(q)
 
-	return model, nil
+	switch e = row.Scan(
+`)
+
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`		&c.` + f.Name + `,
+`)
+	}
+
+	b.WriteString(`	); e { 
+	case sql.ErrNoRows: 
+		return nil, nil 
+	case nil: 
+		fmt.Printf("` + modelNode.Name + `DALGetter.Get(%s).Run()\n", q)
+		return c, nil 
+	default: 
+		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter(%s).Run(): %w", q, e)
+	}
 }
 
 // String returns a json marshalled string of the object 
@@ -500,13 +527,53 @@ func (r *` + modelNode.Name + `) Raw(db db.IDB, queryRaw string) ([]*` + modelNo
 
 	var e error
 	model := []*` + modelNode.Name + `{}
-	e = db.Select(&model, queryRaw)
+	sel := query.Select(r) 
 
+`)
+
+	b.WriteString(`	sel.Fields(
+`)
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`	query.NewField(query.FieldTypeBasic, ` + modelNode.Name + `_Column_` + f.Name + `),
+`)
+	}
+	b.WriteString(`
+	)
+
+	q, e := sel.String()
 	if e != nil {
-		return nil, fmt.Errorf("` + modelNode.Name + `.Query(%s).Run(): %w", queryRaw, e)
+		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Raw.String(): %w", e)
 	}
 
-	fmt.Printf("` + modelNode.Name + `.Query(%s).Run()\n", queryRaw)
+	var rows *sql.Rows 
+	rows, e = db.Query(q) 
+
+	if e != nil {
+		if e == sql.ErrNoRows { 
+			return nil, nil 
+		}
+		return nil, fmt.Errorf("` + modelNode.Name + `DAL.Raw.Run(%s): %w", q, e)
+	}
+
+	defer rows.Close() 
+	for rows.Next() { 
+		m := &` + modelNode.Name + `{}
+		if e = rows.Scan(
+`)
+
+	for _, f := range *modelNode.Fields {
+		b.WriteString(`			&m.` + f.Name + `,
+`)
+	}
+
+	b.WriteString(`		); e != nil { 
+			return nil, fmt.Errorf("` + modelNode.Name + `DALRaw(%s).Run(): %w", q, e)
+		}
+
+		model = append(model, m)
+	}
+
+	fmt.Printf("` + modelNode.Name + `DAL.Raw(%s).Run()\n", q)
 
 	return model, nil
 }
@@ -528,26 +595,6 @@ func (r *` + modelNode.Name + `DALSelector) Alias(alias string) *` + modelNode.N
 	r.q.Alias(alias) 
 	return r
 }
-
-// func (r *` + modelNode.Name + `DALSelector) Sum(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-// 	r.q.Sum(fieldName, fieldAlias)
-// 	return r
-// }
-
-// func (r *` + modelNode.Name + `DALSelector) Count(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-// 	r.q.Count(fieldName, fieldAlias)
-// 	return r
-// }
-
-// func (r *` + modelNode.Name + `DALSelector) Min(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-// 	r.q.Min(fieldName, fieldAlias)
-// 	return r
-// }
-
-// func (r *` + modelNode.Name + `DALSelector) Max(fieldName query.Column, fieldAlias string) *` + modelNode.Name + `DALSelector { 
-// 	r.q.Max(fieldName, fieldAlias)
-// 	return r
-// }
 
 func (r *` + modelNode.Name + `DALSelector) Where(whereParts ...*query.WherePart) *` + modelNode.Name + `DALSelector {
 	r.q.Where(whereParts...)
@@ -685,15 +732,17 @@ func (ds *` + modelNode.Name + `DALSummer) Run() (float64, error) {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALSummer.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&sum, q)
+	row := ds.db.QueryRow(q)
 
-	if e != nil {
-		return 0, fmt.Errorf("` + modelNode.Name + `DALSummer.Query(%s).Run(): %w", q, e)
+	switch e = row.Scan(&sum); e { 
+	case sql.ErrNoRows: 
+		return 0, nil 
+	case nil: 
+		fmt.Printf("` + modelNode.Name + `DALSummer.QueryRow(%s).Run()\n", q)
+		return sum, nil 
+	default: 
+		return 0, fmt.Errorf("` + modelNode.Name + `DALSummer.QueryRow(%s).Run(): %w", q, e)
 	}
-
-	fmt.Printf("` + modelNode.Name + `DALSummer.Query(%s).Run()\n", q)
-
-	return sum, nil
 }
 
 // Minner
@@ -722,15 +771,17 @@ func (ds *` + modelNode.Name + `DALMinner) Run() (float64, error) {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&min, q)
+	row := ds.db.QueryRow(q)
 
-	if e != nil {
-		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.Query(%s).Run(): %w", q, e)
+	switch e = row.Scan(&min); e { 
+	case sql.ErrNoRows: 
+		return 0, nil 
+	case nil: 
+		fmt.Printf("` + modelNode.Name + `DALMinner.QueryRow(%s).Run()\n", q)
+		return min, nil 
+	default: 
+		return 0, fmt.Errorf("` + modelNode.Name + `DALMinner.QueryRow(%s).Run(): %w", q, e)
 	}
-
-	fmt.Printf("` + modelNode.Name + `DALMinner.Query(%s).Run()\n", q)
-
-	return min, nil
 }
 
 // Maxer
@@ -759,15 +810,17 @@ func (ds *` + modelNode.Name + `DALMaxer) Run() (float64, error) {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&max, q)
+	row := ds.db.QueryRow(q)
 
-	if e != nil {
-		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.Query(%s).Run(): %w", q, e)
+	switch e = row.Scan(&max); e { 
+	case sql.ErrNoRows: 
+		return 0, nil 
+	case nil: 
+		fmt.Printf("` + modelNode.Name + `DALMaxer.QueryRow(%s).Run()\n", q)
+		return max, nil 
+	default: 
+		return 0, fmt.Errorf("` + modelNode.Name + `DALMaxer.QueryRow(%s).Run(): %w", q, e)
 	}
-
-	fmt.Printf("` + modelNode.Name + `DALMaxer.Query(%s).Run()\n", q)
-
-	return max, nil
 }
 
 
@@ -817,23 +870,9 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Query.String(): %w", e)
 	}
 
-	var rows *sql.Rows 
-	rows, e = ds.db.Query(q) 
+	row := ds.db.QueryRow(q)
 
-	if e != nil {
-		if e == sql.ErrNoRows { 
-			return nil, nil 
-		}
-		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter.Run(%s): %w", q, e)
-	}
-
-	defer rows.Close() 
-	
-	if ok := rows.Next(); !ok { 
-		return nil, nil
-	}
-
-	if e = rows.Scan(
+	switch e = row.Scan(
 `)
 
 	for _, f := range *modelNode.Fields {
@@ -841,13 +880,15 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 `)
 	}
 
-	b.WriteString(`	); e != nil { 
+	b.WriteString(`	); e { 
+	case sql.ErrNoRows: 
+		return nil, nil 
+	case nil: 
+		fmt.Printf("` + modelNode.Name + `DALGetter.Get(%s).Run()\n", q)
+		return model, nil 
+	default: 
 		return nil, fmt.Errorf("` + modelNode.Name + `DALGetter(%s).Run(): %w", q, e)
 	}
-
-	fmt.Printf("` + modelNode.Name + `DALGetter.Get(%s).Run()\n", q)
-
-	return model, nil
 }
 `)
 
