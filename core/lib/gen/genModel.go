@@ -646,15 +646,17 @@ func (ds *` + modelNode.Name + `DALCounter) Run() (int64, error) {
 		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.Query.String(): %w", e)
 	}
 
-	e = ds.db.Get(&count, q)
+	row := ds.db.QueryRow(q)
 
-	if e != nil {
-		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.Query(%s).Run(): %w", q, e)
+	switch e = row.Scan(&count); e { 
+	case sql.ErrNoRows: 
+		return 0, nil 
+	case nil: 
+		fmt.Printf("` + modelNode.Name + `DALCounter.QueryRow(%s).Run()\n", q)
+		return count, nil 
+	default: 
+		return 0, fmt.Errorf("` + modelNode.Name + `DALCounter.QueryRow(%s).Run(): %w", q, e)
 	}
-
-	fmt.Printf("` + modelNode.Name + `DALCounter.Query(%s).Run()\n", q)
-
-	return count, nil
 }
 
 // Summer

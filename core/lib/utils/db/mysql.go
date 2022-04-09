@@ -79,6 +79,10 @@ func (m *MySQL) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return m.db.Query(query, args...)
 }
 
+func (m *MySQL) QueryRow(query string, args ...interface{}) *sql.Row {
+	return m.db.QueryRow(query, args...)
+}
+
 // Close closes the database and prevents new queries from starting.
 // Close then waits for all queries that have started processing on the server
 // to finish.
