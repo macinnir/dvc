@@ -10,7 +10,7 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx"
+	// "github.com/jmoiron/sqlx"
 )
 
 type Config struct {
@@ -23,7 +23,7 @@ type Config struct {
 // MySQL is mysql
 type MySQL struct {
 	config *Config
-	db     *sqlx.DB
+	db     *sql.DB
 	log    log.ILog
 }
 
@@ -59,7 +59,7 @@ func (m *MySQL) connect() {
 
 	dbConnectionString := fmt.Sprintf("%s:%s@tcp(%s)/%s", m.config.User, m.config.Pass, m.config.Host, m.config.Name)
 
-	if m.db, e = sqlx.Connect("mysql", dbConnectionString); e != nil {
+	if m.db, e = sql.Open("mysql", dbConnectionString); e != nil {
 		m.log.Fatalf("ERROR: Database Connection: %s", e.Error())
 		return
 	}
@@ -67,12 +67,6 @@ func (m *MySQL) connect() {
 	m.log.Println("MARIADB: CONNECTED")
 
 	return
-}
-
-// NamedExec using this DB.
-// Any named placeholder parameters are replaced with fields from arg.
-func (m *MySQL) NamedExec(query string, arg interface{}) (sql.Result, error) {
-	return m.db.NamedExec(query, arg)
 }
 
 // Exec executes a query without returning any rows.
@@ -83,19 +77,6 @@ func (m *MySQL) Exec(query string, args ...interface{}) (sql.Result, error) {
 
 func (m *MySQL) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return m.db.Query(query, args...)
-}
-
-// Get using this DB.
-// Any placeholder parameters are replaced with supplied args.
-// An error is returned if the result set is empty.
-func (m *MySQL) Get(dest interface{}, query string, args ...interface{}) error {
-	return m.db.Get(dest, query, args...)
-}
-
-// Select using this DB.
-// Any placeholder parameters are replaced with supplied args.
-func (m *MySQL) Select(dest interface{}, query string, args ...interface{}) error {
-	return m.db.Select(dest, query, args...)
 }
 
 // Close closes the database and prevents new queries from starting.
