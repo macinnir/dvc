@@ -258,7 +258,7 @@ func objectToString(routes *lib.RoutesJSONContainer, obj string, embedded bool, 
 
 	case "model":
 		if _, ok := routes.Models[objName]; !ok {
-			fmt.Println("Can't find model:", obj)
+			fmt.Println("Can't find model:", obj, "("+objName+")")
 			return ""
 		}
 

@@ -83,7 +83,7 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 			tablesCache.Models[tableKey] = tableHash
 
 			// TODO verbose flag
-			fmt.Printf("Generating model `%s`\n", table.Name)
+			// fmt.Printf("Generating model `%s`\n", table.Name)
 			e = GenerateGoModel(config.BasePackage, "gen/definitions/models", schemaName, table)
 			if e != nil {
 				return e
@@ -111,7 +111,7 @@ func GenerateGoModel(packageName, dir string, schemaName string, table *schema.T
 	// 	return
 	// }
 
-	fmt.Println("Creating", table.Name)
+	// fmt.Println("Creating", table.Name)
 	// lib.Infof("Creating `%s`", g.Options, table.Name)
 	e = buildGoModel(packageName, fullPath, schemaName, table)
 	return
@@ -162,21 +162,21 @@ func buildGoModel(packageName, fullPath string, schemaName string, table *schema
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
-	fmt.Println("buildModelNodeFromTable")
+	// fmt.Println("buildModelNodeFromTable")
 	modelNode, e = buildModelNodeFromTable(packageName, table)
 	if e != nil {
 		fmt.Println("ERROR Building Model Node From Table ", table)
 		return
 	}
 
-	fmt.Println("buildFileFromModelNode")
+	// fmt.Println("buildFileFromModelNode")
 	outFile, e = buildFileFromModelNode(schemaName, table, modelNode)
 	if e != nil {
 		fmt.Println("ERROR Building File From Model Node ", table)
 		return
 	}
 
-	fmt.Println("Writing file to", fullPath)
+	// fmt.Println("Writing file to", fullPath)
 	e = ioutil.WriteFile(fullPath, outFile, 0644)
 	return
 }

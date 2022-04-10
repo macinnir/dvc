@@ -691,6 +691,14 @@ func (r *{{.Table.Name}}DAL) FromID(shard int64, {{.PrimaryKey | toArgName}} {{.
 
 	model, e := (&models.{{.Table.Name}}{}).Get(r.db[shard]).Where(query.EQ(models.{{.Table.Name}}_Column_{{.PrimaryKey}}, {{.PrimaryKey | toArgName}})).Run()
 
+	if model == nil {
+		if mustExist { 
+			return nil, errors.NewRecordNotFoundError()
+		}
+
+		return nil, nil 
+	}
+
 	switch e { 
 	case sql.ErrNoRows: 
 		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
@@ -758,7 +766,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 	)
 	
 	{{if $.IsDeleted}}
-		q.Where(query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0)){{end}}
+		q.Where(query.And(), query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0)){{end}}
 
 	if len(orderBy) > 0 { 
 		q.OrderBy(query.Column(orderBy), query.OrderDirFromString(orderDir))
@@ -772,11 +780,11 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 	collection, e := q.Run()
 
 	if e != nil {
-		r.log.Errorf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}(%s, %d, %d, %s, %s) > %s", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir, e.Error())
+		r.log.Errorf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}({{if or (eq $col.GoType "int") (eq $col.GoType "int64")}}%d{{else}}%s{{end}}, %d, %d, %s, %s) > %s", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir, e.Error())
 		return nil, e 
 	} 
 	
-	r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
+	r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}({{if or (eq $col.GoType "int") (eq $col.GoType "int64")}}%d{{else}}%s{{end}}, %d, %d, %s, %s)", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir)
 	
 	return collection, nil 
 }
@@ -791,7 +799,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 	}
 
 	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]).Where(
-		query.INInt64(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s), 
+		query.INInt{{if eq $col.GoType "int64"}}64{{end}}(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s), 
 		{{if $.IsDeleted}}		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0),{{end}}
 	)
@@ -837,6 +845,14 @@ func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}(shard int64, {{$col.Name | 
 func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, mustExist bool) (*models.{{$.Table.Name}}, error) {
 
 	model, e := (&models.{{$.Table.Name}}{}).Get(r.db[shard]).Where(query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}})).Run()
+
+	if model == nil {
+		if mustExist { 
+			return nil, errors.NewRecordNotFoundError()
+		}
+
+		return nil, nil 
+	}
 
 	switch e { 
 	case sql.ErrNoRows: 
