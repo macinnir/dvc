@@ -198,7 +198,6 @@ package definitions
 
 import (
 	"log"
-	"os"
 	"` + path.Join(config.BasePackage, "core/app") + `" 
 `
 
@@ -224,16 +223,17 @@ type Services struct {
 	tpl += `}
 
 // InitAppFromCLI initializes the application (presumably from the command line)
-func InitAppFromCLI(appName, version, commitHash, buildDate, clientVersion string) *App { 
+func InitAppFromCLI(
+	configFilePath, 
+	appName, 
+	version, 
+	commitHash, 
+	buildDate, 
+	clientVersion string,
+) *App { 
 	
 	if len(appName) == 0 { 
 		log.Fatal("App name cannot be empty") 
-	}
-
-	args := os.Args
-	configFilePath := "config.json"
-	if len(args) > 1 { 
-		configFilePath = args[1] 
 	}
 
 	baseApp, coreRepos, authLog := app.NewBaseApp(configFilePath, appName, version, commitHash, buildDate, clientVersion) 
@@ -252,7 +252,6 @@ func InitAppFromCLI(appName, version, commitHash, buildDate, clientVersion strin
 
 	return app
 } 
-
 
 // Finish cleans up any connections from the app
 func (a *App) Finish() {

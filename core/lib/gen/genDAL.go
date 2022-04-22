@@ -632,7 +632,7 @@ func (r *{{.Table.Name}}DAL) DeleteHard(shard int64, {{.PrimaryKey | toArgName}}
 }
 
 // DeleteManyHard deletes {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.Table.Name}}) (e error) {
 
 	// No records 
 	if len(modelSlice) == 0 {
@@ -646,7 +646,7 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []models.{{.T
 	}
 
 	chunkSize := 25
-	chunks := [][]models.{{.Table.Name}}{}
+	chunks := [][]*models.{{.Table.Name}}{}
 
 	for i := 0; i < len(modelSlice); i += chunkSize {
 		end := i + chunkSize
