@@ -72,6 +72,7 @@ const (
 	FieldTypeRaw
 	FieldTypeCount
 	FieldTypeSum
+	FieldTypeAvg
 	FieldTypeMin
 	FieldTypeMax
 )
@@ -160,6 +161,8 @@ func (q *Q) FromFieldToString(field *Field) string {
 		return "COUNT(`" + q.alias + "`.`" + string(field.Name) + "`)" + as
 	case FieldTypeSum:
 		return "COALESCE(SUM(`" + q.alias + "`.`" + string(field.Name) + "`), 0)" + as
+	case FieldTypeAvg:
+		return "COALESCE(AVG(`" + q.alias + "`.`" + string(field.Name) + "`), 0)" + as
 	case FieldTypeMin:
 		return "COALESCE(MIN(`" + q.alias + "`.`" + string(field.Name) + "`), 0)" + as
 	case FieldTypeMax:
@@ -268,6 +271,22 @@ func (q *Q) Sum(name Column, as string) *Q {
 	}
 
 	q.fields = append(q.fields, NewField(FieldTypeSum, name, as))
+	return q
+
+	// return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
+}
+
+// Avg creates an Avg statement
+// 	q.Avg(query.Column("Foo"), "FooAveraged")
+//	COALESCE(AVG(`t`.`Foo`), 0) AS `FooAveraged`
+func (q *Q) Avg(name Column, as string) *Q {
+
+	if _, ok := q.columnTypes[name]; !ok {
+		q.errorInvalidColumn(QUERY_ERROR_INVALID_COLUMN, "SELECT...Sum()", string(name))
+		return q
+	}
+
+	q.fields = append(q.fields, NewField(FieldTypeAvg, name, as))
 	return q
 
 	// return q.FieldRaw("COALESCE(SUM(`"+q.alias+"`.`"+string(name)+"`), 0)", as)
@@ -843,7 +862,8 @@ func GT(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// LTE is a less than or equals (<=) statement between a table column and a value
+// LTOE is a less than or equals (<=) statement between a table column and a value
+//  `t`.`Col` <= value
 func LTOE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeLessThanOrEqualTo,
@@ -852,7 +872,8 @@ func LTOE(fieldName Column, value interface{}) *WherePart {
 	)
 }
 
-// LT is a greater than or equals statement (>=) between a table column and a value
+// GTOE is a greater than or equals statement (>=) between a table column and a value
+// 	`t`.`Col` >= value
 func GTOE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeGreaterThanOrEqualTo,

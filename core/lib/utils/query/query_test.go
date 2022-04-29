@@ -715,3 +715,15 @@ func ExampleMod(t *testing.T) {
 
 	// Output: MOD(`t`.`foo`, 2) = 1
 }
+
+func TestAvgAndCountsAndSums(t *testing.T) {
+
+	q, e := query.Select(&testassets.FiscalYear{}).
+		Count(testassets.FiscalYear_Column_FiscalYearID, "Overall").
+		Sum(testassets.FiscalYear_Column_FiscalYearID, "ChangesFound").
+		Avg(testassets.FiscalYear_Column_FiscalYearID, "AverageChangesFound").String()
+
+	assert.Nil(t, e)
+	assert.Equal(t, "SELECT COUNT(`t`.`FiscalYearID`) AS `Overall`, COALESCE(SUM(`t`.`FiscalYearID`), 0) AS `ChangesFound`, COALESCE(AVG(`t`.`FiscalYearID`), 0) AS `AverageChangesFound` FROM `FiscalYear` `t`", q)
+
+}
