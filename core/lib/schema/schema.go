@@ -37,7 +37,7 @@ func LoadLocalSchemas() (*SchemaList, error) {
 
 func loadSchema(filePath string) (*SchemaList, error) {
 
-	fmt.Println("Load schema from ", filePath)
+	// fmt.Println("Load schema from ", filePath)
 
 	var e error
 	var fileBytes []byte

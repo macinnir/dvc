@@ -36,7 +36,7 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 		return e
 	}
 
-	fmt.Println("Generating models...")
+	// fmt.Println("Generating models...")
 
 	if clean {
 
@@ -60,6 +60,8 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 	}
 
 	generatedModelCount := 0
+
+	lib.EnsureDir(lib.ModelsGenDir)
 
 	for k := range schemaList.Schemas {
 
@@ -89,8 +91,9 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 			tablesCache.Models[tableKey] = tableHash
 
 			// TODO verbose flag
-			// fmt.Printf("Generating model `%s`\n", table.Name)
-			e = GenerateGoModel(config.BasePackage, "gen/definitions/models", schemaName, table)
+
+			e = GenerateGoModel(config.BasePackage, lib.ModelsGenDir, schemaName, table)
+
 			if e != nil {
 				return e
 			}
@@ -106,19 +109,7 @@ func GenModels(config *lib.Config, force bool, clean bool) error {
 
 // GenerateGoModel returns a string for a model in golang
 func GenerateGoModel(packageName, dir string, schemaName string, table *schema.Table) (e error) {
-
-	lib.EnsureDir(dir)
-
 	fullPath := path.Join(dir, table.Name+".go")
-
-	// if lib.FileExists(p) {
-	// 	lib.Infof("Updating `%s`", g.Options, table.Name)
-	// 	e = g.updateGoModel(p, table)
-	// 	return
-	// }
-
-	// fmt.Println("Creating", table.Name)
-	// lib.Infof("Creating `%s`", g.Options, table.Name)
 	e = buildGoModel(packageName, fullPath, schemaName, table)
 	return
 }
@@ -148,14 +139,12 @@ func buildGoModel(packageName, fullPath string, schemaName string, table *schema
 	var modelNode *lib.GoStruct
 	var outFile []byte
 
-	// fmt.Println("buildModelNodeFromTable")
 	modelNode, e = buildModelNodeFromTable(table)
 	if e != nil {
 		fmt.Println("ERROR Building Model Node From Table ", table)
 		return
 	}
 
-	// fmt.Println("buildFileFromModelNode")
 	outFile, e = buildFileFromModelNode(schemaName, table, modelNode)
 	if e != nil {
 		fmt.Println("ERROR Building File From Model Node ", table)
@@ -194,7 +183,9 @@ func buildModelNodeFromTable(table *schema.Table) (*lib.GoStruct, error) {
 
 		fieldType := schema.DataTypeToGoTypeString(col)
 
-		hasNull = schema.IsNull(fieldType)
+		if schema.IsNull(fieldType) {
+			hasNull = true
+		}
 
 		modelNode.Fields.Append(&lib.GoStructField{
 			Name:     col.Name,
@@ -214,7 +205,10 @@ func buildModelNodeFromTable(table *schema.Table) (*lib.GoStruct, error) {
 	return modelNode, nil
 }
 
-func buildFileFromModelNode(schemaName string, table *schema.Table, modelNode *lib.GoStruct) (file []byte, e error) {
+func buildFileFromModelNode(schemaName string, table *schema.Table, modelNode *lib.GoStruct) ([]byte, error) {
+
+	var file []byte
+	var e error
 
 	insertColumns := fetchInsertColumns(table.ToSortedColumns())
 	updateColumns := fetchUpdateColumns(table.ToSortedColumns())
@@ -889,7 +883,12 @@ func (ds *` + modelNode.Name + `DALGetter) Run() (*` + modelNode.Name + `, error
 	}
 
 	file, e = lib.FormatCode(string(file))
-	return
+
+	if e != nil {
+		log.Fatalf("FORMAT CODE ERROR: File: %s; Error: %s\n%s", modelNode.Name, e.Error(), b.String())
+	}
+
+	return file, nil
 }
 
 // func (g *Gen) buildGoModelOld(p string, table *schema.Table) (e error) {

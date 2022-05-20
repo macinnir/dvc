@@ -47,6 +47,7 @@ func LoadTableCache() (TablesCache, error) {
 	return tableCache, nil
 }
 
+// HashTable generates an md5 hash of a marshalled table
 func HashTable(table *schema.Table) (string, error) {
 
 	var marshalledTable []byte

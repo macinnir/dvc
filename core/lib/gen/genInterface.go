@@ -16,17 +16,42 @@ import (
 // GenInterface takes makes the interface into a byte array
 func GenInterface(comment, pkgName, ifaceName, ifaceComment string, methods []string, imports []string) ([]byte, error) {
 
-	output := []string{"// " + comment, "", "package " + pkgName, "import ("}
-	output = append(output, imports...)
-	output = append(output, ")", "")
-	if len(ifaceComment) > 0 {
-		output = append(output, fmt.Sprintf("// %s", strings.Replace(ifaceComment, "\n", "\n// ", -1)))
+	var sb strings.Builder
+	sb.WriteString(`// ` + comment + `
+
+package ` + pkgName + `
+
+import (
+`)
+	for k := range imports {
+		sb.WriteString("\t" + imports[k] + "\n")
 	}
-	output = append(output, fmt.Sprintf("type %s interface {", ifaceName))
-	output = append(output, methods...)
-	output = append(output, "}")
-	code := strings.Join(output, "\n")
-	return lib.FormatCode(code)
+
+	sb.WriteString(`)
+
+`)
+
+	// output := []string{"// " + comment, "", "package " + pkgName, "import ("}
+	// output = append(output, imports...)
+	// output = append(output, ")", "")
+
+	if len(ifaceComment) > 0 {
+		sb.WriteString(fmt.Sprintf("// %s", strings.Replace(ifaceComment, "\n", "\n// ", -1)))
+	}
+	sb.WriteString("\ntype " + ifaceName + " interface {\n")
+	for k := range methods {
+		sb.WriteString("\t" + methods[k] + "\n")
+	}
+
+	sb.WriteString("}\n")
+	return lib.FormatCode(sb.String())
+	// return []byte(sb.String()), nil
+
+	// output = append(output, fmt.Sprintf("type %s interface {", ifaceName))
+	// output = append(output, methods...)
+	// output = append(output, "}")
+	// code := strings.Join(output, "\n")
+	// return lib.FormatCode(code)
 }
 
 func fetchExistingInterfaceFiles(srcDir string) ([]string, error) {
@@ -130,82 +155,45 @@ func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
 }
 
-// services/services.go
-func GenServicesBootstrap(config *lib.Config) error {
+// GenAppBootstrapFile generates the services bootstrap file
+func GenAppBootstrapFile(basePackage string) error {
 
-	lib.EnsureDir("app/definitions")
-	lib.EnsureDir("core/definitions")
+	lib.EnsureDir(lib.AppServicesDir)
+	lib.EnsureDir(lib.CoreServicesDir)
 
 	var files []os.FileInfo
 	var e error
-	files, e = ioutil.ReadDir("core/services")
+	files, _ = ioutil.ReadDir(lib.CoreServicesDir)
 	packages := []string{}
 	for k := range files {
 		if files[k].IsDir() {
-			packages = append(packages, path.Join("core/services", files[k].Name()))
+			packages = append(packages, path.Join(lib.CoreServicesDir, files[k].Name()))
 		}
 	}
 
-	files, e = ioutil.ReadDir("app/services")
+	files, _ = ioutil.ReadDir(lib.AppServicesDir)
 	for k := range files {
 		if files[k].IsDir() {
-			packages = append(packages, path.Join("app/services", files[k].Name()))
+			packages = append(packages, path.Join(lib.AppServicesDir, files[k].Name()))
 		}
 	}
 
-	// 	tpl := `// DO NOT EDIT; Auto generated
-	// package services
-
-	// import (
-	// 	"` + path.Join(config.BasePackage, config.Dirs.Integrations) + `"
-	// 	"` + path.Join(config.BasePackage, "gen/dal") + `"
-	// 	"` + path.Join(config.BasePackage, "core/definitions") + `"
-	// 	"` + path.Join(config.BasePackage, "core") + `"
-	// 	"` + path.Join(config.BasePackage, "core/repos") + `"
-	// 	"` + path.Join(config.BasePackage, "core/cache") + `"
-	// `
-	// 	for k := range packages {
-	// 		tpl += "\t\"" + path.Join(config.BasePackage, packages[k]) + "\"\n"
-	// 	}
-	// 	tpl += `
-	// )
-
-	// func bootstrapServices(
-	// 	d *dal.DAL,
-	// 	config *core.Config,
-	// 	i *integrations.Integrations,
-	// 	a *AuthLog,
-	// 	r *repos.Repos,
-	// 	c *cache.Cache,
-	// ) *definitions.Services {
-	// 	return &definitions.Services {
-	// `
-
-	// 	for k := range packages {
-	// 		packageName := path.Base(packages[k])
-	// 		tpl += "\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(d, config, i, a, r, c),\n"
-	// 	}
-
-	// 	tpl += `	}
-	// }
-	// `
-
-	// 	ioutil.WriteFile(path.Join(config.Dirs.Services, "services.go"), []byte(tpl), 0777)
-
 	// Write Definitions file
-	tpl := `// DO NOT EDIT; Auto generated
+	var sb strings.Builder
+
+	sb.WriteString(`// DO NOT EDIT; Auto generated
 package definitions 
 
 import (
 	"log"
-	"` + path.Join(config.BasePackage, "core/app") + `" 
-`
+	"` + path.Join(basePackage, "core/app") + `" 
+`)
 
 	for k := range packages {
-		tpl += "\t\"" + path.Join(config.BasePackage, packages[k]) + "\"\n"
+		sb.WriteString("\t\"" + path.Join(basePackage, packages[k]) + "\"\n")
 	}
 
-	tpl += `)
+	sb.WriteString(`)
 
 // App is a container for the services layer down
 type App struct { 
@@ -215,12 +203,12 @@ type App struct {
 
 // Services is a container for all services 
 type Services struct {
-`
+`)
 	for k := range packages {
 		packageName := path.Base(packages[k])
-		tpl += "\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Services\n"
+		sb.WriteString("\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Services\n")
 	}
-	tpl += `}
+	sb.WriteString(`}
 
 // InitAppFromCLI initializes the application (presumably from the command line)
 func InitAppFromCLI(
@@ -242,12 +230,12 @@ func InitAppFromCLI(
 		BaseApp: baseApp, 
 	}
 
-	app.Services = &Services {`
+	app.Services = &Services {`)
 	for k := range packages {
 		packageName := path.Base(packages[k])
-		tpl += "\n\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(app.DAL, app.Config, app.Integrations, authLog, coreRepos, app.Cache),"
+		sb.WriteString("\n\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(app.DAL, app.Config, app.Integrations, authLog, coreRepos, app.Cache),")
 	}
-	tpl += `
+	sb.WriteString(`
 	}
 
 	return app
@@ -261,8 +249,8 @@ func (a *App) Finish() {
 		}
 	}
 }
-`
-	ioutil.WriteFile("gen/definitions/app.go", []byte(tpl), 0777)
+`)
+	ioutil.WriteFile("gen/definitions/app.go", []byte(sb.String()), 0777)
 
 	return e
 }

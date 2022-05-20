@@ -137,8 +137,6 @@ func GenDALs(dalsDir, dalInterfacesDir string, config *lib.Config, force, clean 
 		return e
 	}
 
-	fmt.Println("Generating models...")
-
 	if clean {
 		CleanGoDALs(dalsDir, dalInterfacesDir, schemaList.Schemas)
 	}

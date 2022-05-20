@@ -17,6 +17,10 @@ const (
 	RoutesFilePath      = ".dvc/routes.json"
 	ModelsDir           = "models"
 
+	AppServicesDir  = "app/services"
+	CoreServicesDir = "core/services"
+
+	DalsGenDir               = "gen/dal"
 	ModelsGenDir             = "gen/definitions/models"
 	ServiceDefinitionsGenDir = "gen/definitions/services"
 	DALDefinitionsGenDir     = "gen/definitions/dal"

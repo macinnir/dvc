@@ -16,7 +16,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	if len(args) == 0 {
 		log.Warn("Missing gen type")
-		return errors.New("Missing gen type")
+		return errors.New("missing gen type")
 	}
 
 	cmd := args[0]
@@ -36,12 +36,12 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	case "models":
 		gen.GenModels(config, force, clean)
 	case "dals":
-		gen.GenDALs("gen/dal", lib.DALDefinitionsGenDir, config, force, clean)
+		gen.GenDALs(lib.DalsGenDir, lib.DALDefinitionsGenDir, config, force, clean)
 	case "interfaces":
-		gen.GenServicesBootstrap(config)
-		gen.GenInterfaces("gen/dal", lib.DALDefinitionsGenDir)
-		gen.GenInterfaces("core/services", lib.ServiceDefinitionsGenDir)
-		gen.GenInterfaces("app/services", lib.ServiceDefinitionsGenDir)
+		gen.GenAppBootstrapFile(config.BasePackage)
+		gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
+		gen.GenInterfaces(lib.CoreServicesDir, lib.ServiceDefinitionsGenDir)
+		gen.GenInterfaces(lib.AppServicesDir, lib.ServiceDefinitionsGenDir)
 	case "routes":
 		cf := fetcher.NewControllerFetcher()
 		controllers, dirs, e := cf.FetchAll()

@@ -2,7 +2,10 @@ package refresh
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/macinnir/dvc/core/commands/gen"
+	"github.com/macinnir/dvc/core/commands/importcmd"
 	"github.com/macinnir/dvc/core/lib"
 	"go.uber.org/zap"
 )
@@ -11,6 +14,18 @@ const CommandName = "refresh"
 
 // Refresh is the refresh command
 func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
+
+	var start = time.Now()
+	importcmd.Cmd(logger, config, args)
+	// dvc gen models -c
+	gen.Cmd(logger, config, []string{"models", "-c"})
+	gen.Cmd(logger, config, []string{"dals", "-c"})
+	gen.Cmd(logger, config, []string{"interfaces"})
+	gen.Cmd(logger, config, []string{"goperms"})
+	gen.Cmd(logger, config, []string{"tsperms"})
+	gen.Cmd(logger, config, []string{"ts"})
+	gen.Cmd(logger, config, []string{"routes"})
+	fmt.Printf("Finished in %f seconds\n", time.Since(start).Seconds())
 
 	return nil
 
@@ -55,10 +70,13 @@ func helpRefresh() {
 
 	Alias for running all of the following commands (in order):
 
-		1. import
-		2. gen models
-		3. gen dals
-		4. gen interfaces
-		5. gen routes
+		dvc import 
+		dvc gen models -c 
+		dvc gen dals 
+		dvc gen interfaces 
+		dvc gen goperms
+		dvc gen tsperms 
+		dvc gen ts 
+		dvc gen routes 
 	`)
 }
