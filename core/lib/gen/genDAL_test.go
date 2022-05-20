@@ -30,22 +30,22 @@ const (
 var TestGenTableObj1 = &schema.Table{
 	Name: "Table1",
 	Columns: map[string]*schema.Column{
-		"Table1ID":    {Name: "Table1ID", ColumnKey: "PRI", DataType: "int", Position: 1},
-		"Foo":         {Name: "Foo", DataType: "varchar", Position: 2},
-		"Bar":         {Name: "Bar", DataType: "varchar", Position: 3},
-		"IsDeleted":   {Name: "IsDeleted", DataType: "tinyint", Position: 4},
-		"DateCreated": {Name: "DateCreated", DataType: "bigint", Position: 5},
+		"Table1ID":    {Name: "Table1ID", ColumnKey: "PRI", DataType: "int"},
+		"Foo":         {Name: "Foo", DataType: "varchar"},
+		"Bar":         {Name: "Bar", DataType: "varchar"},
+		"IsDeleted":   {Name: "IsDeleted", DataType: "tinyint"},
+		"DateCreated": {Name: "DateCreated", DataType: "bigint"},
 	},
 }
 
 var TestGenTableObj2 = &schema.Table{
 	Name: "Table2",
 	Columns: map[string]*schema.Column{
-		"Table2ID":    {Name: "Table2ID", ColumnKey: "PRI", DataType: "int", Position: 1},
-		"Baz":         {Name: "Baz", DataType: "varchar", Position: 2},
-		"Quux":        {Name: "Quux", DataType: "varchar", Position: 3},
-		"IsDeleted":   {Name: "IsDeleted", DataType: "tinyint", Position: 4},
-		"DateCreated": {Name: "DateCreated", DataType: "bigint", Position: 5},
+		"Table2ID":    {Name: "Table2ID", ColumnKey: "PRI", DataType: "int"},
+		"Baz":         {Name: "Baz", DataType: "varchar"},
+		"Quux":        {Name: "Quux", DataType: "varchar"},
+		"IsDeleted":   {Name: "IsDeleted", DataType: "tinyint"},
+		"DateCreated": {Name: "DateCreated", DataType: "bigint"},
 	},
 }
 

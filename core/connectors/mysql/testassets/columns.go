@@ -29,7 +29,6 @@ var (
 
 	columnDateCreated = &schema.Column{
 		Name:         "DateCreated",
-		Position:     5,
 		Default:      "0",
 		IsNullable:   false,
 		IsUnsigned:   true,
@@ -48,7 +47,6 @@ var (
 
 	columnIsDeleted = &schema.Column{
 		Name:         "IsDeleted",
-		Position:     3,
 		Default:      "0",
 		IsNullable:   false,
 		IsUnsigned:   false,
@@ -67,7 +65,6 @@ var (
 
 	columnName = &schema.Column{
 		Name:         "Name",
-		Position:     4,
 		Default:      "",
 		IsNullable:   false,
 		IsUnsigned:   false,
@@ -86,7 +83,6 @@ var (
 
 	columnNameSize100 = &schema.Column{
 		Name:         "Name",
-		Position:     4,
 		Default:      "",
 		IsNullable:   false,
 		IsUnsigned:   false,
@@ -105,7 +101,6 @@ var (
 
 	columnNameWithUniqueIndex = &schema.Column{
 		Name:         "Name",
-		Position:     4,
 		Default:      "",
 		IsNullable:   false,
 		IsUnsigned:   false,
@@ -124,7 +119,6 @@ var (
 
 	columnNameWithIndex = &schema.Column{
 		Name:         "Name",
-		Position:     4,
 		Default:      "",
 		IsNullable:   false,
 		IsUnsigned:   false,

@@ -86,9 +86,9 @@ type School struct {
 }
 `)
 
-func TestBuildModelNodeFromFile(t *testing.T) {
+func TestParseStringToGoStruct(t *testing.T) {
 
-	modelNode, e := buildGoStructFromFile(structBytes)
+	modelNode, e := parseStringToGoStruct(structBytes)
 
 	require.Nil(t, e)
 	assert.Equal(t, "Foo", modelNode.Name)
@@ -123,34 +123,11 @@ func TestBuildModelNodeFromFile(t *testing.T) {
 	assert.Equal(t, "C", modelNode.Fields.Get(2).Name)
 }
 
-// func TestBuildFileFromModelNode(t *testing.T) {
-// 	modelNode, e := buildGoStructFromFile(structBytes)
-// 	require.Nil(t, e)
-// 	var modelBytes []byte
-// 	modelBytes, e = buildFileFromModelNode(modelNode)
-
-// 	assert.Nil(t, e)
-// 	assert.Equal(t, string(structBytes), string(modelBytes))
-// }
-
-// func TestResolveTableToModel(t *testing.T) {
-// 	model, e := buildGoStructFromFile(structB)
-// 	if e != nil {
-// 		t.Log(e)
-// 	}
-// 	require.Nil(t, e)
-// 	resolveTableToModel(model, tableB)
-
-// 	updated, _ := buildFileFromModelNode(model)
-
-// 	assert.Equal(t, string(structBUpdated), string(updated))
-// }
-
 func TestResolveTableToModel_WithNulls(t *testing.T) {
 	table := &schema.Table{
 		Columns: map[string]*schema.Column{
-			"One":         {Name: "One", DataType: "varchar", Position: 0},
-			"NullableCol": {Name: "NullableCol", DataType: "varchar", IsNullable: true, Position: 1},
+			"One":         {Name: "One", DataType: "varchar"},
+			"NullableCol": {Name: "NullableCol", DataType: "varchar", IsNullable: true},
 		},
 	}
 
@@ -171,8 +148,8 @@ func TestResolveTableToModel_WithNulls(t *testing.T) {
 func TestResolveTableToModel_UpdatedType(t *testing.T) {
 	table := &schema.Table{
 		Columns: map[string]*schema.Column{
-			"One":         {Name: "One", DataType: "varchar", Position: 0},
-			"NullableCol": {Name: "NullableCol", DataType: "int", IsNullable: true, Position: 1},
+			"One":         {Name: "One", DataType: "varchar"},
+			"NullableCol": {Name: "NullableCol", DataType: "int", IsNullable: true},
 		},
 	}
 
@@ -194,7 +171,7 @@ func TestResolveTableToModel_UpdatedType(t *testing.T) {
 func TestResolveTableToModel_RemoveColumn(t *testing.T) {
 	table := &schema.Table{
 		Columns: map[string]*schema.Column{
-			"One": {Name: "One", DataType: "varchar", Position: 0},
+			"One": {Name: "One", DataType: "varchar"},
 		},
 	}
 
@@ -216,8 +193,8 @@ func TestBuildModelNodeFromTable(t *testing.T) {
 	table := &schema.Table{
 		Name: "Foo",
 		Columns: map[string]*schema.Column{
-			"Foo1":    {Name: "Foo1", DataType: "int", Position: 0},
-			"NullFoo": {Name: "NullFoo", DataType: "datetime", IsNullable: true, Position: 1},
+			"Foo1":    {Name: "Foo1", DataType: "int"},
+			"NullFoo": {Name: "NullFoo", DataType: "datetime", IsNullable: true},
 		},
 	}
 	m, e := buildModelNodeFromTable(table)

@@ -1,7 +1,6 @@
 package gen
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"go/format"
@@ -53,7 +52,14 @@ func (g *Gen) GetOrphanedDals(dir string, database *schema.Schema) []string {
 }
 
 // CleanGoDALs removes any repo files that aren't in the database.Tables map
-func CleanGoDALs(dir string, database *schema.Schema) (e error) {
+func CleanGoDALs(dir, interfacesDir string, schemas []*schema.Schema) (e error) {
+
+	tableNames := map[string]struct{}{}
+	for k := range schemas {
+		for l := range schemas[k].Tables {
+			tableNames[schemas[k].Tables[l].Name] = struct{}{}
+		}
+	}
 
 	// EXT
 	dirHandle, err := os.Open(dir)
@@ -68,7 +74,7 @@ func CleanGoDALs(dir string, database *schema.Schema) (e error) {
 		panic(err)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 
 	for _, name := range dirFileNames {
 
@@ -97,13 +103,16 @@ func CleanGoDALs(dir string, database *schema.Schema) (e error) {
 			modelName = modelName[:len(modelName)-3] // DAL
 		}
 
-		if _, ok := database.Tables[modelName]; !ok {
+		if _, ok := tableNames[modelName]; !ok {
 			if modelName != "Config" {
 				fullFilePath := path.Join(dir, name)
-				if result := lib.ReadCliInput(reader, fmt.Sprintf("Delete unused dal `%s`(Y/n)?", name)); result == "Y" {
-					fmt.Printf("Removing %s\n", fullFilePath)
-					os.Remove(fullFilePath)
-				}
+				interfaceFilePath := path.Join(interfacesDir, "I"+name)
+				// if result := lib.ReadCliInput(reader, fmt.Sprintf("Delete unused dal `%s`(Y/n)?", name)); result == "Y" {
+				fmt.Printf("Deleting `%s`\n", fullFilePath)
+				os.Remove(fullFilePath)
+				fmt.Printf("Deleting `%s`\n", interfaceFilePath)
+				os.Remove(interfaceFilePath)
+				// }
 			}
 		}
 	}
@@ -114,7 +123,7 @@ func toArgName(field string) string {
 	return strings.ToLower(field[:1]) + field[1:]
 }
 
-func GenDALs(dalsDir string, config *lib.Config, force, clean bool) error {
+func GenDALs(dalsDir, dalInterfacesDir string, config *lib.Config, force, clean bool) error {
 
 	lib.EnsureDir(dalsDir)
 
@@ -131,9 +140,7 @@ func GenDALs(dalsDir string, config *lib.Config, force, clean bool) error {
 	fmt.Println("Generating models...")
 
 	if clean {
-		for k := range schemaList.Schemas {
-			CleanGoDALs(dalsDir, schemaList.Schemas[k])
-		}
+		CleanGoDALs(dalsDir, dalInterfacesDir, schemaList.Schemas)
 	}
 
 	var tablesCache cache.TablesCache
@@ -1201,8 +1208,36 @@ func fetchTableUpdateFieldsString(columns schema.SortedColumns) string {
 	return strings.Join(fields, ",")
 }
 
+const bootstrapFileTpl = `
+// Package dal is the Data Access Layer
+package dal
+
+import (
+	"{{ .DBPackage }}"
+	"{{ .LogPackage }}"
+	"{{ .ModelsPackage }}"
+)
+
+// DAL is a container for all dal structs
+type DAL struct {
+	{{range .Tables}}
+	{{.Name}} *{{.Name}}DAL{{end}}
+}
+
+// BootstrapDAL bootstraps all of the DAL methods
+func BootstrapDAL(db map[string][]db.IDB, log log.ILog) *DAL {
+
+	d := &DAL{}
+	{{range .Tables}}
+	d.{{.Name}} = New{{.Name}}DAL(db[models.{{.Name}}_SchemaName], log){{end}}
+
+	return d
+}`
+
 // GenerateDALsBootstrapFile generates a dal bootstrap file in golang
-func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schema.SchemaList) (e error) {
+func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schema.SchemaList) error {
+
+	var e error
 
 	tables := map[string]*schema.Table{}
 
@@ -1229,51 +1264,27 @@ func GenerateDALsBootstrapFile(config *lib.Config, dir string, schemaList *schem
 		ModelsPackage: fmt.Sprintf("%s/%s", config.BasePackage, "gen/definitions/models"),
 	}
 
-	tpl := `
-// Package dal is the Data Access Layer
-package dal
-
-import (
-	"{{ .DBPackage }}"
-	"{{ .LogPackage }}"
-	"{{ .ModelsPackage }}"
-)
-
-// DAL is a container for all dal structs
-type DAL struct {
-	{{range .Tables}}
-	{{.Name}} *{{.Name}}DAL{{end}}
-}
-
-// BootstrapDAL bootstraps all of the DAL methods
-func BootstrapDAL(db map[string][]db.IDB, log log.ILog) *DAL {
-
-	d := &DAL{}
-	{{range .Tables}}
-	d.{{.Name}} = New{{.Name}}DAL(db[models.{{.Name}}_SchemaName], log){{end}}
-
-	return d
-}`
-
 	p := path.Join(dir, "bootstrap.go")
 	// lib.Debugf("Generating dal bootstrap file at path %s", g.Options, p)
-	t := template.Must(template.New("repos-bootstrap").Parse(tpl))
+	t := template.Must(template.New("repos-bootstrap").Parse(bootstrapFileTpl))
 	buffer := bytes.Buffer{}
 
 	e = t.Execute(&buffer, data)
 	if e != nil {
 		fmt.Println("Template Error: ", e.Error())
-		return
+		return e
 	}
 
 	var formatted []byte
-	formatted, e = format.Source(buffer.Bytes())
+	if formatted, e = format.Source(buffer.Bytes()); e != nil {
+		fmt.Println("Format Error:", e.Error())
+		return e
+	}
 
 	if e = ioutil.WriteFile(p, formatted, 0644); e != nil {
 		fmt.Println("Write file error: ", e.Error())
+		return e
 	}
 
-	// fmt.Println(string(buffer.Bytes()))
-
-	return
+	return nil
 }

@@ -1,4 +1,65 @@
-package routes
+package gen
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestGenControllerBootstrap(t *testing.T) {
+
+	// var result = GenControllerBootstrap("foo", []string{ "bar", "baz", "quux"})
+	// assert.Equal(`
+
+	// `)
+
+}
+
+func TestGetConstantsFromGoFile(t *testing.T) {
+
+	var buffer bytes.Buffer
+	buffer.WriteString(`package constants
+
+// ProjectType is a type of project
+type ProjectType int
+
+const (
+	// ProjectTypeUnknown is an unknown project type
+	ProjectTypeUnknown ProjectType = 1
+	// ProjectTypeNew is a project on a new application/service
+	ProjectTypeNew ProjectType = 2
+	// ProjectTypeSupport is a project on an existing application/service
+	ProjectTypeSupport ProjectType = 3
+)
+
+func (p ProjectType) String() string {
+	switch p {
+	case ProjectTypeUnknown:
+		return "Unknown"
+	case ProjectTypeNew:
+		return "New"
+	case ProjectTypeSupport:
+		return "Support"
+	default:
+		return "Unknown"
+	}
+}
+
+// Int64 returns the int64 representation of the constant
+func (p ProjectType) Int64() int64 {
+	return int64(p)
+}`)
+
+	var name, constants = getConstantsFromGoFile(&buffer)
+
+	assert.Equal(t, "ProjectType", name)
+	require.Equal(t, 3, len(constants))
+	assert.Equal(t, "ProjectTypeUnknown", constants[0])
+	assert.Equal(t, "ProjectTypeNew", constants[1])
+	assert.Equal(t, "ProjectTypeSupport", constants[2])
+}
 
 var controllerFilePath = "/Users/robertmacinnis/go/src/axis-api/core/controllers/AssignmentsController.go"
 var controller = `package controllers

@@ -1,9 +1,11 @@
-package routes
+package gen
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -11,51 +13,52 @@ import (
 	"strings"
 
 	"github.com/macinnir/dvc/core/lib"
-	"github.com/macinnir/dvc/core/lib/gen"
 )
 
-func GenControllerBootstrap(config *lib.Config, dirs []string) {
+// GenControllerBootstrap generates the bootstrap file for the applications controllers
+func GenControllerBootstrap(basePackageName string, dirs []string) string {
 
-	tpl := `// DO NOT EDIT: Auto generated
+	var sb strings.Builder
+
+	sb.WriteString(`// DO NOT EDIT: Auto generated
 package gen
 
 import (
 
-`
+`)
 	for k := range dirs {
-		tpl += "\t\"" + path.Join(config.BasePackage, dirs[k]) + "\"\n"
+		sb.WriteString("\t\"" + path.Join(basePackageName, dirs[k]) + "\"\n")
 	}
-	tpl += `	"` + config.BasePackage + `/gen/definitions"
+	sb.WriteString(`	"` + basePackageName + `/gen/definitions"
 
 	"github.com/macinnir/dvc/core/lib/utils/request"
 )
 
 // Controllers is the main container for all of the controller modules 
 type Controllers struct {
-`
+`)
 
 	for k := range dirs {
 		packageName := path.Base(dirs[k])
-		tpl += "\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Controllers\n"
+		sb.WriteString("\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Controllers\n")
 	}
 
-	tpl += `}
+	sb.WriteString(`}
 
 // NewControllers bootstraps all of the controller modules 
 func NewControllers(s *definitions.App, r request.IResponseLogger) *Controllers { 
 	return &Controllers{
-`
+`)
 
 	for k := range dirs {
 		packageName := path.Base(dirs[k])
-		tpl += "\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewControllers(s, r),\n"
+		sb.WriteString("\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewControllers(s, r),\n")
 	}
 
-	tpl += `	}
-}`
+	sb.WriteString(`	}
+}`)
 
-	ioutil.WriteFile("gen/controllers.go", []byte(tpl), 0777)
-
+	return sb.String()
 }
 
 func LoadRoutes(config *lib.Config) (*lib.RoutesJSONContainer, error) {
@@ -144,13 +147,13 @@ func GenRoutesAndPermissions(controllers []*lib.Controller, dirs []string, confi
 
 	if hasBodyImports {
 		// imports = append(imports, g.Config.BasePackage+"/core/utils/response")
-		imports = append(imports, config.BasePackage+"/core/definitions/dtos")
+		imports = append(imports, path.Join(config.BasePackage, lib.CoreDTOsDir))
 	}
 
-	imports = append(imports, "github.com/macinnir/dvc/core/lib/utils/request")
+	imports = append(imports, lib.LibRequests)
 
 	if packageUsesPermission {
-		imports = append(imports, "github.com/macinnir/dvc/core/lib/utils")
+		imports = append(imports, lib.LibUtils)
 		imports = append(imports, path.Join(config.BasePackage, lib.GoPermissionsPath))
 	}
 
@@ -166,7 +169,7 @@ import (
 	}
 
 	final += `
-	appdtos "` + config.BasePackage + `/app/definitions/dtos"
+	appdtos "` + path.Join(config.BasePackage, lib.AppDTOsDir) + `"
 )
 
 // MapRoutesToControllers maps the routes to the controllers
@@ -178,8 +181,8 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controlle
 	ioutil.WriteFile("gen/routes.go", []byte(final), 0777)
 
 	// DTOS
-	dtos := genDTOSMap("core/definitions/dtos")
-	appDTOs := genDTOSMap("app/definitions/dtos")
+	dtos := genDTOSMap(lib.CoreDTOsDir)
+	appDTOs := genDTOSMap(lib.AppDTOsDir)
 	for dtoName := range appDTOs {
 		dtos[dtoName] = appDTOs[dtoName]
 	}
@@ -210,7 +213,9 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controlle
 	// fmt.Println("Writing Routes JSON to path", lib.RoutesFilePath)
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
 
-	GenControllerBootstrap(config, dirs)
+	var controllerBootstrapFile = GenControllerBootstrap(config.BasePackage, dirs)
+
+	ioutil.WriteFile(lib.ControllersBootstrapGenFile, []byte(controllerBootstrapFile), 0777)
 
 	return nil
 }
@@ -375,7 +380,7 @@ func genDTOSMap(dir string) map[string]map[string]string {
 
 		fullPath := path.Join(dir, name)
 
-		model, e := gen.InspectFile(fullPath)
+		model, e := ParseFileToGoStruct(fullPath)
 		if e != nil {
 			panic(e)
 		}
@@ -394,9 +399,7 @@ func genDTOSMap(dir string) map[string]map[string]string {
 
 func genModelsMap() map[string]map[string]string {
 
-	modelsDir := "gen/definitions/models"
-
-	dirHandle, err := os.Open(modelsDir)
+	dirHandle, err := os.Open(lib.ModelsGenDir)
 
 	if err != nil {
 		panic(err)
@@ -421,9 +424,9 @@ func genModelsMap() map[string]map[string]string {
 		}
 
 		modelName := name[0 : len(name)-3]
-		fullPath := path.Join(modelsDir, name)
+		fullPath := path.Join(lib.ModelsGenDir, name)
 
-		model, e := gen.InspectFile(fullPath)
+		model, e := ParseFileToGoStruct(fullPath)
 		if e != nil {
 			panic(e)
 		}
@@ -439,6 +442,8 @@ func genModelsMap() map[string]map[string]string {
 
 	return result
 }
+
+var structRegex = regexp.MustCompile("^type [a-zA-Z0-9]+ struct {$")
 
 func genAggregatesMap(dir string) map[string]map[string]string {
 
@@ -477,7 +482,6 @@ func genAggregatesMap(dir string) map[string]map[string]string {
 
 		contents := string(fileBytes)
 
-		re := regexp.MustCompile("^type [a-zA-Z0-9]+ struct {$")
 		contentLines := strings.Split(contents, "\n")
 		currentStruct := ""
 		for k := range contentLines {
@@ -488,7 +492,7 @@ func genAggregatesMap(dir string) map[string]map[string]string {
 				continue
 			}
 
-			if re.Match([]byte(contentLines[k])) {
+			if structRegex.Match([]byte(contentLines[k])) {
 				structName := contentLines[k][5 : len(contentLines[k])-9]
 				// fmt.Println(k, structName)
 				result[structName] = map[string]string{}
@@ -554,22 +558,15 @@ func genAggregatesMap(dir string) map[string]map[string]string {
 	return result
 }
 
+var goConstantRegex = regexp.MustCompile("^type [a-zA-Z0-9]+ [a-zA-Z0-9]+$")
+
 func genConstantsMap() map[string][]string {
 
-	modelsDir := "core/definitions/constants"
-
-	files, err := ioutil.ReadDir(modelsDir)
+	files, err := ioutil.ReadDir(lib.CoreConstantsDir)
 
 	if err != nil {
 		panic(err)
 	}
-
-	// defer dirHandle.Close()
-
-	// var dirFileNames []string
-	// dirFileNames, err = dirHandle.Readdirnames(-1)
-
-	// reader := bufio.NewReader(os.Stdin)
 
 	result := map[string][]string{}
 
@@ -583,66 +580,61 @@ func genConstantsMap() map[string][]string {
 			continue
 		}
 
-		// fileNameNoExt := name[0 : len(name)-3]
-		fullPath := path.Join(modelsDir, file.Name())
-		// fmt.Println(fullPath)
+		fullPath := path.Join(lib.CoreConstantsDir, file.Name())
 
-		fileBytes, e := ioutil.ReadFile(fullPath)
+		file, _ := os.Open(fullPath)
 
-		if e != nil {
-			panic(e)
-		}
+		key, value := getConstantsFromGoFile(file)
 
-		contents := string(fileBytes)
+		result[key] = value
 
-		re := regexp.MustCompile("^type [a-zA-Z0-9]+ [a-zA-Z0-9]+$")
-		contentLines := strings.Split(contents, "\n")
-		currentStruct := ""
-		isConsts := false
-		for k := range contentLines {
-			// fmt.Println(k, contentLines[k])
-			if re.Match([]byte(contentLines[k])) {
-				structName := contentLines[k][5:]
-				structName = strings.Split(structName, " ")[0]
-				// fmt.Println(k, structName)
-				result[structName] = []string{}
-				currentStruct = structName
-				continue
-			}
-
-			if contentLines[k] == "const (" {
-				isConsts = true
-				continue
-			}
-
-			if isConsts == true {
-				contentLines[k] = strings.TrimSpace(contentLines[k])
-				if contentLines[k] == ")" {
-					break
-				}
-
-				if len(contentLines[k]) > 2 && contentLines[k][0:2] == "//" {
-					continue
-				}
-
-				parts := strings.Split(contentLines[k], " ")
-				result[currentStruct] = append(result[currentStruct], parts[0])
-			}
-
-			// if len(contentLines[k]) > 5 && contentLines[k][0:5] == "type " {
-			// }
-		}
-		// model, e := InspectFile(fullPath)
-		// if e != nil {
-		// 	panic(e)
-		// }
-		// k := 0
-
-		// for k < model.Fields.Len() {
-		// 	result[model.Name][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
-		// 	k++
-		// }
+		file.Close()
 	}
 
 	return result
+}
+
+func getConstantsFromGoFile(file io.Reader) (string, []string) {
+
+	scanner := bufio.NewScanner(file)
+
+	var structName = ""
+	isConsts := false
+	var constants = []string{}
+
+	for scanner.Scan() {
+
+		var line = scanner.Text()
+
+		if goConstantRegex.Match([]byte(line)) {
+			structName = strings.Split(line[5:], " ")[0]
+			continue
+		}
+
+		if line == "const (" {
+			isConsts = true
+			continue
+		}
+
+		if isConsts {
+
+			line = strings.TrimSpace(line)
+
+			if line == ")" {
+				break
+			}
+
+			if len(line) > 2 && line[0:2] == "//" {
+				continue
+			}
+
+			parts := strings.Split(line, " ")
+
+			constants = append(constants, parts[0])
+
+		}
+	}
+
+	return structName, constants
+
 }

@@ -14,7 +14,7 @@ const CommandName = "connections"
 func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	for k := range config.Databases {
-		fmt.Println(" - ", config.Databases[k].Key, "(Schema: "+lib.ExtractRootNameFromKey(config.Databases[k].Key)+")")
+		fmt.Println(" - ", config.Databases[k].Key, "(Schema: "+lib.ExtractRootNameFromKey(config.Databases[k].Key)+") => "+config.Databases[k].Host)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-package routes
+package gen
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/macinnir/dvc/core/lib"
-	"github.com/macinnir/dvc/core/lib/gen"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
@@ -781,7 +780,7 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 		<h2>Permissions</h2>
 	`)
 
-	permissionMap, _ := gen.FetchAllPermissionsFromControllers(config.Dirs.Controllers)
+	permissionMap, _ := FetchAllPermissionsFromControllers(config.Dirs.Controllers)
 
 	permissionNames := make([]string, len(permissionMap))
 	var n = 0

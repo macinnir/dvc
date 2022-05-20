@@ -6,8 +6,6 @@ import (
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/fetcher"
 	"github.com/macinnir/dvc/core/lib/gen"
-	"github.com/macinnir/dvc/core/lib/gen/routes"
-	"github.com/macinnir/dvc/core/lib/gen/typescript"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +21,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	cmd := args[0]
 	force := false
-	clean := false
+	clean := true
 
 	for k := range args {
 		switch args[k] {
@@ -38,12 +36,12 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	case "models":
 		gen.GenModels(config, force, clean)
 	case "dals":
-		gen.GenDALs("gen/dal", config, force, clean)
+		gen.GenDALs("gen/dal", lib.DALDefinitionsGenDir, config, force, clean)
 	case "interfaces":
 		gen.GenServicesBootstrap(config)
-		gen.GenInterfaces("gen/dal", "gen/definitions/dal")
-		gen.GenInterfaces("core/services", "gen/definitions/services")
-		gen.GenInterfaces("app/services", "gen/definitions/services")
+		gen.GenInterfaces("gen/dal", lib.DALDefinitionsGenDir)
+		gen.GenInterfaces("core/services", lib.ServiceDefinitionsGenDir)
+		gen.GenInterfaces("app/services", lib.ServiceDefinitionsGenDir)
 	case "routes":
 		cf := fetcher.NewControllerFetcher()
 		controllers, dirs, e := cf.FetchAll()
@@ -51,11 +49,11 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		if e := routes.GenRoutesAndPermissions(controllers, dirs, config); e != nil {
+		if e := gen.GenRoutesAndPermissions(controllers, dirs, config); e != nil {
 			return e
 		}
 
-		if e := routes.GenTSRoutes(controllers, config); e != nil {
+		if e := gen.GenTSRoutes(controllers, config); e != nil {
 			return e
 		}
 
@@ -64,26 +62,26 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		var e error
 		var r *lib.RoutesJSONContainer
 
-		r, e = routes.LoadRoutes(config)
+		r, e = gen.LoadRoutes(config)
 
 		if e != nil {
 			return e
 		}
 
-		if e = typescript.GenerateTypescriptModels(config, r); e != nil {
+		if e = gen.GenerateTypescriptModels(config, r); e != nil {
 			return e
 		}
-		if e = typescript.GenerateTypesriptDTOs(config, r); e != nil {
-			return e
-		}
-
-		tg := typescript.NewTypescriptGenerator(config, r)
-
-		if e = tg.GenerateTypesriptAggregates(); e != nil {
+		if e = gen.GenerateTypesriptDTOs(config, r); e != nil {
 			return e
 		}
 
-		routes.GenAPIDocs(config, r)
+		tg := gen.NewTypescriptGenerator(config, r)
+
+		if e = tg.GenerateTypesriptAggregates(config); e != nil {
+			return e
+		}
+
+		gen.GenAPIDocs(config, r)
 
 	// case "tsdtos":
 	// 	fmt.Println("Generating Typescript DTOs")

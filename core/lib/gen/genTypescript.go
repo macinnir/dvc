@@ -1,4 +1,4 @@
-package typescript
+package gen
 
 import (
 	"fmt"
@@ -38,7 +38,9 @@ func GenerateTypescriptModels(config *lib.Config, routes *lib.RoutesJSONContaine
 			continue
 		}
 
-		os.Remove(path.Join(config.TypescriptModelsPath, files[k].Name()))
+		tsFilePath := path.Join(config.TypescriptModelsPath, files[k].Name())
+		// fmt.Println("Removing", tsFilePath)
+		os.Remove(tsFilePath)
 	}
 
 	var str string
@@ -99,6 +101,28 @@ export const new` + name + ` = () : ` + name + ` => ({
 func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
 	lib.EnsureDir(config.TypescriptDTOsPath)
+
+	var e error
+	var files []os.FileInfo
+
+	if files, e = ioutil.ReadDir(config.TypescriptDTOsPath); e != nil {
+		return e
+	}
+
+	for k := range files {
+
+		if files[k].IsDir() {
+			continue
+		}
+
+		if files[k].Name()[0:1] == "." {
+			continue
+		}
+
+		tsFilePath := path.Join(config.TypescriptDTOsPath, files[k].Name())
+		// fmt.Println("Removing", tsFilePath)
+		os.Remove(tsFilePath)
+	}
 
 	for name := range routes.DTOs {
 		str, _ := GenerateTypescriptDTO(name, routes.DTOs[name])
@@ -166,19 +190,30 @@ func NewTypescriptGenerator(config *lib.Config, routes *lib.RoutesJSONContainer)
 	}
 }
 
-func (tg *TypescriptGenerator) GenerateTypesriptAggregates() error {
+func (tg *TypescriptGenerator) GenerateTypesriptAggregates(config *lib.Config) error {
 
 	lib.EnsureDir(tg.config.TypescriptAggregatesPath)
 
-	// Clean out any old files
-	files, e := ioutil.ReadDir(tg.config.TypescriptAggregatesPath)
+	var e error
+	var files []os.FileInfo
 
-	if e != nil {
+	if files, e = ioutil.ReadDir(config.TypescriptAggregatesPath); e != nil {
 		return e
 	}
 
 	for k := range files {
-		os.Remove(path.Join(tg.config.TypescriptAggregatesPath, files[k].Name()))
+
+		if files[k].IsDir() {
+			continue
+		}
+
+		if files[k].Name()[0:1] == "." {
+			continue
+		}
+
+		tsFilePath := path.Join(config.TypescriptAggregatesPath, files[k].Name())
+		// fmt.Println("Removing", tsFilePath)
+		os.Remove(tsFilePath)
 	}
 
 	for name := range tg.routes.Aggregates {

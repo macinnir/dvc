@@ -443,6 +443,11 @@ func IsString(column *Column) bool {
 
 }
 
+// IsNull returns true if the field uses the `null` package
+func IsNull(fieldType string) bool {
+	return len(fieldType) > 5 && fieldType[0:5] == "null."
+}
+
 type SchemaComparison struct {
 	Database    string
 	DatabaseKey string
