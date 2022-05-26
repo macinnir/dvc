@@ -780,11 +780,9 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 		<h2>Permissions</h2>
 	`)
 
-	permissionMap, _ := FetchAllPermissionsFromControllers(config.Dirs.Controllers)
-
-	permissionNames := make([]string, len(permissionMap))
+	permissionNames := make([]string, len(routes.Permissions))
 	var n = 0
-	for permissionName := range permissionMap {
+	for permissionName := range routes.Permissions {
 		permissionNames[n] = permissionName
 		n++
 	}
@@ -807,7 +805,7 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 				<td class="permission-title">
 				<a name="permission-` + permissionName + `"></a>
 				` + permissionName + `</td>
-				<td class="permission-description">` + permissionMap[permissionName] + `</td>
+				<td class="permission-description">` + routes.Permissions[permissionName] + `</td>
 			</tr>
 		`)
 	}

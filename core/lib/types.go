@@ -78,6 +78,8 @@ type Controller struct {
 
 // ControllerRoute represents a route inside a REST controller
 type ControllerRoute struct {
+	Package        string                 `json:"Package"`
+	Controller     string                 `json:"Controller"`
 	Name           string                 `json:"Name"`
 	Description    string                 `json:"Description"`
 	Raw            string                 `json:"Path"`

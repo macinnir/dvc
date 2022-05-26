@@ -129,7 +129,7 @@ func (ss *MySQL) UseDatabase(server *schema.Server, databaseName string) (e erro
 	return
 }
 
-func (ss *MySQL) FetchDatabase(server *schema.Server, databaseName string) (*schema.Database, error) {
+func (ss *MySQL) FetchDatabase(schemaName string, server *schema.Server, databaseName string) (*schema.Database, error) {
 
 	var e error
 	database := &schema.Database{
@@ -140,7 +140,7 @@ func (ss *MySQL) FetchDatabase(server *schema.Server, databaseName string) (*sch
 		return nil, e
 	}
 
-	if database.Tables, e = ss.fetchDatabaseTables(server, databaseName); e != nil {
+	if database.Tables, e = ss.fetchDatabaseTables(schemaName, server, databaseName); e != nil {
 		return nil, e
 	}
 
@@ -149,7 +149,7 @@ func (ss *MySQL) FetchDatabase(server *schema.Server, databaseName string) (*sch
 }
 
 // fetchDatabaseTables fetches the complete set of tables from this database
-func (ss *MySQL) fetchDatabaseTables(server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error) {
+func (ss *MySQL) fetchDatabaseTables(schemaName string, server *schema.Server, databaseName string) (tables map[string]*schema.Table, e error) {
 
 	var rows *sql.Rows
 	query := "select t.`TABLE_NAME`, t.`ENGINE`, t.`VERSION`, t.`ROW_FORMAT`, t.`TABLE_ROWS`, t.`DATA_LENGTH`, t.`TABLE_COLLATION`, COALESCE(t.`AUTO_INCREMENT`, 0) AS `AUTO_INCREMENT`, ccsa.CHARACTER_SET_NAME FROM information_schema.tables t JOIN information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` ccsa ON ccsa.`COLLATION_NAME` = t.`TABLE_COLLATION` WHERE TABLE_SCHEMA = '" + databaseName + "'"
@@ -179,6 +179,8 @@ func (ss *MySQL) fetchDatabaseTables(server *schema.Server, databaseName string)
 			&table.AutoIncrement,
 			&table.CharacterSet,
 		)
+
+		table.SchemaName = schemaName
 
 		table.Columns, e = ss.FetchTableColumns(server, databaseName, table.Name)
 

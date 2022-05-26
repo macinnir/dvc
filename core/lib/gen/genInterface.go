@@ -155,197 +155,26 @@ func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
 }
 
-// GenAppBootstrapFile generates the services bootstrap file
-func GenAppBootstrapFile(basePackage string) error {
-
-	lib.EnsureDir(lib.AppServicesDir)
-	lib.EnsureDir(lib.CoreServicesDir)
-
-	var files []os.FileInfo
-	var e error
-	files, _ = ioutil.ReadDir(lib.CoreServicesDir)
-	packages := []string{}
-	for k := range files {
-		if files[k].IsDir() {
-			packages = append(packages, path.Join(lib.CoreServicesDir, files[k].Name()))
-		}
-	}
-
-	files, _ = ioutil.ReadDir(lib.AppServicesDir)
-	for k := range files {
-		if files[k].IsDir() {
-			packages = append(packages, path.Join(lib.AppServicesDir, files[k].Name()))
-		}
-	}
-
-	// Write Definitions file
-	var sb strings.Builder
-
-	sb.WriteString(`// DO NOT EDIT; Auto generated
-package definitions 
-
-import (
-	"log"
-	"` + path.Join(basePackage, "core/app") + `" 
-`)
-
-	for k := range packages {
-		sb.WriteString("\t\"" + path.Join(basePackage, packages[k]) + "\"\n")
-	}
-
-	sb.WriteString(`)
-
-// App is a container for the services layer down
-type App struct { 
-	*app.BaseApp 
-	Services *Services 
-}
-
-// Services is a container for all services 
-type Services struct {
-`)
-	for k := range packages {
-		packageName := path.Base(packages[k])
-		sb.WriteString("\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Services\n")
-	}
-	sb.WriteString(`}
-
-// InitAppFromCLI initializes the application (presumably from the command line)
-func InitAppFromCLI(
-	configFilePath, 
-	appName, 
-	version, 
-	commitHash, 
-	buildDate, 
-	clientVersion string,
-) *App { 
-	
-	if len(appName) == 0 { 
-		log.Fatal("App name cannot be empty") 
-	}
-
-	baseApp, coreRepos, authLog := app.NewBaseApp(configFilePath, appName, version, commitHash, buildDate, clientVersion) 
-
-	app := &App { 
-		BaseApp: baseApp, 
-	}
-
-	app.Services = &Services {`)
-	for k := range packages {
-		packageName := path.Base(packages[k])
-		sb.WriteString("\n\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(app.DAL, app.Config, app.Integrations, authLog, coreRepos, app.Cache),")
-	}
-	sb.WriteString(`
-	}
-
-	return app
-} 
-
-// Finish cleans up any connections from the app
-func (a *App) Finish() {
-	for schemaName := range a.Integrations.DB {
-		for k := range a.Integrations.DB[schemaName] {
-			a.Integrations.DB[schemaName][k].Close()
-		}
-	}
-}
-`)
-	ioutil.WriteFile("gen/definitions/app.go", []byte(sb.String()), 0777)
-
-	return e
-}
-
 func GenInterfaces(srcDir, destDir string) error {
-
-	existingInterfaces, _ := fetchExistingInterfaceFiles(destDir)
-
-	existingInterfaceMap := map[string]bool{}
-	for k := range existingInterfaces {
-		baseName := path.Base(existingInterfaces[k])
-		s := baseName[1 : len(baseName)-3]
-		existingInterfaceMap[s] = true
-		// fmt.Println(path.Base(existingInterfaces[k][1 : len(existingInterfaces[k])-3])
-	}
-
-	start := time.Now()
 
 	lib.EnsureDir(destDir)
 
+	var start = time.Now()
 	var e error
-	generatedInterfaces := 0
+	var generatedInterfaces = 0
 	var files []string
 	if files, e = fetchSrcFilesForInterfaces(srcDir); e != nil {
 		return e
 	}
 
-	// removeInterface := []string{}
-	addedInterfaceMap := map[string]bool{}
+	var addedInterfaceMap = map[string]struct{}{}
 	for k := range files {
-
-		srcFile := files[k]
-		baseName := filepath.Base(srcFile)
-		structName := baseName[0 : len(baseName)-3]
-		addedInterfaceMap[structName] = true
-		interfaceName := "I" + structName
-		packageName := filepath.Base(filepath.Dir(srcFile))
-		destDirName := filepath.Base(destDir)
-		// TODO verbose flag?
-		// fmt.Println("DestDir: ", destDirName)
-
-		subDestDir := destDir
-
-		if packageName != destDirName {
-			subDestDir = path.Join(destDir, packageName)
-		}
-
-		// fmt.Println("SubDestDir: ", subDestDir)
-		destFile := path.Join(subDestDir, interfaceName+".go")
-		srcFiles := []string{srcFile}
-
-		// fmt.Println("Generating interface: " + srcFile + " ==> " + destFile)
-
-		// Check if EXT file exists
-		extFile := srcFile[0:len(srcFile)-3] + "Ext.go"
-		if _, e = os.Stat(extFile); e == nil {
-			srcFiles = append(srcFiles, extFile)
-		}
-
-		var i []byte
-		i, e = genInterfaces(
-			srcFiles,
-			structName,
-			"Generated Code; DO NOT EDIT.",
-			packageName,
-			interfaceName,
-			fmt.Sprintf("%s describes the %s", interfaceName, baseName),
-			true,
-			true,
-		)
-
-		if e != nil {
-			fmt.Println("ERROR: " + srcFile + " => " + e.Error())
-			return e
-		}
-
-		lib.EnsureDir(subDestDir)
-
-		// TODO verbose flag
-		// fmt.Printf("Generating interface %s...\n", destFile)
-		ioutil.WriteFile(destFile, i, 0644)
-
+		baseName := filepath.Base(files[k])
+		var structName = baseName[0 : len(baseName)-3]
+		addedInterfaceMap[structName] = struct{}{}
+		GenInterface2(structName, files[k], destDir)
 		generatedInterfaces++
-
 	}
-
-	// for k := range existingInterfaceMap {
-	// 	if _, ok := addedInterfaceMap[k]; !ok {
-	// 		fullPath := path.Join(destDir, "I"+k+".go")
-	// 		// if e = os.Remove(fullPath); e != nil {
-	// 		// 	return fmt.Errorf("remove file %s: %e", fullPath, e)
-	// 		// }
-	// 		fmt.Println("Removed interface at ", fullPath)
-	// 	}
-	// }
 
 	fmt.Printf("Generated %d interfaces to %s in %f seconds\n", generatedInterfaces, destDir, time.Since(start).Seconds())
 
@@ -353,9 +182,56 @@ func GenInterfaces(srcDir, destDir string) error {
 
 }
 
-// GenInterfaces runs GenInterface on all the target files
-func genInterfaces(
-	files []string,
+func GenInterface2(structName, srcFile, destDir string) error {
+
+	var e error
+
+	interfaceName := "I" + structName
+	packageName := filepath.Base(filepath.Dir(srcFile))
+	destDirName := filepath.Base(destDir)
+	destSubDir := destDir
+
+	if packageName != destDirName {
+		destSubDir = path.Join(destDir, packageName)
+	}
+
+	destFile := path.Join(destSubDir, interfaceName+".go")
+
+	var i []byte
+
+	var src []byte
+	if src, e = ioutil.ReadFile(srcFile); e != nil {
+		return e
+	}
+
+	i, e = genInterface(
+		src,
+		structName,
+		"Generated Code; DO NOT EDIT.",
+		packageName,
+		interfaceName,
+		fmt.Sprintf("%s describes %s", interfaceName, structName),
+		true,
+		true,
+	)
+
+	if e != nil {
+		fmt.Println("ERROR: " + srcFile + " => " + e.Error())
+		return e
+	}
+
+	lib.EnsureDir(destSubDir)
+
+	// TODO verbose flag
+	// fmt.Printf("Generating interface %s...\n", destFile)
+	ioutil.WriteFile(destFile, i, 0644)
+
+	return nil
+}
+
+// genInterface generates an interface for the given file
+func genInterface(
+	src []byte,
 	structType,
 	comment,
 	pkgName,
@@ -374,29 +250,21 @@ func genInterfaces(
 
 	var typeDoc string
 
-	for _, f := range files {
-
-		var src []byte
-		if src, e = ioutil.ReadFile(f); e != nil {
-			return
+	methods, imports, parsedTypeDoc := lib.ParseStruct(src, structType, copyDocuments, copyTypeDoc, pkgName)
+	for _, m := range methods {
+		if _, ok := mset[m.Code]; !ok {
+			allMethods = append(allMethods, m.Lines()...)
+			mset[m.Code] = struct{}{}
 		}
-
-		methods, imports, parsedTypeDoc := lib.ParseStruct(src, structType, copyDocuments, copyTypeDoc, pkgName)
-		for _, m := range methods {
-			if _, ok := mset[m.Code]; !ok {
-				allMethods = append(allMethods, m.Lines()...)
-				mset[m.Code] = struct{}{}
-			}
+	}
+	for _, i := range imports {
+		if _, ok := iset[i]; !ok {
+			allImports = append(allImports, i)
+			iset[i] = struct{}{}
 		}
-		for _, i := range imports {
-			if _, ok := iset[i]; !ok {
-				allImports = append(allImports, i)
-				iset[i] = struct{}{}
-			}
-		}
-		if typeDoc == "" {
-			typeDoc = parsedTypeDoc
-		}
+	}
+	if typeDoc == "" {
+		typeDoc = parsedTypeDoc
 	}
 
 	if typeDoc != "" {

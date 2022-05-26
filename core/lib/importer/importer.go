@@ -52,6 +52,7 @@ func FetchAllUniqueSchemas(config *lib.Config) (*schema.SchemaList, error) {
 
 		var s *schema.Database
 		s, e = connector.FetchDatabase(
+			schemaName,
 			executor,
 			configs[schemaName].Name,
 		)
@@ -127,6 +128,7 @@ func FetchSchema(config *lib.Config, schemaName, connectionName string) (*schema
 
 	var s *schema.Database
 	s, e = connector.FetchDatabase(
+		schemaName,
 		executor,
 		connectionConfig.Name,
 	)
@@ -158,6 +160,7 @@ func FetchAllSchemas(config *lib.Config) (map[string]*schema.Schema, error) {
 
 		var database *schema.Database
 		database, e = connector.FetchDatabase(
+			schemaName,
 			executor,
 			config.Name,
 		)

@@ -15,16 +15,15 @@ const CommandName = "refresh"
 // Refresh is the refresh command
 func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 
+	var genArgs = []string{"all", "-c"}
+	for k := range args {
+		if args[k] == "-f" {
+			genArgs = append(genArgs, "-f")
+		}
+	}
 	var start = time.Now()
-	importcmd.Cmd(logger, config, args)
-	// dvc gen models -c
-	gen.Cmd(logger, config, []string{"models", "-c"})
-	gen.Cmd(logger, config, []string{"dals", "-c"})
-	gen.Cmd(logger, config, []string{"interfaces"})
-	gen.Cmd(logger, config, []string{"goperms"})
-	gen.Cmd(logger, config, []string{"tsperms"})
-	gen.Cmd(logger, config, []string{"ts"})
-	gen.Cmd(logger, config, []string{"routes"})
+	importcmd.Cmd(logger, config, []string{})
+	gen.Cmd(logger, config, genArgs)
 	fmt.Printf("Finished in %f seconds\n", time.Since(start).Seconds())
 
 	return nil

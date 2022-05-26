@@ -1,26 +1,22 @@
 package gen
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"go/format"
 	"io/ioutil"
 	"os"
 	"path"
 	"sort"
-	"strings"
+	"text/template"
+	"time"
 	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
-	"github.com/macinnir/dvc/core/lib/fetcher"
 )
 
-func FetchAllPermissionsFromControllers(controllersDir string) (map[string]string, error) {
-
-	cf := fetcher.NewControllerFetcher()
-	controllers, _, e := cf.FetchAll()
-
-	if e != nil {
-		return nil, e
-	}
+func FetchAllPermissionsFromControllers(controllers []*lib.Controller) (map[string]string, error) {
 
 	permissionMap := LoadPermissionsFromJSON()
 
@@ -31,6 +27,9 @@ func FetchAllPermissionsFromControllers(controllersDir string) (map[string]strin
 		permissionMap[controller.Name+"_View"] = "View " + controller.Name
 
 		for k := range controller.Routes {
+			if len(controller.Routes[k].Permission) == 0 {
+				continue
+			}
 			permissionMap[controller.Routes[k].Permission] = controller.Routes[k].Description
 		}
 	}
@@ -64,125 +63,179 @@ func LoadPermissionsFromJSON() map[string]string {
 	return permissionMap
 }
 
-func GenTSPerms(config *lib.Config) (e error) {
+// 0.014938 seconds
+// 0.005944
+// 0.000568
+func GenTSPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
 
+	var start = time.Now()
 	lib.EnsureDir(config.TypescriptPermissionsPath)
+	var tsPermissionsPath = path.Join(config.TypescriptPermissionsPath, "permissions.ts")
+	BuildTypescriptPermissions(permissions, tsPermissionsPath)
+	fmt.Printf("Generated %d ts permissions to %s in %f seconds\n", len(permissions), tsPermissionsPath, time.Since(start).Seconds())
 
-	var permissionMap map[string]string
-	permissionMap, e = FetchAllPermissionsFromControllers(config.Dirs.Controllers)
-	if e != nil {
-		return
-	}
-	str := BuildTypescriptPermissions(permissionMap)
-	e = ioutil.WriteFile(path.Join(config.TypescriptPermissionsPath, "permissions.ts"), []byte(str), 0777)
 	return
 }
 
-func GenGoPerms(config *lib.Config) (e error) {
-
-	var permissionMap map[string]string
-	permissionMap, e = FetchAllPermissionsFromControllers(config.Dirs.Controllers)
-	if e != nil {
-		return
-	}
-
-	BuildPermissionsGoFile(permissionMap)
+// 0.018100
+// 0.000900
+func GenGoPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
+	var start = time.Now()
+	var permissionsFilePath = path.Join(lib.GoPermissionsDir, "permissions.go")
+	BuildPermissionsGoFile(permissions, permissionsFilePath)
+	fmt.Printf("Generated %d go permissions to %s in %f seconds\n", len(permissions), permissionsFilePath, time.Since(start).Seconds())
 	return
 }
 
-func BuildPermissionsGoFile(permissionMap map[string]string) {
+var goPermissionsFileTemplate = template.Must(template.New("go-permissions-file").Parse(`// Generated Code; DO NOT EDIT.
 
-	permissions := make([]string, 0, len(permissionMap))
+package permissions
 
-	for k := range permissionMap {
-		if len(k) == 0 {
-			continue
+import (
+	"github.com/macinnir/dvc/core/lib/utils"
+)
+
+const (
+	{{range .Permissions}}
+	// {{.Title}} permission grants the ability of "{{.Description}}"
+	{{.Title}} utils.Permission = "{{.Name}}"
+	{{end}}
+)
+
+// Permissions returns a slice of permissions 
+func Permissions() map[utils.Permission]string {
+
+	return map[utils.Permission]string {
+		{{range .Permissions}} 
+		{{.Title}}: "{{.Description}}",{{end}}
+	}
+
+}
+`))
+
+type PermissionTplType struct {
+	Title       string
+	Description string
+	Name        string
+}
+
+func BuildTplPermissions(permissionMap map[string]string) []PermissionTplType {
+
+	var perms = make([]PermissionTplType, len(permissionMap))
+
+	var k = 0
+	for permissionName := range permissionMap {
+		perms[k] = PermissionTplType{
+			Title:       string(unicode.ToUpper(rune(permissionName[0]))) + permissionName[1:],
+			Description: permissionMap[permissionName],
+			Name:        permissionName,
 		}
-		permissions = append(permissions, k)
+		k++
 	}
 
-	sort.Strings(permissions)
+	sort.Slice(perms, func(i, j int) bool {
+		return perms[i].Name < perms[j].Name
+	})
 
-	// for k := range permissions {
+	return perms
+}
 
-	// 	permission := permissions[k]
-	// 	description := permissionMap[permissions[k]]
-
-	// 	// fmt.Println(permission + ": " + description)
-
-	// }
-
-	var b strings.Builder
-
-	b.WriteString(`// Generated Code; DO NOT EDIT.
-
-	package permissions
-
-	import (
-		"github.com/macinnir/dvc/core/lib/utils"
-	)
-	
-	const (
-	`)
-	for k := range permissions {
-
-		// fmt.Println("Permission: ", k, permissions[k])
-		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		b.WriteString(`	// ` + permTitle + ` permission grants the ability of "` + permissionMap[permissions[k]] + `"
-	` + permTitle + ` utils.Permission = "` + permissions[k] + `"
-`)
-	}
-
-	b.WriteString(`)
-	
-	// Permissions returns a slice of permissions 
-	func Permissions() map[utils.Permission]string {
-		return map[utils.Permission]string {
-	`)
-
-	for k := range permissions {
-		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
-		b.WriteString(`		` + permTitle + `: "` + permissionMap[permissions[k]] + `",
-`)
-	}
-
-	b.WriteString(`	}
-	}	
-	
-	`)
-	lib.EnsureDir(lib.GoPermissionsPath)
-	// permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
-	permissionsFilePath := path.Join(lib.GoPermissionsPath, "permissions.go")
-	var permissionsFileBytes []byte
+func BuildPermissionsGoFile(permissions []PermissionTplType, permissionsFilePath string) error {
 
 	var e error
-	permissionsFileBytes, e = lib.FormatCode(b.String())
-	if e != nil {
-		panic(e)
+
+	var tplVals = struct {
+		Permissions []PermissionTplType
+	}{
+		Permissions: permissions,
 	}
-	ioutil.WriteFile(permissionsFilePath, permissionsFileBytes, 0777)
+
+	var buffer = bytes.Buffer{}
+
+	goPermissionsFileTemplate.Execute(&buffer, tplVals)
+
+	var formatted []byte
+	if formatted, e = format.Source(buffer.Bytes()); e != nil {
+		fmt.Println("Format Error:", e.Error())
+		return e
+	}
+
+	if e = ioutil.WriteFile(permissionsFilePath, formatted, lib.DefaultFileMode); e != nil {
+		fmt.Println("Write file error: ", e.Error())
+		return e
+	}
+
+	return nil
+	// 	for k := range permissions {
+
+	// 		// fmt.Println("Permission: ", k, permissions[k])
+	// 		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
+	// 		b.WriteString(`	// ` + permTitle + ` permission grants the ability of "` + permissionMap[permissions[k]] + `"
+	// 	` + permTitle + ` utils.Permission = "` + permissions[k] + `"
+	// `)
+	// 	}
+
+	// 	b.WriteString(`)
+
+	// 	// Permissions returns a slice of permissions
+	// 	func Permissions() map[utils.Permission]string {
+	// 		return map[utils.Permission]string {
+	// 	`)
+
+	// 	for k := range permissions {
+	// 		permTitle := string(unicode.ToUpper(rune(permissions[k][0]))) + permissions[k][1:]
+	// 		b.WriteString(`		` + permTitle + `: "` + permissionMap[permissions[k]] + `",
+	// `)
+	// 	}
+
+	// 	b.WriteString(`	}
+	// 	}
+
+	// 	`)
+	// 	// permissionsFilePath := path.Join("core", "definitions", "constants", "permissions", "permissions.go")
+	// 	var permissionsFileBytes []byte
+
+	// 	var e error
+	// 	permissionsFileBytes, e = lib.FormatCode(b.String())
+	// 	if e != nil {
+	// 		panic(e)
+	// 	}
+	// 	ioutil.WriteFile(permissionsFilePath, permissionsFileBytes, 0777)
 }
 
+var tsPermissionsFileTemplate = template.Must(template.New("ts-permissions-file").Parse(`// Generated Code; DO NOT EDIT.
+{{range .Permissions}}
+// {{.Title}} -- {{.Description}}
+export const {{.Title}}Permission = "{{.Name}}";
+{{end}}`))
+
 // BuildTypescriptPermissions returns a formatted typescript file of permission constants
-func BuildTypescriptPermissions(permissionMap map[string]string) string {
+func BuildTypescriptPermissions(permissions []PermissionTplType, permissionsFilePath string) error {
 
-	permissions := make([]string, 0, len(permissionMap))
-	for k := range permissionMap {
-		if len(k) == 0 {
-			continue
-		}
-		permissions = append(permissions, k)
+	var e error
+	var tplVals = struct {
+		Permissions []PermissionTplType
+	}{
+		Permissions: permissions,
+	}
+	var buffer = bytes.Buffer{}
+
+	tsPermissionsFileTemplate.Execute(&buffer, tplVals)
+
+	if e = ioutil.WriteFile(permissionsFilePath, buffer.Bytes(), lib.DefaultFileMode); e != nil {
+		fmt.Println("Write file error: ", e.Error())
+		return e
 	}
 
-	sort.Strings(permissions)
+	return nil
 
-	permissionsFile := "// Generated Code; DO NOT EDIT.\n\n"
-	for k := range permissions {
-		permission := strings.TrimSpace(permissions[k])
-		permTitle := string(unicode.ToUpper(rune(permission[0]))) + permission[1:]
-		permissionsFile += "// " + permTitle + " -- " + permissionMap[permission] + "\n"
-		permissionsFile += "export const " + permTitle + "Permission = \"" + permission + "\";\n"
-	}
+	// permissionsFile := "// Generated Code; DO NOT EDIT.\n\n"
+	// for k := range permissions {
+	// 	permission := strings.TrimSpace(permissions[k])
+	// 	permTitle := string(unicode.ToUpper(rune(permission[0]))) + permission[1:]
+	// 	permissionsFile += "// " + permTitle + " -- " + permissionMap[permission] + "\n"
+	// 	permissionsFile += "export const " + permTitle + "Permission = \"" + permission + "\";\n"
+	// }
 
-	return permissionsFile
+	// return permissionsFile
 }

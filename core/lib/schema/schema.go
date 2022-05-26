@@ -31,6 +31,16 @@ func LoadLocalSchemas() (*SchemaList, error) {
 	}
 
 	appSchema.Schemas = append(appSchema.Schemas, coreSchema.Schemas...)
+	appSchema.TableMap = map[string]struct{}{}
+
+	for k := range appSchema.Schemas {
+
+		var schema = appSchema.Schemas[k]
+
+		for l := range schema.Tables {
+			appSchema.TableMap[schema.Tables[l].Name] = struct{}{}
+		}
+	}
 
 	return appSchema, nil
 }

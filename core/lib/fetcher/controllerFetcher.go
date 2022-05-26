@@ -133,7 +133,7 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 	for k := range methods {
 
-		route := parseControllerMethod(methods[k], controller)
+		route := parseControllerMethod(pkgName, methods[k], controller)
 
 		routeSignature := route.Method + " " + route.Path
 		if _, ok := cf.routeMap[routeSignature]; ok {
@@ -150,6 +150,7 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 }
 
 func parseControllerMethod(
+	packageName string,
 	method lib.Method,
 	controller *lib.Controller,
 ) *lib.ControllerRoute {
@@ -157,8 +158,10 @@ func parseControllerMethod(
 	var e error
 
 	route := &lib.ControllerRoute{
-		Queries: []lib.ControllerRouteQuery{},
-		Params:  []lib.ControllerRouteParam{},
+		Package:    strings.ToUpper(packageName[0:1]) + packageName[1:],
+		Controller: controller.Name,
+		Queries:    []lib.ControllerRouteQuery{},
+		Params:     []lib.ControllerRouteParam{},
 	}
 
 	isAnyone := false
@@ -194,6 +197,9 @@ func parseControllerMethod(
 
 			if len(bodyComment) > 1 {
 				route.BodyType = bodyComment[1]
+				if route.BodyType[0:1] == "*" {
+					route.BodyType = route.BodyType[1:]
+				}
 			}
 
 			controller.HasDTOsImport = true

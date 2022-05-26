@@ -209,3 +209,28 @@ func TestBuildModelNodeFromTable(t *testing.T) {
 	assert.Equal(t, "null.String", m.Fields.Get(1).DataType)
 	assert.Contains(t, *m.Imports, NullPackage)
 }
+
+func TestParseFileNameToModelName(t *testing.T) {
+
+	var tests = []struct {
+		file   string
+		prefix string
+		suffix string
+		result string
+	}{
+		{"IFooDAL.go", "I", "DAL", "Foo"},
+		{"Foo.go", "", "", "Foo"},
+		{"Foo_test.go", "", "", "Foo"},
+		{"FooDAL_test.go", "", "DAL", "Foo"},
+	}
+
+	for k := range tests {
+
+		ts := tests[k]
+
+		var result = parseFileNameToModelName(ts.file, ts.prefix, ts.suffix)
+		assert.Equal(t, ts.result, result)
+
+	}
+
+}

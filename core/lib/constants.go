@@ -15,24 +15,29 @@ const (
 	ChangeFilePath      = ".dvc/changes.log"
 	TablesCacheFilePath = ".dvc/tables-cache.json"
 	RoutesFilePath      = ".dvc/routes.json"
-	ModelsDir           = "models"
 
-	AppServicesDir  = "app/services"
-	CoreServicesDir = "core/services"
-
+	GenDir                   = "gen"
 	DalsGenDir               = "gen/dal"
 	ModelsGenDir             = "gen/definitions/models"
 	ServiceDefinitionsGenDir = "gen/definitions/services"
 	DALDefinitionsGenDir     = "gen/definitions/dal"
-	CoreDTOsDir              = "core/definitions/dtos"
-	AppDTOsDir               = "app/definitions/dtos"
-	CoreConstantsDir         = "core/definitions/constants"
+	GoPermissionsDir         = "gen/permissions"
 
-	ControllersBootstrapGenFile = "gen/controllers.go"
-	IntegrationsDir             = "integrations"
-	DALsDir                     = "dals"
+	AppServicesDir    = "app/services"
+	AppDTOsDir        = "app/definitions/dtos"
+	AppAggregatesDir  = "app/definitions/aggregates"
+	CoreServicesDir   = "core/services"
+	CoreDTOsDir       = "core/definitions/dtos"
+	CoreConstantsDir  = "core/definitions/constants"
+	CoreAggregatesDir = "core/definitions/aggregates"
+
+	DefaultFileMode             = 0777
+	ServicesDir                 = "gen/definitions/services"
+	AppBootstrapFile            = "gen/definitions/services/app.go"
+	RoutesBootstrapFile         = "gen/routes/routes.go"
+	DALBootstrapFile            = "gen/definitions/dal.go"
+	ControllersBootstrapGenFile = "gen/routes/controllers.go"
 	LibRequests                 = "github.com/macinnir/dvc/core/lib/utils/request"
 	LibUtils                    = "github.com/macinnir/dvc/core/lib/utils"
 	// Generated Go file containing constants for all route permissions
-	GoPermissionsPath = "gen/permissions"
 )

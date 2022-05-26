@@ -2,10 +2,13 @@ package gen
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/cache"
 	"github.com/macinnir/dvc/core/lib/fetcher"
 	"github.com/macinnir/dvc/core/lib/gen"
+	"github.com/macinnir/dvc/core/lib/schema"
 	"go.uber.org/zap"
 )
 
@@ -33,29 +36,151 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	}
 
 	switch cmd {
-	case "models":
-		gen.GenModels(config, force, clean)
-	case "dals":
-		gen.GenDALs(lib.DalsGenDir, lib.DALDefinitionsGenDir, config, force, clean)
-	case "interfaces":
+	case "all":
+
+		var e error
+		var tableCache *cache.TablesCache
+		tableCache, e = cache.LoadTableCache()
+
+		if e != nil {
+			return e
+		}
+
+		var schemaList, _ = schema.LoadLocalSchemas()
+		var changedTables []*schema.Table
+		changedTables, e = gen.GetChangedTables(schemaList, tableCache, force)
+		if e != nil {
+			return e
+		}
+
+		fmt.Printf("%d tables have changed.\n", len(changedTables))
+
+		//
+		// Models
+		//
+		if clean {
+
+			// Clean Models
+			e = gen.CleanFiles("go models", lib.ModelsGenDir, schemaList, "", "")
+			if e != nil {
+				return e
+			}
+
+			// Clean Typescript
+			e = gen.CleanFiles("typescript models", config.TypescriptModelsPath, schemaList, "", "")
+			if e != nil {
+				return e
+			}
+
+			// Clean DALs
+			e = gen.CleanFiles("go dals", lib.DalsGenDir, schemaList, "", "DAL")
+			if e != nil {
+				return e
+			}
+
+			// Clean DAL Interfaces
+			e = gen.CleanFiles("go dal interfaces", lib.DALDefinitionsGenDir, schemaList, "I", "DAL")
+			if e != nil {
+				return e
+			}
+		}
+
+		if len(changedTables) > 0 {
+			gen.GenModels(changedTables, config)
+		}
+
+		if len(changedTables) > 0 {
+			gen.GenDALs(changedTables, config)
+			if e = gen.GenerateDALsBootstrapFile(config, schemaList); e != nil {
+				return e
+			}
+		}
+
 		gen.GenAppBootstrapFile(config.BasePackage)
-		gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
+		if len(changedTables) > 0 {
+			gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
+		}
+
 		gen.GenInterfaces(lib.CoreServicesDir, lib.ServiceDefinitionsGenDir)
 		gen.GenInterfaces(lib.AppServicesDir, lib.ServiceDefinitionsGenDir)
-	case "routes":
+
+		// Routes
 		cf := fetcher.NewControllerFetcher()
 		controllers, dirs, e := cf.FetchAll()
 		if e != nil {
 			return e
 		}
 
-		if e := gen.GenRoutesAndPermissions(controllers, dirs, config); e != nil {
+		var routes *lib.RoutesJSONContainer
+
+		if routes, e = gen.GenRoutesAndPermissions(schemaList, controllers, dirs, config); e != nil {
 			return e
 		}
+
+		fmt.Printf("###### Found %d permissions\n", len(routes.Permissions))
+
+		tplPermissions := gen.BuildTplPermissions(routes.Permissions)
+
+		if e := gen.GenGoPerms(config, tplPermissions); e != nil {
+			return e
+		}
+
+		if e := gen.GenTSPerms(config, tplPermissions); e != nil {
+			return e
+		}
+
+		if e = gen.GenerateTypescriptModels(config, routes); e != nil {
+			return e
+		}
+
+		if e = gen.CleanTypescriptDTOs(config, routes); e != nil {
+			return e
+		}
+
+		if e = gen.GenerateTypesriptDTOs(config, routes); e != nil {
+			return e
+		}
+
+		tg := gen.NewTypescriptGenerator(config, routes)
+
+		if e = tg.CleanTypescriptAggregates(); e != nil {
+			return e
+		}
+
+		if e = tg.GenerateTypescriptAggregates(); e != nil {
+			return e
+		}
+
+		gen.GenAPIDocs(config, routes)
 
 		if e := gen.GenTSRoutes(controllers, config); e != nil {
 			return e
 		}
+
+	// case "models":
+	// 	gen.GenModels(config, force, clean)
+	// case "dals":
+	// 	gen.GenDALs(lib.DalsGenDir, lib.DALDefinitionsGenDir, config, force, clean)
+	case "interfaces":
+		gen.GenAppBootstrapFile(config.BasePackage)
+		gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
+		gen.GenInterfaces(lib.CoreServicesDir, lib.ServiceDefinitionsGenDir)
+		gen.GenInterfaces(lib.AppServicesDir, lib.ServiceDefinitionsGenDir)
+
+	// case "routes":
+	// 	cf := fetcher.NewControllerFetcher()
+	// 	controllers, dirs, e := cf.FetchAll()
+	// 	if e != nil {
+	// 		return e
+	// 	}
+
+	// 	if _, e := gen.GenRoutesAndPermissions(controllers, dirs, config); e != nil {
+	// 		return e
+	// 	}
+
+	// 	if e := gen.GenTSRoutes(controllers, config); e != nil {
+	// 		return e
+	// 	}
 
 	case "ts":
 
@@ -71,13 +196,22 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		if e = gen.GenerateTypescriptModels(config, r); e != nil {
 			return e
 		}
+
+		if e = gen.CleanTypescriptDTOs(config, r); e != nil {
+			return e
+		}
+
 		if e = gen.GenerateTypesriptDTOs(config, r); e != nil {
 			return e
 		}
 
 		tg := gen.NewTypescriptGenerator(config, r)
 
-		if e = tg.GenerateTypesriptAggregates(config); e != nil {
+		if e = tg.CleanTypescriptAggregates(); e != nil {
+			return e
+		}
+
+		if e = tg.GenerateTypescriptAggregates(); e != nil {
 			return e
 		}
 
@@ -89,14 +223,14 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 	// case "tsaggregates":
 	// 	fmt.Println("Generating Typescript Aggregates")
 	// 	typescript.GenerateTypesriptAggregates(config)
-	case "tsperms":
-		if e := gen.GenTSPerms(config); e != nil {
-			return e
-		}
-	case "goperms":
-		if e := gen.GenGoPerms(config); e != nil {
-			return e
-		}
+	// case "tsperms":
+	// 	if e := gen.GenTSPerms(config); e != nil {
+	// 		return e
+	// 	}
+	// case "goperms":
+	// 	if e := gen.GenGoPerms(config); e != nil {
+	// 		return e
+	// 	}
 
 	default:
 		return errors.New("unknown gen type")

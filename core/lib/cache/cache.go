@@ -24,17 +24,17 @@ type TablesCache struct {
 }
 
 // NewTablesCache is a factory method for TablesCache
-func NewTablesCache() TablesCache {
-	return TablesCache{
+func NewTablesCache() *TablesCache {
+	return &TablesCache{
 		Dals:   map[string]string{},
 		Models: map[string]string{},
 	}
 }
 
 // LoadTableCache loads the table cache
-func LoadTableCache() (TablesCache, error) {
+func LoadTableCache() (*TablesCache, error) {
 
-	tableCache := NewTablesCache()
+	var tableCache = NewTablesCache()
 
 	if _, e := os.Stat(lib.TablesCacheFilePath); e == nil {
 		if fileBytes, e := ioutil.ReadFile(lib.TablesCacheFilePath); e == nil {
@@ -62,7 +62,7 @@ func HashTable(table *schema.Table) (string, error) {
 }
 
 // SaveTableCache writes a table cache to the table cache file
-func SaveTableCache(tablesCache TablesCache) error {
+func SaveTableCache(tablesCache *TablesCache) error {
 
 	var e error
 	var tableCacheSerialized []byte

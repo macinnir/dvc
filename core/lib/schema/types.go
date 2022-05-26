@@ -20,7 +20,8 @@ const (
 )
 
 type SchemaList struct {
-	Schemas []*Schema `json:"schemas"`
+	Schemas  []*Schema           `json:"schemas"`
+	TableMap map[string]struct{} `json:"-"`
 }
 
 // Database represents a database
@@ -99,6 +100,7 @@ type Table struct {
 	CharacterSet  string             `json:"characterSet"`
 	AutoIncrement int64              `json:"-"`
 	Columns       map[string]*Column `json:"columns"`
+	SchemaName    string
 }
 
 // SortedColumns is a slice of Column objects
@@ -133,6 +135,10 @@ func (table *Table) ToSortedColumns() SortedColumns {
 	sort.Sort(sortedColumns)
 
 	return sortedColumns
+}
+
+func (table *Table) Key() string {
+	return table.SchemaName + "_" + table.Name
 }
 
 // SortedTables is a slice of Table objects

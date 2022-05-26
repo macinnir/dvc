@@ -2,6 +2,7 @@ package gen
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,56 +10,83 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
+	"time"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/schema"
 )
+
+var goControllerBootstrapTemplate = template.Must(template.New("go-controllers-bootstrap-file").Parse(`// Generated Code; DO NOT EDIT.
+
+package routes 
+
+import(
+	{{ range .Imports}}"{{.}}"
+	{{end}}
+)
+
+
+// Controllers is the main container for all of the controller modules 
+type Controllers struct {
+	{{ range .Controllers }}
+	{{.Title}} *{{.Name}}.Controllers{{end}}
+}
+
+// NewControllers bootstraps all of the controller modules 
+func NewControllers(s *services.App, r request.IResponseLogger) *Controllers {
+	return &Controllers {
+		{{ range .Controllers }}
+		{{.Title}}: {{.Name}}.NewControllers(s, r),{{ end }} 
+	}
+}
+
+`))
+
+type GoControllerBootstrapTemplateValues struct {
+	Imports     []string
+	Controllers []struct {
+		Title string
+		Name  string
+	}
+}
+
+// 0.085753
 
 // GenControllerBootstrap generates the bootstrap file for the applications controllers
 func GenControllerBootstrap(basePackageName string, dirs []string) string {
 
-	var sb strings.Builder
-
-	sb.WriteString(`// DO NOT EDIT: Auto generated
-package gen
-
-import (
-
-`)
-	for k := range dirs {
-		sb.WriteString("\t\"" + path.Join(basePackageName, dirs[k]) + "\"\n")
+	var vals = GoControllerBootstrapTemplateValues{
+		Imports: make([]string, len(dirs)+2),
+		Controllers: make([]struct {
+			Title string
+			Name  string
+		}, len(dirs)),
 	}
-	sb.WriteString(`	"` + basePackageName + `/gen/definitions"
-
-	"github.com/macinnir/dvc/core/lib/utils/request"
-)
-
-// Controllers is the main container for all of the controller modules 
-type Controllers struct {
-`)
 
 	for k := range dirs {
 		packageName := path.Base(dirs[k])
-		sb.WriteString("\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + " *" + packageName + ".Controllers\n")
+		vals.Imports[k] = path.Join(basePackageName, dirs[k])
+		vals.Controllers[k] = struct {
+			Title string
+			Name  string
+		}{
+			strings.ToUpper(packageName[0:1]) + packageName[1:],
+			packageName,
+		}
 	}
 
-	sb.WriteString(`}
+	vals.Imports[len(dirs)] = path.Join(basePackageName, "gen/definitions/services")
+	vals.Imports[len(dirs)+1] = "github.com/macinnir/dvc/core/lib/utils/request"
 
-// NewControllers bootstraps all of the controller modules 
-func NewControllers(s *definitions.App, r request.IResponseLogger) *Controllers { 
-	return &Controllers{
-`)
+	var buf bytes.Buffer
 
-	for k := range dirs {
-		packageName := path.Base(dirs[k])
-		sb.WriteString("\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewControllers(s, r),\n")
-	}
+	goControllerBootstrapTemplate.Execute(&buf, vals)
 
-	sb.WriteString(`	}
-}`)
-
-	return sb.String()
+	return buf.String()
 }
 
 func LoadRoutes(config *lib.Config) (*lib.RoutesJSONContainer, error) {
@@ -84,102 +112,110 @@ func LoadRoutes(config *lib.Config) (*lib.RoutesJSONContainer, error) {
 	return routes, nil
 }
 
-// GenRoutes generates a list of routes from a directory of controller files
-func GenRoutesAndPermissions(controllers []*lib.Controller, dirs []string, config *lib.Config) error {
+var goRoutesTemplate = template.Must(template.New("go-routes-file").Parse(`// Generated Code; DO NOT EDIT.
 
-	var e error
-	imports := []string{
-		path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
-		// path.Join(config.BasePackage, config.Dirs.Aggregates),
-		"net/http",
-		"github.com/gorilla/mux",
-	}
-
-	// fmt.Println(imports)
-
-	code := ""
-
-	rest := ""
-	// controllerCalls := []string{}
-
-	hasBodyImports := false
-	packageUsesPermission := false
-
-	if e != nil {
-		return e
-	}
-
-	for k := range controllers {
-
-		controller := controllers[k]
-
-		if controller.PermCount > 0 {
-			packageUsesPermission = true
-		}
-
-		// Documentation routes
-		controllers = append(controllers, controller)
-
-		// Include imports for dtos and response if necessary for JSON http body
-		if controller.HasDTOsImport {
-			hasBodyImports = true
-		}
-
-		var routesString string
-
-		routesString, e = buildRoutesCodeFromController(controller)
-
-		if e != nil {
-			return e
-		}
-
-		rest += "\n" + routesString + "\n"
-
-		// controllerCalls = append(
-		// 	controllerCalls,
-		// 	"map"+strings.Title(controller.Package)+controller.Name+"Routes(res, r, auth, c, log)",
-		// )
-	}
-
-	// code += strings.Join(controllerCalls, "\n\t")
-	code += rest
-	code += "\n\n}\n"
-
-	if hasBodyImports {
-		// imports = append(imports, g.Config.BasePackage+"/core/utils/response")
-		imports = append(imports, path.Join(config.BasePackage, lib.CoreDTOsDir))
-	}
-
-	imports = append(imports, lib.LibRequests)
-
-	if packageUsesPermission {
-		imports = append(imports, lib.LibUtils)
-		imports = append(imports, path.Join(config.BasePackage, lib.GoPermissionsPath))
-	}
-
-	final := `// Generated Code; DO NOT EDIT.
-
-package gen
+package routes
 
 import (
-`
-
-	for _, i := range imports {
-		final += fmt.Sprintf("\t\"%s\"\n", i)
-	}
-
-	final += `
-	appdtos "` + path.Join(config.BasePackage, lib.AppDTOsDir) + `"
+	{{range .Imports}}"{{.}}"
+	{{end}}
+	appdtos "{{.AppDTOsPath}}"
 )
 
 // MapRoutesToControllers maps the routes to the controllers
-func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controllers, res request.IResponseLogger, log integrations.ILog) {
+func MapRoutesToControllers(r *mux.Router, app *services.App, res request.IResponseLogger) {
 
-	`
-	final += code
+	var auth = app.Integrations.Auth
+	var log = app.Integrations.Log
+	var c = NewControllers(app, res)
 
-	ioutil.WriteFile("gen/routes.go", []byte(final), 0777)
+	{{range .Controllers}}
+	////
+	// {{.Package}}.{{.Name}}
+	////
 
+	{{range .Routes}}
+	// {{.Package}}.{{.Controller}}.{{.Name}}
+	// {{.Method}} {{.Raw}}{{if not .IsAuth}}
+	// @anonymous{{else}}{{if eq (len .Permission) 0}}
+	// @anyone{{end}}{{end}}
+	r.Handle("{{.Path}}", {{ if .IsAuth }}auth.AuthMiddleware{{ else }}auth.AnonMiddleware{{ end }}(func(w http.ResponseWriter, req *request.Request) {
+
+		log.Debug("ROUTE: {{.Method}} {{.Path}} => {{.Name}}")
+
+		{{ if and .IsAuth (gt (len .Permission) 0) }}// Requires permission {{.Permission}} 
+		if !utils.HasPerm(req, req.User, permissions.{{.Permission}}) {
+			res.Forbidden(req, w)
+			return
+		}{{end}}
+{{if gt (len .BodyType) 0}}
+		// Parse the body of type {{.BodyType}} 
+		var body = &{{.BodyType}}{}
+		req.BodyJSON(body){{end}}
+		
+		{{range .Params}}
+		// URL Param {{.Name}}
+		// {{.Pattern}}{{if eq .Type "int64"}}
+		var {{.Name}} = req.ArgInt64("{{.Name}}", {{ if eq .Pattern "-?[0-9]+" }}-1{{else}}0{{end}})
+		{{else}}
+		var {{.Name}} = req.Arg("{{.Name}}", "")
+		{{end}}{{end}}
+		{{range .Queries}}
+		// Query Arg {{.VariableName}}
+		// {{.Pattern}}{{if eq .Type "int64"}}
+		var {{.VariableName}} = req.ArgInt64("{{.VariableName}}",{{ if eq .Pattern "-?[0-9]+" }}-1{{else}}0{{end}}){{else}}
+		var {{.VariableName}} = req.Arg("{{.VariableName}}", ""){{end}}{{end}}
+
+		c.{{.Package}}.{{.Controller}}.{{.Name}}(w, req{{range .Params}}, {{.Name}}{{end}}{{range .Queries}}, {{.VariableName}}{{end}}{{if gt (len .BodyType) 0}}, body{{end}})
+
+	})).
+		Methods("{{.Method}}").{{if gt (len .Queries) 0}}
+		Queries({{range .Queries}}
+			"{{.VariableName}}", "{{.ValueRaw}}",{{end}}
+		).{{end}}
+		Name("{{.Name}}")
+	{{end}}
+	{{end}}
+
+}
+`))
+
+type RoutesTplValues struct {
+	Imports     []string
+	AppDTOsPath string
+	Controllers []*lib.Controller
+}
+
+// GenRoutesAndPermissions generates a list of routes from a directory of controller files
+// 0.0824
+// 0.008664
+func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.Controller, dirs []string, config *lib.Config) (*lib.RoutesJSONContainer, error) {
+
+	var buf bytes.Buffer
+	var start = time.Now()
+	var e error
+
+	var routesTplValues = RoutesTplValues{
+		Imports: []string{
+			// path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
+			// path.Join(config.BasePackage, config.Dirs.Aggregates),
+			"net/http",
+			"github.com/gorilla/mux",
+			lib.LibRequests,
+			path.Join(config.BasePackage, lib.ServicesDir),
+			path.Join(config.BasePackage, lib.CoreDTOsDir),
+			lib.LibUtils,
+			path.Join(config.BasePackage, lib.GoPermissionsDir),
+		},
+		AppDTOsPath: path.Join(config.BasePackage, lib.AppDTOsDir),
+		Controllers: controllers,
+	}
+	goRoutesTemplate.Execute(&buf, routesTplValues)
+	lib.EnsureDir(filepath.Dir(lib.RoutesBootstrapFile))
+	ioutil.WriteFile(lib.RoutesBootstrapFile, buf.Bytes(), 0777)
+	fmt.Printf("Generated routes bootstrap file to `%s` in %f seconds\n", lib.RoutesBootstrapFile, time.Since(start).Seconds())
+
+	start = time.Now()
 	// DTOS
 	dtos := genDTOSMap(lib.CoreDTOsDir)
 	appDTOs := genDTOSMap(lib.AppDTOsDir)
@@ -188,18 +224,27 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controlle
 	}
 
 	// Aggregates
-	aggregates := genAggregatesMap("core/definitions/aggregates")
-	appAggregates := genAggregatesMap("app/definitions/aggregates")
+	aggregates := genAggregatesMap(lib.CoreAggregatesDir)
+	appAggregates := genAggregatesMap(lib.AppAggregatesDir)
+
 	for aggregateName := range appAggregates {
 		aggregates[aggregateName] = appAggregates[aggregateName]
 	}
 
-	routesContainer := &lib.RoutesJSONContainer{
-		Routes:     map[string]*lib.ControllerRoute{},
-		DTOs:       dtos,
-		Models:     genModelsMap(),
-		Aggregates: aggregates,
-		Constants:  genConstantsMap(),
+	var permissions = map[string]string{}
+	permissions, e = FetchAllPermissionsFromControllers(controllers)
+
+	if e != nil {
+		return nil, e
+	}
+
+	var routesContainer = &lib.RoutesJSONContainer{
+		Routes:      map[string]*lib.ControllerRoute{},
+		DTOs:        dtos,
+		Models:      genModelsMap(schemaList),
+		Aggregates:  aggregates,
+		Constants:   genConstantsMap(),
+		Permissions: permissions,
 	}
 
 	for k := range controllers {
@@ -210,14 +255,17 @@ func MapRoutesToControllers(r *mux.Router, auth integrations.IAuth, c *Controlle
 	}
 
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
-	// fmt.Println("Writing Routes JSON to path", lib.RoutesFilePath)
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
+	fmt.Printf("Generated routes to `%s` in %f seconds\n", lib.RoutesFilePath, time.Since(start).Seconds())
 
+	start = time.Now()
+	// Controller Bootstrap
 	var controllerBootstrapFile = GenControllerBootstrap(config.BasePackage, dirs)
-
+	lib.EnsureDir(filepath.Dir(lib.ControllersBootstrapGenFile))
 	ioutil.WriteFile(lib.ControllersBootstrapGenFile, []byte(controllerBootstrapFile), 0777)
+	fmt.Printf("Generated ControllerBootstrapGenFile to `%s` in %f seconds\n", lib.ControllersBootstrapGenFile, time.Since(start).Seconds())
 
-	return nil
+	return routesContainer, nil
 }
 
 func buildRoutesCodeFromController(controller *lib.Controller) (out string, e error) {
@@ -397,50 +445,72 @@ func genDTOSMap(dir string) map[string]map[string]string {
 	return result
 }
 
-func genModelsMap() map[string]map[string]string {
+func genModelsMap(schemas *schema.SchemaList) map[string]map[string]string {
 
-	dirHandle, err := os.Open(lib.ModelsGenDir)
+	var tableMap = map[string]map[string]string{}
+	for k := range schemas.Schemas {
 
-	if err != nil {
-		panic(err)
-	}
+		var s = schemas.Schemas[k]
 
-	defer dirHandle.Close()
+		for l := range s.Tables {
+			var table = s.Tables[l]
 
-	var dirFileNames []string
-	dirFileNames, err = dirHandle.Readdirnames(-1)
+			tableMap[table.Name] = map[string]string{}
 
-	if err != nil {
-		panic(err)
-	}
-	// reader := bufio.NewReader(os.Stdin)
+			for m := range table.Columns {
 
-	result := map[string]map[string]string{}
+				tableMap[table.Name][m] = schema.DataTypeToGoTypeString(table.Columns[m])
 
-	for _, name := range dirFileNames {
+			}
 
-		if name == ".DS_Store" {
-			continue
 		}
 
-		modelName := name[0 : len(name)-3]
-		fullPath := path.Join(lib.ModelsGenDir, name)
-
-		model, e := ParseFileToGoStruct(fullPath)
-		if e != nil {
-			panic(e)
-		}
-		k := 0
-
-		result[modelName] = map[string]string{}
-
-		for k < model.Fields.Len() {
-			result[modelName][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
-			k++
-		}
 	}
 
-	return result
+	return tableMap
+
+	// dirHandle, err := os.Open(lib.ModelsGenDir)
+
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// defer dirHandle.Close()
+
+	// var dirFileNames []string
+	// dirFileNames, err = dirHandle.Readdirnames(-1)
+
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// // reader := bufio.NewReader(os.Stdin)
+
+	// result := map[string]map[string]string{}
+
+	// for _, name := range dirFileNames {
+
+	// 	if name == ".DS_Store" {
+	// 		continue
+	// 	}
+
+	// 	modelName := name[0 : len(name)-3]
+	// 	fullPath := path.Join(lib.ModelsGenDir, name)
+
+	// 	model, e := ParseFileToGoStruct(fullPath)
+	// 	if e != nil {
+	// 		panic(e)
+	// 	}
+	// 	k := 0
+
+	// 	result[modelName] = map[string]string{}
+
+	// 	for k < model.Fields.Len() {
+	// 		result[modelName][model.Fields.Get(k).Name] = model.Fields.Get(k).DataType
+	// 		k++
+	// 	}
+	// }
+
+	// return result
 }
 
 var structRegex = regexp.MustCompile("^type [a-zA-Z0-9]+ struct {$")
