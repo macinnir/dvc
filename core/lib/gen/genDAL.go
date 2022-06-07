@@ -770,12 +770,14 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 
 		updateColumnNames.WriteString("`" + col.Name + "` = ?")
 		updateColumnArgs.WriteString("model." + col.Name)
+		updateColumnArgs.WriteString(", ")
 
 		if k < len(data.UpdateColumns)-1 {
 			updateColumnNames.WriteString(", ")
-			updateColumnArgs.WriteString(", ")
 		}
 	}
+
+	updateColumnArgs.WriteString("model." + data.PrimaryKey)
 
 	data.UpdateArgs = updateColumnArgs.String()
 	data.UpdateSQL = "UPDATE `" + data.Table.Name + "` SET " + updateColumnNames.String() + " WHERE `" + data.PrimaryKey + "` = ?"

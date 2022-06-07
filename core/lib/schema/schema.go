@@ -230,6 +230,10 @@ func GoBaseTypeToBaseTypescriptType(goDataType string) string {
 	}
 
 	switch goDataType {
+	case "[]int", "[]int64", "[]float64":
+		return "number[]"
+	case "[]string":
+		return "string[]"
 	case "string", "null.String":
 		return "string"
 	case "int", "int64", "float64", "null.Float":

@@ -157,6 +157,8 @@ func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
 func GenInterfaces(srcDir, destDir string) error {
 
+	fmt.Println("Generating interface files from", srcDir, " => ", destDir)
+
 	lib.EnsureDir(destDir)
 
 	var start = time.Now()
@@ -167,14 +169,49 @@ func GenInterfaces(srcDir, destDir string) error {
 		return e
 	}
 
-	var addedInterfaceMap = map[string]struct{}{}
+	// var interfaceMap = map[string]struct{}{}
+	// for k := range files {
+	// 	fmt.Println("Source File:", filepath.Dir(files[k]), filepath.Base(files[k]))
+	// 	// var baseFile = filepath.Base(files[k])
+	// 	// interfaceMap[path.Join(destDir, "I"+baseFile[0:len(baseFile)-3]+".go")] = struct{}{}
+	// }
+
+	// var existingInterfaceFiles []string
+	// if existingInterfaceFiles, e = fetchSrcFilesForInterfaces(destDir); e != nil {
+	// 	return e
+	// }
+
+	// for k := range existingInterfaceFiles {
+	// 	fmt.Println("Existing Interface:", existingInterfaceFiles[k])
+	// }
+
+	var genInterfaceMap = map[string]struct{}{}
 	for k := range files {
-		baseName := filepath.Base(files[k])
+		var srcFile = files[k]
+		baseName := filepath.Base(srcFile)
 		var structName = baseName[0 : len(baseName)-3]
-		addedInterfaceMap[structName] = struct{}{}
-		GenInterface2(structName, files[k], destDir)
+
+		interfaceName := "I" + structName
+		packageName := filepath.Base(filepath.Dir(srcFile))
+		destDirName := filepath.Base(destDir)
+		destSubDir := destDir
+
+		if packageName != destDirName {
+			destSubDir = path.Join(destDir, packageName)
+		}
+
+		destFile := path.Join(destSubDir, interfaceName+".go")
+		genInterfaceMap[destFile] = struct{}{}
+		// fmt.Println("Generating", destFile)
+		GenInterface2(structName, srcFile, packageName, interfaceName, destSubDir, destFile)
 		generatedInterfaces++
 	}
+
+	// for k := range existingInterfaceFiles {
+	// 	if _, ok := genInterfaceMap[existingInterfaceFiles[k]]; !ok {
+	// 		fmt.Println("Removing interface at path", existingInterfaceFiles[k])
+	// 	}
+	// }
 
 	fmt.Printf("Generated %d interfaces to %s in %f seconds\n", generatedInterfaces, destDir, time.Since(start).Seconds())
 
@@ -182,20 +219,9 @@ func GenInterfaces(srcDir, destDir string) error {
 
 }
 
-func GenInterface2(structName, srcFile, destDir string) error {
+func GenInterface2(structName, srcFile, packageName, interfaceName, destDir, destFile string) error {
 
 	var e error
-
-	interfaceName := "I" + structName
-	packageName := filepath.Base(filepath.Dir(srcFile))
-	destDirName := filepath.Base(destDir)
-	destSubDir := destDir
-
-	if packageName != destDirName {
-		destSubDir = path.Join(destDir, packageName)
-	}
-
-	destFile := path.Join(destSubDir, interfaceName+".go")
 
 	var i []byte
 
@@ -220,7 +246,7 @@ func GenInterface2(structName, srcFile, destDir string) error {
 		return e
 	}
 
-	lib.EnsureDir(destSubDir)
+	lib.EnsureDir(destDir)
 
 	// TODO verbose flag
 	// fmt.Printf("Generating interface %s...\n", destFile)
