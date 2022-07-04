@@ -747,7 +747,7 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 	var insertColumnArgs bytes.Buffer
 
 	sort.Slice(insertColumns, func(a, b int) bool { return insertColumns[a].Name < insertColumns[b].Name })
-	sort.Slice(data.UpdateColumns, func(a, b int) bool { return insertColumns[a].Name < insertColumns[b].Name })
+	sort.Slice(data.UpdateColumns, func(a, b int) bool { return data.UpdateColumns[a].Name < data.UpdateColumns[b].Name })
 
 	for k, col := range insertColumns {
 
