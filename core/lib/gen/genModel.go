@@ -257,7 +257,7 @@ func (c *{{ $.Name }}) FromID(db db.IDB, id int64) (query.IModel, error) {
 	case sql.ErrNoRows: 
 		return nil, nil 
 	case nil: 
-		fmt.Printf("{{ $.Name }}DALGetter.Get(%s).Run()\n", q)
+		// fmt.Printf("{{ $.Name }}DALGetter.Get(%s).Run()\n", q)
 		return c, nil 
 	default: 
 		return nil, fmt.Errorf("{{ $.Name }}DALGetter(%s).Run(): %w", q, e)
@@ -368,7 +368,7 @@ func (r *{{ $.Name }}) Raw(db db.IDB, queryRaw string) ([]*{{ $.Name }}, error) 
 		model = append(model, m)
 	}
 
-	fmt.Printf("{{ $.Name }}DAL.Raw(%s).Run()\n", q)
+	// fmt.Printf("{{ $.Name }}DAL.Raw(%s).Run()\n", q)
 
 	return model, nil
 }
@@ -439,7 +439,7 @@ func (r *{{ $.Name }}DALSelector) Run() ([]*{{ $.Name }}, error) {
 		model = append(model, m)
 	}
 
-	fmt.Printf("{{ $.Name }}DALSelector(%s).Run()\n", q)
+	// fmt.Printf("{{ $.Name }}DALSelector(%s).Run()\n", q)
 
 	return model, nil
 }
@@ -481,7 +481,7 @@ func (ds *{{ $.Name }}DALCounter) Run() (int64, error) {
 	case sql.ErrNoRows: 
 		return 0, nil 
 	case nil: 
-		fmt.Printf("{{ $.Name }}DALCounter.QueryRow(%s).Run()\n", q)
+		// fmt.Printf("{{ $.Name }}DALCounter.QueryRow(%s).Run()\n", q)
 		return count, nil 
 	default: 
 		return 0, fmt.Errorf("{{ $.Name }}DALCounter.QueryRow(%s).Run(): %w", q, e)
@@ -520,7 +520,7 @@ func (ds *{{ $.Name }}DALSummer) Run() (float64, error) {
 	case sql.ErrNoRows: 
 		return 0, nil 
 	case nil: 
-		fmt.Printf("{{ $.Name }}DALSummer.QueryRow(%s).Run()\n", q)
+		// fmt.Printf("{{ $.Name }}DALSummer.QueryRow(%s).Run()\n", q)
 		return sum, nil 
 	default: 
 		return 0, fmt.Errorf("{{ $.Name }}DALSummer.QueryRow(%s).Run(): %w", q, e)
@@ -559,7 +559,7 @@ func (ds *{{ $.Name }}DALMinner) Run() (float64, error) {
 	case sql.ErrNoRows: 
 		return 0, nil 
 	case nil: 
-		fmt.Printf("{{ $.Name }}DALMinner.QueryRow(%s).Run()\n", q)
+		// fmt.Printf("{{ $.Name }}DALMinner.QueryRow(%s).Run()\n", q)
 		return min, nil 
 	default: 
 		return 0, fmt.Errorf("{{ $.Name }}DALMinner.QueryRow(%s).Run(): %w", q, e)
@@ -598,7 +598,7 @@ func (ds *{{ $.Name }}DALMaxer) Run() (float64, error) {
 	case sql.ErrNoRows: 
 		return 0, nil 
 	case nil: 
-		fmt.Printf("{{ $.Name }}DALMaxer.QueryRow(%s).Run()\n", q)
+		// fmt.Printf("{{ $.Name }}DALMaxer.QueryRow(%s).Run()\n", q)
 		return max, nil 
 	default: 
 		return 0, fmt.Errorf("{{ $.Name }}DALMaxer.QueryRow(%s).Run(): %w", q, e)
@@ -654,7 +654,7 @@ func (ds *{{ $.Name }}DALGetter) Run() (*{{ $.Name }}, error) {
 	case sql.ErrNoRows: 
 		return nil, nil 
 	case nil: 
-		fmt.Printf("{{ $.Name }}DALGetter.Get(%s).Run()\n", q)
+		// fmt.Printf("{{ $.Name }}DALGetter.Get(%s).Run()\n", q)
 		return model, nil 
 	default: 
 		return nil, fmt.Errorf("{{ $.Name }}DALGetter(%s).Run(): %w", q, e)
