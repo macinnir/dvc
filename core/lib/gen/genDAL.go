@@ -136,12 +136,14 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 			{{if .IsLastUpdated}}
 			model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 
-			_, e = tx.ExecContext(ctx, "{{.InsertSQL}}", {{.InsertArgs}})
+			var result sql.Result 
+			result, e = tx.ExecContext(ctx, "{{.InsertSQL}}", {{.InsertArgs}})
 			if e != nil {
 				r.log.Errorf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, insertID, e.Error())
 				break
 			} else {
 				r.log.Debugf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, insertID)
+				model.{{.PrimaryKey}}, _ = result.LastInsertId()
 			}
 		}
 
