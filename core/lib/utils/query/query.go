@@ -532,7 +532,7 @@ func (q *Q) String() (string, error) {
 
 			orderBys = append(orderBys, q.col(q.orderBy[k][0])+" "+strings.ToUpper(q.orderBy[k][1]))
 		}
-		sb.WriteString(" ORDER BY " + strings.Join(orderBys, ","))
+		sb.WriteString(" ORDER BY " + strings.Join(orderBys, ", "))
 	}
 
 	if q.limit > 0 {

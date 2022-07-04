@@ -88,6 +88,12 @@ func TestQuerySelect_LimitPage(t *testing.T) {
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` LIMIT 10 OFFSET 50", sql, "LimitPage() should have an offset that multiplies the limit by the page")
 }
 
+func TestMultipleOrderBy(t *testing.T) {
+	q, e := query.Select(&testassets.Comment{}).OrderBy("CommentID", query.OrderDirASC).OrderBy("DateCreated", query.OrderDirDESC).String()
+	assert.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` ORDER BY `t`.`CommentID` ASC, `t`.`DateCreated` DESC", q)
+}
+
 func TestQuerySelect_InvalidOrderByColumn(t *testing.T) {
 
 	q, e := query.Select(&testassets.Comment{}).OrderBy("CommentID", query.OrderDirASC).String()
