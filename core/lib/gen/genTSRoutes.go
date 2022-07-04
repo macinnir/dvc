@@ -464,9 +464,13 @@ func (t *TSRouteGenerator) AddImport(importType string) {
 	tsType := schema.GoTypeToTypescriptString(importType)
 
 	if len(tsType) > 0 && tsType != "any" && !schema.IsGoTypeBaseType(importType) {
+
 		if tsType[len(tsType)-2:] == "[]" {
 			tsType = tsType[0 : len(tsType)-2]
 		}
-		t.imports[tsType] = struct{}{}
+
+		if tsType != "number" {
+			t.imports[tsType] = struct{}{}
+		}
 	}
 }
