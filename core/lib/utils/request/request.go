@@ -15,6 +15,7 @@ import (
 
 // AuthHeaderKey is the name of the Authorization header
 const AuthHeaderKey = "Authorization"
+const DeviceHeader = "X-Device"
 
 // AuthHeaderValuePrefix is the start of the Authorization string (in the authorization header) used to authorize the request
 const AuthHeaderValuePrefix = "Bearer "
@@ -157,6 +158,11 @@ func (r *Request) AuthKey() string {
 	}
 
 	return authKey[len(AuthHeaderValuePrefix):]
+}
+
+// Device returns the device key from the request header
+func (r *Request) Device() string {
+	return r.Header(DeviceHeader)
 }
 
 // IP returns the IP from which the request originated
