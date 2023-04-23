@@ -277,6 +277,9 @@ func genInterface(
 	var typeDoc string
 
 	methods, imports, parsedTypeDoc := lib.ParseStruct(src, structType, copyDocuments, copyTypeDoc, pkgName)
+
+	
+
 	for _, m := range methods {
 		if _, ok := mset[m.Code]; !ok {
 			allMethods = append(allMethods, m.Lines()...)

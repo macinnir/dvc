@@ -24,6 +24,7 @@ func main() {
 
 	if e != nil {
 		fmt.Printf("ERROR: %s\n", e.Error())
+		fmt.Println("Args: ", os.Args)
 		return
 	}
 }

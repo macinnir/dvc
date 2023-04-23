@@ -22,17 +22,10 @@ func GenAppBootstrapFile(basePackage string) error {
 	var start = time.Now()
 
 	lib.EnsureDir(lib.AppServicesDir)
-	lib.EnsureDir(lib.CoreServicesDir)
 
 	var files []os.FileInfo
 	var e error
-	files, _ = ioutil.ReadDir(lib.CoreServicesDir)
 	packages := []string{}
-	for k := range files {
-		if files[k].IsDir() {
-			packages = append(packages, path.Join(lib.CoreServicesDir, files[k].Name()))
-		}
-	}
 
 	files, _ = ioutil.ReadDir(lib.AppServicesDir)
 	for k := range files {
@@ -50,6 +43,7 @@ package services
 import (
 	"log"
 	"` + path.Join(basePackage, "core/app") + `" 
+	"` + path.Join(basePackage, "core/services/base") + `"
 `)
 
 	for k := range packages {
@@ -66,6 +60,7 @@ type App struct {
 
 // Services is a container for all services 
 type Services struct {
+	Base *base.Services
 `)
 	for k := range packages {
 		packageName := path.Base(packages[k])
@@ -87,30 +82,24 @@ func InitAppFromCLI(
 		log.Fatal("App name cannot be empty") 
 	}
 
-	baseApp, coreRepos, authLog := app.NewBaseApp(configFilePath, appName, version, commitHash, buildDate, clientVersion) 
-
-	app := &App { 
-		BaseApp: baseApp, 
+	var app = &App { 
+		BaseApp: app.NewBaseApp(configFilePath, appName, version, commitHash, buildDate, clientVersion),
+		Services: &Services{}, 
 	}
 
-	app.Services = &Services {`)
+	// Base Services 
+	app.Services.Base = base.NewServices(app.DAL, app.Config, app.Integrations, app.Log, app.Repos, app.Cache)`)
 	for k := range packages {
 		packageName := path.Base(packages[k])
-		sb.WriteString("\n\t\t" + strings.ToUpper(packageName[0:1]) + packageName[1:] + ": " + packageName + ".NewServices(app.DAL, app.Config, app.Integrations, authLog, coreRepos, app.Cache),")
+		sb.WriteString("\n\tapp.Services." + strings.ToUpper(packageName[0:1]) + packageName[1:] + " = " + packageName + ".NewServices(app.Services.Base, app.DAL, app.Config, app.Integrations, app.Log, app.BaseApp.Repos, app.Cache)")
 	}
 	sb.WriteString(`
-	}
-
 	return app
 } 
 
 // Finish cleans up any connections from the app
 func (a *App) Finish() {
-	for schemaName := range a.Integrations.DB {
-		for k := range a.Integrations.DB[schemaName] {
-			a.Integrations.DB[schemaName][k].Close()
-		}
-	}
+	a.Finish()
 }
 `)
 	var bootstrapDir = filepath.Dir(lib.AppBootstrapFile)

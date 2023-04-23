@@ -1,0 +1,6 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/robertmacinnis/go/src/github.com/macinnir/dvc'
+mkdir -p .build/
+go build -ldflags "-X main.Version=`git describe --tags`" -o .build/dvc cli/dvc/main.go
+make: Leaving directory `/Users/robertmacinnis/go/src/github.com/macinnir/dvc'
+ 

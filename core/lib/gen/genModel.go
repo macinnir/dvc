@@ -373,6 +373,10 @@ func (r *{{ $.Name }}) Raw(db db.IDB, queryRaw string) ([]*{{ $.Name }}, error) 
 	return model, nil
 }
 
+type I{{ $.Name }}DALSelector interface { 
+	Select(db db.IDB) I{{ $.Name }}DALSelector
+}
+
 type {{ $.Name }}DALSelector struct {
 	db    	 db.IDB
 	q     	 *query.Q

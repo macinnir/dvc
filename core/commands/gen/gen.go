@@ -90,19 +90,49 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		}
 
 		if len(changedTables) > 0 {
-			gen.GenDALs(changedTables, config)
+
+			if e = gen.GenDALs(changedTables, config); e != nil {
+				return e
+			}
+
 			if e = gen.GenerateDALsBootstrapFile(config, schemaList); e != nil {
 				return e
 			}
 		}
 
-		gen.GenAppBootstrapFile(config.BasePackage)
+		if len(changedTables) > 0 {
+
+			var cacheConfigs = config.Cache
+
+			if cacheConfigs == nil {
+				cacheConfigs = map[string]*lib.CacheConfig{}
+			}
+
+			var coreCacheConfig = map[string]*lib.CacheConfig{}
+			if coreCacheConfig, e = lib.LoadCoreCacheFile(); e == nil {
+				for tableName := range coreCacheConfig {
+					cacheConfigs[tableName] = coreCacheConfig[tableName]
+				}
+			}
+
+			gen.GenCaches(changedTables, config.BasePackage, cacheConfigs)
+			gen.GenerateCacheBootstrapFile(config.BasePackage, cacheConfigs)
+			gen.GenCacheInterfaces(config.BasePackage, changedTables, cacheConfigs)
+
+			gen.GenRepos(config.BasePackage, changedTables, cacheConfigs)
+			gen.GenRepoBootstrapFile(config.BasePackage, cacheConfigs)
+			gen.GenRepoInterfaces(config.BasePackage, changedTables, cacheConfigs)
+		}
+
+		// gen.GenAppBootstrapFile(config.BasePackage)
 		if len(changedTables) > 0 {
 			gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
 		}
 
 		gen.GenInterfaces(lib.CoreServicesDir, lib.ServiceDefinitionsGenDir)
 		gen.GenInterfaces(lib.AppServicesDir, lib.ServiceDefinitionsGenDir)
+		// gen.GenInterfaces(lib.CoreReposDir, lib.RepoDefinitionsGenDir)
+		// gen.GenInterfaces(lib.AppReposDir, lib.RepoDefinitionsGenDir)
 
 		// Routes
 		cf := fetcher.NewControllerFetcher()

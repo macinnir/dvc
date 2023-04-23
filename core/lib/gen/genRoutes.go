@@ -37,7 +37,7 @@ type Controllers struct {
 }
 
 // NewControllers bootstraps all of the controller modules 
-func NewControllers(s *services.App, r request.IResponseLogger) *Controllers {
+func NewControllers(s *app.App, r request.IResponseLogger) *Controllers {
 	return &Controllers {
 		{{ range .Controllers }}
 		{{.Title}}: {{.Name}}.NewControllers(s, r),{{ end }} 
@@ -79,7 +79,7 @@ func GenControllerBootstrap(basePackageName string, dirs []string) string {
 		}
 	}
 
-	vals.Imports[len(dirs)] = path.Join(basePackageName, "gen/definitions/services")
+	vals.Imports[len(dirs)] = path.Join(basePackageName, "core/app")
 	vals.Imports[len(dirs)+1] = "github.com/macinnir/dvc/core/lib/utils/request"
 
 	var buf bytes.Buffer
@@ -123,10 +123,10 @@ import (
 )
 
 // MapRoutesToControllers maps the routes to the controllers
-func MapRoutesToControllers(r *mux.Router, app *services.App, res request.IResponseLogger) {
+func MapRoutesToControllers(r *mux.Router, app *app.App, res request.IResponseLogger) {
 
-	var auth = app.Integrations.Auth
-	var log = app.Integrations.Log
+	var auth = app.Auth
+	var log = app.Utils.Logger
 	var c = NewControllers(app, res)
 
 	{{range .Controllers}}
@@ -138,16 +138,11 @@ func MapRoutesToControllers(r *mux.Router, app *services.App, res request.IRespo
 	// {{.Package}}.{{.Controller}}.{{.Name}}
 	// {{.Method}} {{.Raw}}{{if not .IsAuth}}
 	// @anonymous{{else}}{{if eq (len .Permission) 0}}
-	// @anyone{{end}}{{end}}
-	r.Handle("{{.Path}}", {{ if .IsAuth }}auth.AuthMiddleware{{ else }}auth.AnonMiddleware{{ end }}(func(w http.ResponseWriter, req *request.Request) {
+	// @anyone{{else}}
+	// @permission {{.Permission}}{{end}}{{end}}
+	r.Handle("{{.Path}}", {{ if .IsAuth }}auth.AuthMiddleware({{ if gt (len .Permission) 0 }}permissions.{{.Permission}}{{ else }}""{{end}},{{ else }}auth.AnonMiddleware({{ end }}func(w http.ResponseWriter, req *request.Request) {
 
 		log.Debug("ROUTE: {{.Method}} {{.Path}} => {{.Name}}")
-
-		{{ if and .IsAuth (gt (len .Permission) 0) }}// Requires permission {{.Permission}} 
-		if !utils.HasPerm(req, req.User, permissions.{{.Permission}}) {
-			res.Forbidden(req, w)
-			return
-		}{{end}}
 {{if gt (len .BodyType) 0}}
 		// Parse the body of type {{.BodyType}} 
 		var body = &{{.BodyType}}{}
@@ -202,9 +197,8 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 			"net/http",
 			"github.com/gorilla/mux",
 			lib.LibRequests,
-			path.Join(config.BasePackage, lib.ServicesDir),
+			path.Join(config.BasePackage, "core/app"),
 			path.Join(config.BasePackage, lib.CoreDTOsDir),
-			lib.LibUtils,
 			path.Join(config.BasePackage, lib.GoPermissionsDir),
 		},
 		AppDTOsPath: path.Join(config.BasePackage, lib.AppDTOsDir),

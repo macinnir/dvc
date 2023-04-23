@@ -476,8 +476,8 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 	}
 
 	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]).Where(
-		query.INInt{{if eq $col.GoType "int64"}}64{{end}}(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s), 
-		{{if $.IsDeleted}}		query.And(), 
+		query.INInt{{if eq $col.GoType "int64"}}64{{end}}(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s), {{if $.IsDeleted}}		
+		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0),{{end}}
 	)
 
@@ -504,8 +504,8 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}(shard int64, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (int64, error) {
 	
 	count, e := (&models.{{$.Table.Name}}{}).Count(r.db[shard]).Where(
-		query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}), 
-		{{if $.IsDeleted}}		query.And(), 
+		query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}),{{if $.IsDeleted}}		
+		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0), {{end}}
 	).Run()
 
@@ -521,7 +521,11 @@ func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}(shard int64, {{$col.Name | 
 // SingleFrom{{$col.Name}} returns a single {{$.Table.Name}} record by its {{$col.Name}}
 func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, mustExist bool) (*models.{{$.Table.Name}}, error) {
 
-	model, e := (&models.{{$.Table.Name}}{}).Get(r.db[shard]).Where(query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}})).Run()
+	model, e := (&models.{{$.Table.Name}}{}).Get(r.db[shard]).Where(
+		query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}),{{if $.IsDeleted}}
+		query.And(), 
+		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0), {{end}}
+	).Run()
 
 	if model == nil {
 		if mustExist { 
@@ -555,10 +559,7 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name |
 		r.log.Errorf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}({{if $col.IsString}}%s{{end}}{{if not $col.IsString}}%d{{end}}) > %s", {{$col.Name | toArgName}}, e.Error())
 		return nil, e 
 	}
-}
-
-
-{{end}}
+}{{end}}
 
 // ManyPaged returns a slice of {{.Table.Name}} models
 func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy, orderDir string) ([]*models.{{.Table.Name}}, error) {
@@ -584,7 +585,47 @@ func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy
 		r.log.Debugf("{{.Table.Name}}DAL.ManyPaged(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
 	}
 	return collection, e 
-}`))
+}
+{{ if gt (len .StringColumns) 0 }}{{ range $col := .StringColumns}}
+// Search{{$col.Name}} searches the {{$col.Name}} field in the {{$.Table.Name}} table
+func (r *{{$.Table.Name}}DAL) Search{{$col.Name}}(shard int64, queryString string, limit, offset int64, leftOrRightOrBoth int) ([]*models.{{$.Table.Name}}, error) { 
+
+	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]){{if $.IsDeleted}}		
+	q.Where(
+		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0),
+	){{end}}
+
+	// Search left
+	switch leftOrRightOrBoth { 
+	case 2: 
+		// Search both 
+		queryString = "%" + queryString + "%"
+	case 1: 
+		// Search right 
+		queryString = "%" + queryString
+	default:  
+		// Search left (0)
+		queryString += "%"
+	} 
+
+	q.Where(query.Like(models.{{$.Table.Name}}_Column_{{$col.Name}}, queryString))
+	
+	if limit > 0 { 
+		q.Limit(limit, offset) 
+	}
+	
+	collection, e := q.Run()
+
+	if e != nil {
+		r.log.Errorf("{{$.Table.Name}}DAL.Search(%s, %d) > %s", queryString, limit, e.Error())
+	} else {
+		r.log.Debugf("{{$.Table.Name}}DAL.Search(%s, %d)", queryString, limit)
+	}
+	return collection, e 
+}
+{{ end }}
+{{ end }}
+`))
 
 // GetOrphanedDals gets repo files that aren't in the database.Tables map
 func (g *Gen) GetOrphanedDals(dir string, database *schema.Schema) []string {
@@ -619,13 +660,6 @@ func (g *Gen) GetOrphanedDals(dir string, database *schema.Schema) []string {
 	return orphans
 }
 
-func toArgName(field string) string {
-	if len(field) == 0 {
-		return ""
-	}
-	return strings.ToLower(field[:1]) + field[1:]
-}
-
 func GenDALs(tables []*schema.Table, config *lib.Config) error {
 
 	start := time.Now()
@@ -634,12 +668,12 @@ func GenDALs(tables []*schema.Table, config *lib.Config) error {
 
 	for k := range tables {
 		if e := GenerateGoDAL(config, tables[k], lib.DalsGenDir); e != nil {
-			return e
+			return fmt.Errorf("GenDALs(%s): %w", tables[k].Name, e)
 		}
 		generatedDALCount++
 	}
-	fmt.Printf("Generated %d dals in %f seconds.\n", generatedDALCount, time.Since(start).Seconds())
 
+	fmt.Printf("Generated %d dals in %f seconds.\n", generatedDALCount, time.Since(start).Seconds())
 	return nil
 }
 
@@ -658,11 +692,12 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 
 	// lib.Debugf("Generating go dal file for table %s at path %s", g.Options, table.Name, p)
 
-	data := struct {
+	var data = struct {
 		BasePackage       string
 		Table             *schema.Table
 		Columns           schema.SortedColumns
 		UpdateColumns     []*schema.Column
+		StringColumns     []*schema.Column
 		InsertSQL         string
 		InsertArgs        string
 		UpdateSQL         string
@@ -680,8 +715,13 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 		HasNull           bool
 	}{
 		BasePackage:       config.BasePackage,
-		HasNull:           false,
 		Table:             table,
+		UpdateColumns:     []*schema.Column{},
+		StringColumns:     []*schema.Column{},
+		InsertSQL:         "",
+		InsertArgs:        "",
+		UpdateSQL:         "",
+		UpdateArgs:        "",
 		PrimaryKey:        "",
 		PrimaryKeyType:    "",
 		PrimaryKeyArgName: "",
@@ -692,7 +732,7 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 		Imports:           []string{},
 		FileHead:          "",
 		FileFoot:          "",
-		UpdateColumns:     []*schema.Column{},
+		HasNull:           false,
 	}
 
 	// if data.FileHead, data.FileFoot, imports, e = g.scanFileParts(p, true); e != nil {
@@ -720,6 +760,14 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 			data.PrimaryKey = column.Name
 			data.PrimaryKeyType = column.DataType
 		}
+
+		if schema.DataTypeToGoTypeString(column) == "string" {
+			data.StringColumns = append(data.StringColumns, column)
+		}
+
+		sort.Slice(data.StringColumns, func(i, j int) bool {
+			return data.StringColumns[i].Name < data.StringColumns[j].Name
+		})
 
 		goDataType := schema.DataTypeToGoTypeString(column)
 		if len(goDataType) > 5 && goDataType[0:5] == "null." {

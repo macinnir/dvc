@@ -6,9 +6,8 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"log"
-	"path"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/imports"
@@ -34,96 +33,100 @@ type ParsedStruct struct {
 // Reflection: https://stackoverflow.com/questions/20170275/how-to-find-the-type-of-an-object-in-go
 //
 
-func ParseStruct2(filePath string) (*ParsedStruct, error) {
+// func ParseStruct2(filePath string) (*ParsedStruct, error) {
 
-	p := &ParsedStruct{
-		Docs:   []string{},
-		Fields: map[string]string{},
-	}
+// 	p := &ParsedStruct{
+// 		Docs:   []string{},
+// 		Fields: map[string]string{},
+// 	}
 
-	fileBytes, _ := ioutil.ReadFile(filePath)
+// 	fileBytes, _ := ioutil.ReadFile(filePath)
 
-	src := string(fileBytes)
+// 	src := string(fileBytes)
 
-	// Create the AST by parsing src.
-	fset := token.NewFileSet() // positions are relative to fset
-	f, err := parser.ParseFile(fset, path.Base(filePath), src, 0)
-	if err != nil {
-		return nil, err
-	}
+// 	// Create the AST by parsing src.
+// 	fset := token.NewFileSet() // positions are relative to fset
+// 	f, err := parser.ParseFile(fset, path.Base(filePath), src, 0)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	fieldNo := 0
+// 	fieldNo := 0
 
-	for _, node := range f.Decls {
-		switch node.(type) {
+// 	for _, node := range f.Decls {
+// 		switch node.(type) {
 
-		case *ast.GenDecl:
-			decl := node.(*ast.GenDecl)
-			for _, spec := range decl.Specs {
-				switch spec.(type) {
-				case *ast.TypeSpec:
-					typeSpec := spec.(*ast.TypeSpec)
+// 		case *ast.GenDecl:
+// 			decl := node.(*ast.GenDecl)
+// 			for _, spec := range decl.Specs {
+// 				switch spec.(type) {
+// 				case *ast.TypeSpec:
+// 					typeSpec := spec.(*ast.TypeSpec)
 
-					if decl.Doc != nil {
-						for _, d := range decl.Doc.List {
-							p.Docs = append(p.Docs, string(src[d.Pos()-1:d.End()-1]))
-						}
-					}
+// 					if decl.Doc != nil {
+// 						for _, d := range decl.Doc.List {
+// 							p.Docs = append(p.Docs, string(src[d.Pos()-1:d.End()-1]))
+// 						}
+// 					}
 
-					p.Name = typeSpec.Name.Name
+// 					p.Name = typeSpec.Name.Name
 
-					switch typeSpec.Type.(type) {
-					case *ast.StructType:
-						structType := typeSpec.Type.(*ast.StructType)
-						for _, field := range structType.Fields.List {
+// 					switch typeSpec.Type.(type) {
+// 					case *ast.StructType:
+// 						structType := typeSpec.Type.(*ast.StructType)
+// 						for _, field := range structType.Fields.List {
 
-							fieldType := ""
+// 							fieldType := ""
 
-							// switch field.Type.(type) {
-							// case *ast.ArrayType:
-							// fmt.Println(structType.Fields)
-							// at := field.Type.(*ast.ArrayType)
-							// fieldType = "[]" + fmt.Sprint(at.Elt)
-							typeExpr := field.Type
+// 							// switch field.Type.(type) {
+// 							// case *ast.ArrayType:
+// 							// fmt.Println(structType.Fields)
+// 							// at := field.Type.(*ast.ArrayType)
+// 							// fieldType = "[]" + fmt.Sprint(at.Elt)
+// 							typeExpr := field.Type
 
-							// Fetch Type from scource code
-							typeInSource := src[typeExpr.Pos()-1 : typeExpr.End()-1]
-							fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
-							fieldType = typeInSource
-							// fmt.Println("ArrayType: ", at.Elt)
-							// case *ast.Ident:
-							// 	i := field.Type.(*ast.Ident)
-							// 	fieldType = i.Name
-							// }
+// 							// Fetch Type from scource code
+// 							typeInSource := src[typeExpr.Pos()-1 : typeExpr.End()-1]
+// 							fmt.Println(typeExpr.Pos()-1, typeExpr.End()-1, typeInSource)
+// 							fieldType = typeInSource
+// 							// fmt.Println("ArrayType: ", at.Elt)
+// 							// case *ast.Ident:
+// 							// 	i := field.Type.(*ast.Ident)
+// 							// 	fieldType = i.Name
+// 							// }
 
-							if len(field.Names) > 0 {
-								for _, name := range field.Names {
-									fmt.Printf("\tField: name=%s type=%s\n", name.Name, fieldType)
-									p.Fields[name.Name] = fieldType
+// 							if len(field.Names) > 0 {
+// 								for _, name := range field.Names {
+// 									fmt.Printf("\tField: name=%s type=%s\n", name.Name, fieldType)
+// 									p.Fields[name.Name] = fieldType
 
-								}
-							} else {
-								p.Fields[fmt.Sprintf("#embedded%d", fieldNo)] = fieldType
-							}
+// 								}
+// 							} else {
+// 								p.Fields[fmt.Sprintf("#embedded%d", fieldNo)] = fieldType
+// 							}
 
-						}
+// 						}
 
-					}
-				}
-			}
-		}
-	}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
 
-	return p, nil
-}
+// 	return p, nil
+// }
 
 // ParseStruct parses a struct
-func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocuments bool, pkgName string) (methods []Method, imports []string, typeDoc string) {
+func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocuments bool, pkgName string) ([]Method, []string, string) {
+
+	var methods []Method
+	var imports = []string{}
+	var typeDoc string
 
 	var file *ast.File
 	var e error
 
-	fset := token.NewFileSet()
+	var fset = token.NewFileSet()
 
 	if file, e = parser.ParseFile(fset, "", src, parser.ParseComments); e != nil {
 		log.Fatal(e.Error())
@@ -158,6 +161,7 @@ func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocu
 			}
 
 			methods = append(methods, Method{
+				Name:      decl.Name.String(),
 				Code:      method,
 				Documents: Documents,
 				LineNo:    int(decl.Recv.Pos()),
@@ -176,11 +180,14 @@ func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocu
 		}
 	}
 
-	return
+	sort.Slice(methods, func(i, j int) bool { return methods[i].Name < methods[j].Name })
+
+	return methods, imports, typeDoc
 }
 
 // Method describes code and Documents for a method
 type Method struct {
+	Name      string
 	Code      string
 	Documents []string
 	LineNo    int
@@ -238,23 +245,26 @@ func GetFuncDeclarationReceiverType(fd *ast.FuncDecl) (expr ast.Expr, e error) {
 }
 
 // GetReceiverTypeName returns the name of the receiver type and the declaration
-func GetReceiverTypeName(src []byte, fl interface{}) (name string, funcDef *ast.FuncDecl) {
+func GetReceiverTypeName(src []byte, fl interface{}) (string, *ast.FuncDecl) {
+
+	var name string
+	var funcDef *ast.FuncDecl
 
 	var ok bool
 	var expr ast.Expr
 	var e error
 
 	if funcDef, ok = fl.(*ast.FuncDecl); !ok {
-		return
+		return "", nil
 	}
 
 	if expr, e = GetFuncDeclarationReceiverType(funcDef); e != nil {
-		return
+		return "", nil
 	}
 
 	name = string(src[expr.Pos()-1 : expr.End()-1])
 	if len(name) > 0 && name[0] == '*' {
 		name = name[1:]
 	}
-	return
+	return name, funcDef
 }

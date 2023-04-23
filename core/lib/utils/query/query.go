@@ -845,6 +845,7 @@ func NE(fieldName Column, value interface{}) *WherePart {
 }
 
 // LT is a less than statement between a table column and a value
+// LT('foo', 1) => WHERE `t`.`foo` < 1
 func LT(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeLessThan,
@@ -1123,6 +1124,8 @@ func Ors(args ...*WherePart) *WherePart {
 	return ors
 }
 
+// Paren adds parenthesis to a query where clause
+// .Paren(a, b, c) => (a, b, c)
 func Paren(args ...*WherePart) *WherePart {
 	n := newWherePart(WhereTypeNone, "", []interface{}{})
 

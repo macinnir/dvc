@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -39,6 +40,7 @@ type Config struct {
 	TypescriptAggregatesPath  string            `json:"TypescriptAggregatesPath"`
 	TypescriptPermissionsPath string            `json:"TypescriptPermissionsPath"`
 	TypescriptRoutesPath      string            `json:"TypescriptRoutesPath"`
+	Cache                     map[string]*CacheConfig
 	Packages                  struct {
 		Cache    string `json:"cache"`
 		Models   string `json:"models"`
@@ -67,6 +69,35 @@ type Config struct {
 	} `json:"dirs"`
 }
 
+type CacheConfig struct {
+	Indices   []*CacheConfigIndex
+	Aggregate *CacheConfigAggregate
+	HasHashID bool
+	Search    []*CacheConfigSearch
+}
+
+type CacheConfigIndex struct {
+	Field  string
+	Unique bool
+}
+
+type CacheConfigAggregate struct {
+	Location   string
+	Properties []*CacheConfigAggregateProperty
+}
+
+type CacheConfigSearch struct {
+	Fields     []string
+	Conditions []string
+}
+
+type CacheConfigAggregateProperty struct {
+	Property string
+	On       string
+	Table    string
+	Type     string
+}
+
 // LoadConfig loads a config file
 func LoadConfig() (*Config, error) {
 
@@ -83,7 +114,29 @@ func LoadConfig() (*Config, error) {
 
 	config := &Config{}
 	if e = json.Unmarshal(fileBytes, config); e != nil {
+		return nil, fmt.Errorf("invalid config: %w", e)
+	}
+
+	return config, nil
+}
+
+// LoadConfig loads a config file
+func LoadCoreCacheFile() (map[string]*CacheConfig, error) {
+
+	f, e := os.Open(CoreCacheConfig)
+	if e != nil {
 		return nil, e
+	}
+
+	var fileBytes []byte
+	fileBytes, e = ioutil.ReadAll(f)
+	if e != nil {
+		return nil, e
+	}
+
+	var config = map[string]*CacheConfig{}
+	if e = json.Unmarshal(fileBytes, &config); e != nil {
+		return nil, fmt.Errorf("invalid config: %w", e)
 	}
 
 	return config, nil

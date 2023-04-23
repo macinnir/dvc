@@ -404,12 +404,12 @@ func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) (st
 
 	var tsRouteName = "use" + route.Name
 
-	str.WriteString(`export const ` + tsRouteName + ` = () => useMutation(` + routeName(route))
+	str.WriteString(`export const ` + tsRouteName + ` = () => useMutation(` + routeName(route) + `, {`)
 
 	hasQueryCache := false
 	if t.rootRoute != nil {
 		hasQueryCache = true
-		str.WriteString(`, {
+		str.WriteString(`
 	onSuccess: (data, variables) => { 
 		queryCache.invalidateQueries(["` + routeName(t.rootRoute) + `"]);`)
 
@@ -431,13 +431,12 @@ func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) (st
 			}
 		}
 		str.WriteString(`
-	},
+	},`)
+	}
+	str.WriteString(`
 	throwOnError: true, 
 });
 	`)
-	} else {
-		str.WriteString(`);`)
-	}
 
 	return str.String(), hasQueryCache
 }

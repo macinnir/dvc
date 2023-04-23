@@ -23,7 +23,11 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	}
 	var start = time.Now()
 	importcmd.Cmd(logger, config, []string{})
-	gen.Cmd(logger, config, genArgs)
+	var e error
+	if e = gen.Cmd(logger, config, genArgs); e != nil {
+		return e
+	}
+
 	fmt.Printf("Finished in %f seconds\n", time.Since(start).Seconds())
 
 	return nil
