@@ -3,6 +3,7 @@ package connectors
 import (
 	"errors"
 
+	"github.com/macinnir/dvc/core/connectors/mssql"
 	"github.com/macinnir/dvc/core/connectors/mysql"
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -14,6 +15,8 @@ func DBConnectorFactory(config *lib.ConfigDatabase) (connector IConnector, e err
 	switch config.Type {
 	case schema.SchemaTypeMySQL:
 		connector = mysql.NewMySQL(config)
+	case schema.SchemaTypeSQLServer:
+		connector = mssql.NewMSSQL(config)
 	default:
 		e = errors.New("invalid database type")
 	}
