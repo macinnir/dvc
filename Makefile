@@ -8,7 +8,7 @@ version = `git describe --tags`
 # rm -rf .build/*
 build:
 	mkdir -p .build/
-	go build -ldflags "-X main.Version=${version}" -o .build/dvc cli/dvc/main.go
+	go build -ldflags "-X main.Version=${version}" -o .build/dvc cmd/dvc/main.go
 
 # Build and install the application 
 install: 
