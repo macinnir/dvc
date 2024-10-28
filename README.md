@@ -114,3 +114,7 @@ $ dvc list shards
 ```
 
 https://godoc.org/github.com/macinnir/dvc
+
+
+# TODO 
+[ ] Remove requirement of "core" schema v "app" schema 
