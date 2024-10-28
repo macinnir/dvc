@@ -40,10 +40,24 @@ func NewMSSQL(config *lib.ConfigDatabase) *MSSQL {
 
 // Connect connects to a server and returns a new server object
 func (ss *MSSQL) Connect() (server *schema.Server, e error) {
-	// fmt.Println("Connecting to ", ss.config.Name)
+	// fmt.Println("MSSQL.Connect() ", ss.config.Name, " Host: ", ss.config.Host)
 	server = &schema.Server{Host: ss.config.Host}
-	var connectionString = fmt.Sprintf("server=%s;user id=%s;password=%s", ss.config.Host, ss.config.User, ss.config.Pass)
-	server.Connection, e = sql.Open("mssql", connectionString)
+	var connectionString string
+	if len(ss.config.ConnectionString) > 0 {
+		connectionString = ss.config.ConnectionString
+	} else {
+		// connectionString = ss.config.User + ":" + ss.config.Pass + "@tcp(" + ss.config.Host + ")/" + ss.config.Name + "?charset=utf8"
+		connectionString = fmt.Sprintf("server=%s;user id=%s;password=%s", ss.config.Host, ss.config.User, ss.config.Pass)
+	}
+
+	// fmt.Println("Connecting to ", ss.config.Name)
+	server = &schema.Server{
+		Host: ss.config.Host,
+	}
+
+	// fmt.Printf("Connecting with connection string: %s", connectionString)
+
+	server.Connection, e = sql.Open("sqlserver", connectionString)
 	return
 }
 
@@ -164,11 +178,13 @@ func (ss *MSSQL) fetchDatabaseTables(schemaName string, server *schema.Server, d
 	var rows *sql.Rows
 	query := `SELECT 
 		t.[TABLE_NAME]
-	FROM INFORMATION_SCHEMA.TABLES 
+	FROM INFORMATION_SCHEMA.TABLES t
 	WHERE 
 		TABLE_TYPE = 'BASE TABLE'
 		AND
 		TABLE_CATALOG = '` + databaseName + `'`
+
+	fmt.Println("fetchDatabaseTables()")
 	/// , t.`ENGINE`, t.`VERSION`, t.`ROW_FORMAT`, t.`TABLE_ROWS`, t.`DATA_LENGTH`, t.`TABLE_COLLATION`, COALESCE(t.`AUTO_INCREMENT`, 0) AS `AUTO_INCREMENT`, ccsa.CHARACTER_SET_NAME FROM information_schema.tables t JOIN information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` ccsa ON ccsa.`COLLATION_NAME` = t.`TABLE_COLLATION` WHERE TABLE_SCHEMA = '" + databaseName + "'"
 
 	if rows, e = server.Connection.Query(query); e != nil {
@@ -187,14 +203,14 @@ func (ss *MSSQL) fetchDatabaseTables(schemaName string, server *schema.Server, d
 
 		rows.Scan(
 			&table.Name,
-			&table.Engine,
-			&table.Version,
-			&table.RowFormat,
-			&table.Rows,
-			&table.DataLength,
-			&table.Collation,
-			&table.AutoIncrement,
-			&table.CharacterSet,
+			// &table.Engine,
+			// &table.Version,
+			// &table.RowFormat,
+			// &table.Rows,
+			// &table.DataLength,
+			// &table.Collation,
+			// &table.AutoIncrement,
+			// &table.CharacterSet,
 		)
 
 		table.SchemaName = schemaName
@@ -220,7 +236,6 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 	query := fmt.Sprintf(`
 		SELECT
 			COLUMN_NAME,
-			-- ORDINAL_POSITION,
 			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
 			CASE IS_NULLABLE
 				WHEN 'YES' THEN 1
@@ -230,17 +245,20 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
 			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision,
 			COALESCE(CHARACTER_SET_NAME, '') AS CharSet,
-			COLUMN_TYPE,
-			COLUMN_KEY,
-			EXTRA,
+			DATA_TYPE AS COLUMN_TYPE,
+			'' AS COLUMN_KEY,
+			'' AS EXTRA,
 			COALESCE(NUMERIC_SCALE, 0) as NumericScale,
 			COALESCE(COLLATION_NAME, '') as Collation
-		FROM information_schema.COLUMNS
+		FROM [`+databaseName+`].information_schema.COLUMNS
 		WHERE
-			TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
-	`, databaseName, tableName)
+			TABLE_NAME = '%s'
+	`, tableName)
+
+	// fmt.Println("FetchTableColumns()", query)
 
 	if rows, e = server.Connection.Query(query); e != nil {
+		fmt.Println("ERROR: ", e.Error())
 		return
 	}
 
@@ -254,7 +272,6 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 		column := schema.Column{}
 		if e = rows.Scan(
 			&column.Name,
-			// &column.Position,
 			&column.Default,
 			&column.IsNullable,
 			&column.DataType,
@@ -270,7 +287,7 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 			return
 		}
 
-		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
+		// column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
 		column.FmtType = schema.DataTypeToFormatString(&column)
 		column.GoType = schema.DataTypeToGoTypeString(&column)
 
