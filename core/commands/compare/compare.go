@@ -130,7 +130,11 @@ func CompareAll(config *lib.Config, summarize, apply bool) error {
 	}
 
 	var localSchemaList *schema.SchemaList
-	localSchemaList, _ = schema.LoadLocalSchemas()
+	localSchemaList, e = schema.LoadLocalSchemas()
+
+	if e != nil {
+		return fmt.Errorf("Error loading local schemas: %w", e)
+	}
 
 	comparisons := compare.CompareSchemas(config, localSchemaList, remoteSchemas)
 
