@@ -42,7 +42,12 @@ func NewMySQL(config *lib.ConfigDatabase) *MySQL {
 func (ss *MySQL) Connect() (server *schema.Server, e error) {
 	// fmt.Println("Connecting to ", ss.config.Name)
 	server = &schema.Server{Host: ss.config.Host}
-	var connectionString = ss.config.User + ":" + ss.config.Pass + "@tcp(" + ss.config.Host + ")/" + ss.config.Name + "?charset=utf8"
+	var connectionString string
+	if len(ss.config.ConnectionString) > 0 {
+		connectionString = ss.config.ConnectionString
+	} else {
+		connectionString = ss.config.User + ":" + ss.config.Pass + "@tcp(" + ss.config.Host + ")/" + ss.config.Name + "?charset=utf8"
+	}
 	server.Connection, e = sql.Open("mysql", connectionString)
 	return
 }
@@ -790,7 +795,9 @@ func dropTable(table *schema.Table) []*schema.SchemaChange {
 // changeColumn returns an alter table sql statement that adds or removes an index from a column
 // if and only if the one (e.g. local) has a column and the other (e.g. remote) does not
 // Truth table
-// 		Remote 	| 	Local 	| 	Result
+//
+//	Remote 	| 	Local 	| 	Result
+//
 // ---------------------------------------------------------
 // 1. 	MUL		| 	none 	| 	Drop index
 // 2. 	UNI		| 	none 	| 	Drop unique index

@@ -18,16 +18,17 @@ import (
 // All of those remote databases will be applied the same schema changes
 
 type ConfigDatabase struct {
-	Key       string            `json:"key"`
-	Type      string            `json:"type"`
-	User      string            `json:"user"`
-	Pass      string            `json:"pass"`
-	Host      string            `json:"host"`
-	Name      string            `json:"name"`
-	Enums     []string          `json:"enums"`
-	OneToMany map[string]string `json:"onetomany"`
-	OneToOne  map[string]string `json:"onetoone"`
-	ManyToOne map[string]string `json:"manytoone"`
+	Key              string            `json:"key"`
+	Type             string            `json:"type"`
+	User             string            `json:"user"`
+	Pass             string            `json:"pass"`
+	Host             string            `json:"host"`
+	Name             string            `json:"name"`
+	ConnectionString string            `json:"connectionString"`
+	Enums            []string          `json:"enums"`
+	OneToMany        map[string]string `json:"onetomany"`
+	OneToOne         map[string]string `json:"onetoone"`
+	ManyToOne        map[string]string `json:"manytoone"`
 }
 
 // Config contains a set of configuration values used throughout the application
