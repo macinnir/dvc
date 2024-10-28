@@ -3,7 +3,7 @@ package importcmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/importer"
@@ -63,7 +63,7 @@ func ImportSingleSchema(config *lib.Config, args []string) error {
 	}
 
 	localSchemas := &schema.SchemaList{}
-	srcBytes, _ := ioutil.ReadFile(srcFile)
+	srcBytes, _ := os.ReadFile(srcFile)
 	if e = json.Unmarshal(srcBytes, localSchemas); e != nil {
 		return fmt.Errorf("Unmarshal schema: %w", e)
 	}
@@ -88,7 +88,7 @@ func ImportSingleSchema(config *lib.Config, args []string) error {
 	var dbBytes []byte
 	dbBytes, _ = json.MarshalIndent(localSchemas, " ", "    ")
 
-	return ioutil.WriteFile(srcFile, dbBytes, 0777)
+	return os.WriteFile(srcFile, dbBytes, 0777)
 }
 func ImportAll(log *zap.Logger, config *lib.Config) error {
 	var e error
@@ -123,13 +123,13 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 	// Core Schema List
 	var dbBytes []byte
 	dbBytes, _ = json.MarshalIndent(coreSchemaList, " ", "    ")
-	if e = ioutil.WriteFile(lib.CoreSchemasFilePath, dbBytes, 0644); e != nil {
+	if e = os.WriteFile(lib.CoreSchemasFilePath, dbBytes, 0644); e != nil {
 		return e
 	}
 
 	// App Schema List
 	dbBytes, _ = json.MarshalIndent(appSchemaList, " ", "    ")
-	if e = ioutil.WriteFile(lib.SchemasFilePath, dbBytes, 0644); e != nil {
+	if e = os.WriteFile(lib.SchemasFilePath, dbBytes, 0644); e != nil {
 		return e
 	}
 
