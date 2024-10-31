@@ -26,11 +26,15 @@ func LoadLocalSchemas() (*SchemaList, error) {
 		return nil, e
 	}
 
-	if coreSchema, e = loadSchema(lib.CoreSchemasFilePath); e != nil {
-		return nil, e
-	}
+	if lib.FileExists(lib.CoreSchemasFilePath) {
 
-	appSchema.Schemas = append(appSchema.Schemas, coreSchema.Schemas...)
+		if coreSchema, e = loadSchema(lib.CoreSchemasFilePath); e != nil {
+			return nil, e
+		}
+
+		appSchema.Schemas = append(appSchema.Schemas, coreSchema.Schemas...)
+	}
+	
 	appSchema.TableMap = map[string]struct{}{}
 
 	for k := range appSchema.Schemas {
