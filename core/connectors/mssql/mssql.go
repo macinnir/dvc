@@ -393,7 +393,7 @@ func (ss *MSSQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 					if same {
 						comparison.Changes = append(comparison.Changes, &schema.SchemaChange{
 							Type: schema.RenameTable,
-							SQL:  fmt.Sprintf("RENAME TABLE `%s` TO `%s`;\n", dropTableName, createTableName),
+							SQL:  fmt.Sprintf("EXEC sp_rename '%s', '%s';\n", dropTableName, createTableName),
 						})
 
 						delete(dropTableStatements, dropTableName)
