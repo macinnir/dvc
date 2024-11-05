@@ -94,10 +94,17 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 	var e error
 	var allSchemas *schema.SchemaList
 
+	fmt.Println("Importing all schemas")
+
 	if allSchemas, e = importer.FetchAllUniqueSchemas(config); e != nil {
 		log.Error("Error importing all schemas", zap.Error(e))
 		return e
 	}
+
+	// for k := range allSchemas.Schemas {
+	// 	fmt.Println(k, "Schema: "+allSchemas.Schemas[k].Name)
+	// }
+
 	coreSchemaList := &schema.SchemaList{
 		Schemas: []*schema.Schema{},
 	}
@@ -105,11 +112,6 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 	appSchemaList := &schema.SchemaList{
 		Schemas: []*schema.Schema{},
 	}
-
-	// for k := range allSchemas.Schemas {
-	// 	fmt.Println(k, "Schema: "+allSchemas.Schemas[k].Name)
-
-	// }
 
 	// os.Exit(1)
 	for k := range allSchemas.Schemas {
@@ -120,17 +122,22 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 		}
 	}
 
-	// Core Schema List
 	var dbBytes []byte
-	dbBytes, _ = json.MarshalIndent(coreSchemaList, " ", "    ")
-	if e = os.WriteFile(lib.CoreSchemasFilePath, dbBytes, 0644); e != nil {
-		return e
+
+	// Core Schema List
+	if len(coreSchemaList.Schemas) > 0 {
+		dbBytes, _ = json.MarshalIndent(coreSchemaList, " ", "    ")
+		if e = os.WriteFile(lib.CoreSchemasFilePath, dbBytes, 0644); e != nil {
+			return e
+		}
 	}
 
-	// App Schema List
-	dbBytes, _ = json.MarshalIndent(appSchemaList, " ", "    ")
-	if e = os.WriteFile(lib.SchemasFilePath, dbBytes, 0644); e != nil {
-		return e
+	if len(appSchemaList.Schemas) > 0 {
+		// App Schema List
+		dbBytes, _ = json.MarshalIndent(appSchemaList, " ", "    ")
+		if e = os.WriteFile(lib.SchemasFilePath, dbBytes, 0644); e != nil {
+			return e
+		}
 	}
 
 	return nil
