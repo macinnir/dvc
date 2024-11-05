@@ -235,24 +235,45 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 
 	query := fmt.Sprintf(`
 		SELECT
-			COLUMN_NAME,
-			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
-			CASE IS_NULLABLE
+			c.COLUMN_NAME,
+			COALESCE(c.COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
+			CASE c.IS_NULLABLE
 				WHEN 'YES' THEN 1
 				ELSE 0
 			END AS IS_NULLABLE,
-			DATA_TYPE,
-			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
-			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision,
-			COALESCE(CHARACTER_SET_NAME, '') AS CharSet,
-			DATA_TYPE AS COLUMN_TYPE,
-			'' AS COLUMN_KEY,
+			c.DATA_TYPE,
+			COALESCE(c.CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
+			COALESCE(c.NUMERIC_PRECISION, 0) as NumericPrecision,
+			COALESCE(c.CHARACTER_SET_NAME, '') AS CharSet,
+			c.DATA_TYPE AS COLUMN_TYPE,
+
+			CASE 
+				WHEN pk.COLUMN_NAME IS NOT NULL THEN 'PRI' 
+				ELSE '' 
+			END AS COLUMN_KEY,
 			'' AS EXTRA,
-			COALESCE(NUMERIC_SCALE, 0) as NumericScale,
-			COALESCE(COLLATION_NAME, '') as Collation
-		FROM [`+databaseName+`].information_schema.COLUMNS
+			COALESCE(c.NUMERIC_SCALE, 0) as NumericScale,
+			COALESCE(c.COLLATION_NAME, '') as Collation
+		FROM [`+databaseName+`].information_schema.COLUMNS c
+			
+			LEFT JOIN (
+				SELECT ku.TABLE_CATALOG,ku.TABLE_SCHEMA,ku.TABLE_NAME,ku.COLUMN_NAME
+				FROM [` + databaseName + `].INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
+				INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS ku ON 
+					tc.CONSTRAINT_TYPE = 'PRIMARY KEY' 
+					AND 
+					tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
+			) pk 
+			ON  
+				c.TABLE_CATALOG = pk.TABLE_CATALOG
+				AND 
+				c.TABLE_SCHEMA = pk.TABLE_SCHEMA
+				AND 
+				c.TABLE_NAME = pk.TABLE_NAME
+				AND 
+				c.COLUMN_NAME = pk.COLUMN_NAME
 		WHERE
-			TABLE_NAME = '%s'
+			c.TABLE_NAME = '%s'
 	`, tableName)
 
 	// fmt.Println("FetchTableColumns()", query)
