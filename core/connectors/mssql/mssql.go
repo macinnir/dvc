@@ -184,7 +184,7 @@ func (ss *MSSQL) fetchDatabaseTables(schemaName string, server *schema.Server, d
 		AND
 		TABLE_CATALOG = '` + databaseName + `'`
 
-	fmt.Println("fetchDatabaseTables()")
+	// fmt.Println("fetchDatabaseTables()")
 	/// , t.`ENGINE`, t.`VERSION`, t.`ROW_FORMAT`, t.`TABLE_ROWS`, t.`DATA_LENGTH`, t.`TABLE_COLLATION`, COALESCE(t.`AUTO_INCREMENT`, 0) AS `AUTO_INCREMENT`, ccsa.CHARACTER_SET_NAME FROM information_schema.tables t JOIN information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` ccsa ON ccsa.`COLLATION_NAME` = t.`TABLE_COLLATION` WHERE TABLE_SCHEMA = '" + databaseName + "'"
 
 	if rows, e = server.Connection.Query(query); e != nil {
@@ -431,13 +431,11 @@ func (ss *MSSQL) CompareEnums(
 	remoteSchema *schema.Schema,
 	localSchema *schema.Schema,
 	tableName string,
-) (sql string) {
+) string {
 
-	sql += ""
+	var sb strings.Builder
 
 	localTable := localSchema.Enums[tableName]
-
-	tableSQL := ""
 
 	// remoteTable := remoteSchema.Enums[tableName]
 	localTableSchema := localSchema.Tables[tableName]
@@ -476,9 +474,9 @@ func (ss *MSSQL) CompareEnums(
 				values = append(values, fmt.Sprintf("%.0f", value))
 			}
 		}
-		tableSQL += fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ","))
-	}
-	if len(tableSQL) > 0 {
+
+		// Delete all rows from sql table before inserting new rows
+		sb.WriteString(fmt.Sprintf("DELETE FROM [%s];\n", tableName))
 		sb.WriteString(fmt.Sprintf("INSERT INTO [%s] (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ",")))
 	}
 
@@ -1053,7 +1051,7 @@ func hasDefaultString(dataType string) bool {
 // String Types: https://dev.mysql.com/doc/refman/8.0/en/string-types.html
 func isString(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText, ColTypeDate, ColTypeDateTime:
+	case ColTypeNVarchar, ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText, ColTypeDate, ColTypeDateTime:
 		return true
 	}
 	return false
