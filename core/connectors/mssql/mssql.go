@@ -1140,21 +1140,21 @@ func createColumnSegment(column *schema.Column) (sql string) {
 
 		sql = fmt.Sprintf("[%s] %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
 
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s", SignedSigned)
-		}
+		// if column.IsUnsigned {
+		// 	sql += fmt.Sprintf(" %s", SignedUnsigned)
+		// } else {
+		// 	sql += fmt.Sprintf(" %s", SignedSigned)
+		// }
 
 	} else if isFixedPointType(column.DataType) {
 
 		sql = fmt.Sprintf("[%s] %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
 
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s", SignedSigned)
-		}
+		// if column.IsUnsigned {
+		// 	sql += fmt.Sprintf(" %s", SignedUnsigned)
+		// } else {
+		// 	sql += fmt.Sprintf(" %s", SignedSigned)
+		// }
 	} else if isFloatingPointType(column.DataType) {
 		sql = fmt.Sprintf("[%s] %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
 		// if column.IsUnsigned {
