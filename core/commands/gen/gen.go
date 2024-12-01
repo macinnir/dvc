@@ -3,6 +3,7 @@ package gen
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/cache"
@@ -53,7 +54,12 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		fmt.Printf("%d tables have changed.\n", len(changedTables))
+		var forced = ""
+		if force {
+			forced = " (forced)"
+		}
+
+		fmt.Printf("%d tables have changed%s.\n", len(changedTables), forced)
 
 		//
 		// Models
@@ -86,10 +92,11 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		}
 
 		if len(changedTables) > 0 {
-			gen.GenModels(changedTables, config)
-		}
 
-		if len(changedTables) > 0 {
+			sort.Slice(changedTables, func(i, j int) bool {
+				return changedTables[i].Name < changedTables[j].Name
+			})
+			gen.GenModels(changedTables, config)
 
 			if e = gen.GenDALs(changedTables, config); e != nil {
 				return e
@@ -98,9 +105,6 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			if e = gen.GenerateDALsBootstrapFile(config, schemaList); e != nil {
 				return e
 			}
-		}
-
-		if len(changedTables) > 0 {
 
 			var cacheConfigs = config.Cache
 
@@ -122,10 +126,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			gen.GenRepos(config.BasePackage, changedTables, cacheConfigs)
 			gen.GenRepoBootstrapFile(config.BasePackage, cacheConfigs)
 			gen.GenRepoInterfaces(config.BasePackage, changedTables, cacheConfigs)
-		}
 
-		// gen.GenAppBootstrapFile(config.BasePackage)
-		if len(changedTables) > 0 {
 			gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
 		}
 
@@ -147,7 +148,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		fmt.Printf("###### Found %d permissions\n", len(routes.Permissions))
+		// fmt.Printf("###### Found %d permissions\n", len(routes.Permissions))
 
 		tplPermissions := gen.BuildTplPermissions(routes.Permissions)
 

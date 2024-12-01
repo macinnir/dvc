@@ -2,10 +2,10 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"sync"
 	"text/template"
 	"time"
 
@@ -46,8 +46,7 @@ func CleanTypescriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) er
 
 	}
 
-	fmt.Printf("Removed %d typescript DTOs from `%s` in %f seconds\n", removedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
-
+	lib.LogRemove(start, "%d typescript DTOs from `%s`", removedCount, config.TypescriptDTOsPath)
 	return nil
 }
 
@@ -58,24 +57,40 @@ func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) 
 
 	lib.EnsureDir(config.TypescriptDTOsPath)
 
+	var wg sync.WaitGroup
+	var mutex = sync.Mutex{}
+
 	for name := range routes.DTOs {
-		tsDTOBytes, _ := GenerateTypescriptDTO(name, routes.DTOs[name])
-		fullFilePath := path.Join(config.TypescriptDTOsPath, name+".ts")
-		// fmt.Println("Generating DTO", name, " => ", fullFilePath)
-		// ioutil.WriteFile(fullFilePath, tsDTOBytes, lib.DefaultFileMode)
 
-		f, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
-		if err != nil {
-			panic(err)
-		}
-		if _, err = f.Write(tsDTOBytes); err != nil {
-			panic(err)
-		}
-		f.Close()
-		generatedCount++
+		wg.Add(1)
+
+		go func(name string) {
+
+			defer wg.Done()
+
+			tsDTOBytes, _ := GenerateTypescriptDTO(name, routes.DTOs[name])
+			fullFilePath := path.Join(config.TypescriptDTOsPath, name+".ts")
+			// fmt.Println("Generating DTO", name, " => ", fullFilePath)
+			// ioutil.WriteFile(fullFilePath, tsDTOBytes, lib.DefaultFileMode)
+
+			f, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
+			if err != nil {
+				panic(err)
+			}
+			if _, err = f.Write(tsDTOBytes); err != nil {
+				panic(err)
+			}
+			f.Close()
+
+			mutex.Lock()
+			generatedCount++
+			mutex.Unlock()
+
+		}(name)
 	}
-	fmt.Printf("Generated %d typescript DTOs from `%s` in %f seconds\n", generatedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
 
+	wg.Wait()
+	lib.LogAdd(start, "%d typescript DTOs from `%s`", generatedCount, config.TypescriptDTOsPath)
 	return nil
 }
 

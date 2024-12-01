@@ -2,7 +2,7 @@ package gen
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -993,9 +993,9 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 }
 `)
 
-	ioutil.WriteFile(outFile, []byte(sb.String()), 0777)
+	os.WriteFile(outFile, []byte(sb.String()), 0777)
 
-	fmt.Printf("Generated API Docs to `%s` in %f seconds\n", outFile, time.Since(start).Seconds())
+	lib.LogAdd(start, "API Docs to `%s`", outFile)
 
 }
 

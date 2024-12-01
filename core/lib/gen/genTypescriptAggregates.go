@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log"
 	"os"
 	"path"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -31,10 +33,10 @@ func (tg *TypescriptGenerator) CleanTypescriptAggregates() error {
 
 	var start = time.Now()
 	var e error
-	var files []os.FileInfo
+	var files []os.DirEntry
 	var removedCount = 0
 
-	if files, e = ioutil.ReadDir(tg.config.TypescriptAggregatesPath); e != nil {
+	if files, e = os.ReadDir(tg.config.TypescriptAggregatesPath); e != nil {
 		return e
 	}
 
@@ -55,10 +57,9 @@ func (tg *TypescriptGenerator) CleanTypescriptAggregates() error {
 			os.Remove(tsFilePath)
 			removedCount++
 		}
-
 	}
 
-	fmt.Printf("Removed %d typescript Aggregates from `%s` in %f seconds\n", removedCount, tg.config.TypescriptAggregatesPath, time.Since(start).Seconds())
+	lib.LogRemove(start, "%d typescript Aggregates from `%s`", removedCount, tg.config.TypescriptAggregatesPath)
 
 	return nil
 }
@@ -71,27 +72,46 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 
 	lib.EnsureDir(tg.config.TypescriptAggregatesPath)
 
+	var aggregateNames = []string{}
 	for name := range tg.routes.Aggregates {
-		tsDTOBytes, e := tg.GenerateTypescriptAggregate(name)
-		if e != nil {
-			fmt.Println("ERROR:", e.Error())
-			return e
-		}
-		dest := path.Join(tg.config.TypescriptAggregatesPath, name+".ts")
-		f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
-		if err != nil {
-			panic(err)
-		}
-		if _, err = f.Write(tsDTOBytes); err != nil {
-			panic(err)
-		}
-		f.Close()
-		// ioutil.WriteFile(dest, []byte(str), 0777)
-		generatedCount++
+		aggregateNames = append(aggregateNames, name)
+	}
+	sort.Strings(aggregateNames)
+
+	var wg sync.WaitGroup
+	var mutex = sync.Mutex{}
+
+	for _, name := range aggregateNames {
+
+		wg.Add(1)
+		go func(name string) {
+
+			defer wg.Done()
+
+			tsDTOBytes, e := tg.GenerateTypescriptAggregate(name)
+			if e != nil {
+				log.Fatalf("Error generating typescript aggregate %s: %s", name, e.Error())
+			}
+			dest := path.Join(tg.config.TypescriptAggregatesPath, name+".ts")
+			// log.Printf("Generating Aggregate %s => %s\n", name, dest)
+			f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
+			if err != nil {
+				log.Fatalf("Error opening file %s: %s", dest, err.Error())
+			}
+			if _, err = f.Write(tsDTOBytes); err != nil {
+				log.Fatalf("Error writing to file %s: %s", dest, err.Error())
+			}
+			f.Close()
+
+			mutex.Lock()
+			generatedCount++
+			mutex.Unlock()
+
+		}(name)
 	}
 
-	fmt.Printf("Generated %d typescript Aggregates from `%s` in %f seconds\n", generatedCount, tg.config.TypescriptAggregatesPath, time.Since(start).Seconds())
-
+	wg.Wait()
+	lib.LogAdd(start, "%d typescript Aggregates from %s", generatedCount, tg.config.TypescriptAggregatesPath)
 	return nil
 }
 
@@ -104,7 +124,9 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregate(name string) ([]byte,
 
 	TSFileHeader(&buf, name)
 
-	ImportStrings(&buf, columns)
+	// fmt.Printf("Aggregate: %s\n", name)
+
+	ImportStrings(&buf, columns, name)
 
 	buf.WriteString(`
 export type ` + name + ` = `)
@@ -135,6 +157,7 @@ export type ` + name + ` = `)
 
 func (tg *TypescriptGenerator) ExtractColumns(goType string) map[string]string {
 
+	// Remove pointer symbol
 	if goType[0:1] == "*" {
 		goType = goType[1:]
 	}
@@ -176,7 +199,7 @@ func (tg *TypescriptGenerator) GenerateTypescriptFields(sb io.Writer, objectName
 			continue
 		}
 
-		goType := columns[columnNames[k]]
+		goType := columns[name]
 		fieldType := schema.GoTypeToTypescriptString(goType)
 
 		if len(name) > 9 && name[0:9] == "#embedded" {
@@ -184,12 +207,17 @@ func (tg *TypescriptGenerator) GenerateTypescriptFields(sb io.Writer, objectName
 			continue
 		}
 
-		fmt.Fprintf(sb, "\t// %s %s\n", columnNames[k], columns[columnNames[k]])
-		fmt.Fprintf(sb, "\t%s: %s;\n\n", columnNames[k], fieldType)
+		fmt.Fprint(sb, "\t// "+name+" "+columns[name]+"\n")
+		fmt.Fprint(sb, "\t"+name+": "+fieldType+";\n\n")
 	}
 }
 
 func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectName string) {
+
+	var doLog = objectName == "QuestionAggregate"
+	if doLog {
+		fmt.Println("GenerateTypescriptDefaults", objectName)
+	}
 
 	columns := tg.ExtractColumns(objectName)
 
@@ -201,7 +229,11 @@ func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectNa
 		fieldType := schema.GoTypeToTypescriptString(goType)
 
 		if len(name) > 9 && name[0:9] == "#embedded" {
-			fmt.Fprintf(sb, "\t..."+schema.GoTypeToTypescriptDefault(fieldType)+",\n")
+
+			if doLog {
+				fmt.Println("Embedded", fieldType)
+			}
+			fmt.Fprint(sb, "\t..."+schema.GoTypeToTypescriptDefault(fieldType)+",\n")
 			// tg.GenerateTypescriptDefaults(sb, fieldType)
 			continue
 		}
@@ -211,7 +243,7 @@ func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectNa
 		}
 
 		defaultVal := schema.GoTypeToTypescriptDefault(columns[columnNames[k]])
-		fmt.Fprintf(sb, "\t"+columnNames[k]+": "+defaultVal+",\n")
+		fmt.Fprint(sb, "\t"+columnNames[k]+": "+defaultVal+",\n")
 	}
 
 }

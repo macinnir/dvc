@@ -28,7 +28,7 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 		return e
 	}
 
-	fmt.Printf("Finished in %f seconds\n", time.Since(start).Seconds())
+	fmt.Printf("Finished in %fs\n", time.Since(start).Seconds())
 
 	return nil
 

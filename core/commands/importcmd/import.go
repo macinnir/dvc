@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"sync"
+	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/importer"
@@ -65,7 +68,7 @@ func ImportSingleSchema(config *lib.Config, args []string) error {
 	localSchemas := &schema.SchemaList{}
 	srcBytes, _ := ioutil.ReadFile(srcFile)
 	if e = json.Unmarshal(srcBytes, localSchemas); e != nil {
-		return fmt.Errorf("Unmarshal schema: %w", e)
+		return fmt.Errorf("unmarshal schema: %w", e)
 	}
 
 	targetSchemaKey := -1
@@ -88,9 +91,12 @@ func ImportSingleSchema(config *lib.Config, args []string) error {
 	var dbBytes []byte
 	dbBytes, _ = json.MarshalIndent(localSchemas, " ", "    ")
 
-	return ioutil.WriteFile(srcFile, dbBytes, 0777)
+	return os.WriteFile(srcFile, dbBytes, 0777)
 }
 func ImportAll(log *zap.Logger, config *lib.Config) error {
+
+	var start = time.Now()
+
 	var e error
 	var allSchemas *schema.SchemaList
 
@@ -120,18 +126,28 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 		}
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	// Core Schema List
-	var dbBytes []byte
-	dbBytes, _ = json.MarshalIndent(coreSchemaList, " ", "    ")
-	if e = ioutil.WriteFile(lib.CoreSchemasFilePath, dbBytes, 0644); e != nil {
-		return e
-	}
+	go func() {
+		defer wg.Done()
+		dbBytes, _ := json.MarshalIndent(coreSchemaList, " ", "    ")
+		if e = os.WriteFile(lib.CoreSchemasFilePath, dbBytes, 0644); e != nil {
+			log.Fatal(fmt.Sprintf("Error writing core schemas: %s", e.Error()))
+		}
+	}()
 
 	// App Schema List
-	dbBytes, _ = json.MarshalIndent(appSchemaList, " ", "    ")
-	if e = ioutil.WriteFile(lib.SchemasFilePath, dbBytes, 0644); e != nil {
-		return e
-	}
+	go func() {
+		defer wg.Done()
+		dbBytes, _ := json.MarshalIndent(appSchemaList, " ", "    ")
+		if e = os.WriteFile(lib.SchemasFilePath, dbBytes, 0644); e != nil {
+			log.Fatal(fmt.Sprintf("Error writing app schemas: %s", e.Error()))
+		}
+	}()
+
+	lib.LogAdd(start, "imported all schemas")
 
 	return nil
 }

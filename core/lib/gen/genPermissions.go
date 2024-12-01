@@ -72,7 +72,7 @@ func GenTSPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
 	lib.EnsureDir(config.TypescriptPermissionsPath)
 	var tsPermissionsPath = path.Join(config.TypescriptPermissionsPath, "permissions.ts")
 	BuildTypescriptPermissions(permissions, tsPermissionsPath)
-	fmt.Printf("Generated %d ts permissions to %s in %f seconds\n", len(permissions), tsPermissionsPath, time.Since(start).Seconds())
+	lib.LogAdd(start, "%d ts permissions to %s", len(permissions), tsPermissionsPath)
 
 	return
 }
@@ -83,7 +83,7 @@ func GenGoPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
 	var start = time.Now()
 	var permissionsFilePath = path.Join(lib.GoPermissionsDir, "permissions.go")
 	BuildPermissionsGoFile(permissions, permissionsFilePath)
-	fmt.Printf("Generated %d go permissions to %s in %f seconds\n", len(permissions), permissionsFilePath, time.Since(start).Seconds())
+	lib.LogAdd(start, "%d go permissions to %s", len(permissions), permissionsFilePath)
 	return
 }
 

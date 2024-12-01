@@ -1,10 +1,12 @@
 package gen
 
 import (
-	"fmt"
-	"io/ioutil"
+	"log"
+	"os"
 	"path"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/macinnir/dvc/core/lib"
@@ -18,30 +20,49 @@ func GenerateTypescriptModels(config *lib.Config, routes *lib.RoutesJSONContaine
 
 	lib.EnsureDir(config.TypescriptModelsPath)
 
-	var e error
-	var str string
-
 	var generatedCount = 0
 
+	var wg sync.WaitGroup
+	var mutex = sync.Mutex{}
+
+	var modelNames = []string{}
 	for name := range routes.Models {
-
-		model := routes.Models[name]
-
-		if str, e = GenerateTypescriptModel(name, model); e != nil {
-			return e
-		}
-
-		fullFilePath := path.Join(config.TypescriptModelsPath, name+".ts")
-
-		if e = ioutil.WriteFile(fullFilePath, []byte(str), 0777); e != nil {
-			return e
-		}
-
-		generatedCount++
+		modelNames = append(modelNames, name)
 	}
 
-	fmt.Printf("Generated %d typescript models to %s in %f seconds\n", generatedCount, config.TypescriptModelsPath, time.Since(start).Seconds())
+	sort.Strings(modelNames)
 
+	for _, n := range modelNames {
+
+		wg.Add(1)
+
+		go func(name string, modelProps map[string]string) {
+
+			var e error
+			var str string
+
+			defer wg.Done()
+
+			if str, e = GenerateTypescriptModel(name, modelProps); e != nil {
+				log.Fatalf("Error generating typescript model %s: %s", name, e.Error())
+			}
+
+			var fullFilePath = path.Join(config.TypescriptModelsPath, name+".ts")
+			// log.Printf("Generating typescript model %s => %s", name, fullFilePath)
+
+			if e = os.WriteFile(fullFilePath, []byte(str), 0777); e != nil {
+				log.Fatalf("Error writing to file %s: %s", fullFilePath, e.Error())
+			}
+
+			mutex.Lock()
+			generatedCount++
+			mutex.Unlock()
+
+		}(n, routes.Models[n])
+	}
+
+	wg.Wait()
+	lib.LogAdd(start, "%d typescript models to %s", generatedCount, config.TypescriptModelsPath)
 	return nil
 }
 
@@ -50,7 +71,7 @@ func GenerateTypescriptModel(name string, columns map[string]string) (string, er
 
 	var sb strings.Builder
 	TSFileHeader(&sb, name)
-	ImportStrings(&sb, columns)
+	ImportStrings(&sb, columns, name)
 	columnNames := ColumnMapToNames(columns)
 
 	sb.WriteString(`

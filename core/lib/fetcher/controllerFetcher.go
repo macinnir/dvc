@@ -126,7 +126,11 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 	// Get the controller name
 	var methods []lib.Method
-	methods, _, controller.Description = lib.ParseStruct(src, controllerFullName, true, true, "controllers")
+	methods, _, controller.Description, e = lib.ParseStruct(src, controllerFullName, true, true, "controllers")
+	if e != nil {
+		e = fmt.Errorf("Error parsing controller struct `%s`: %s", controller.Name, e.Error())
+		return
+	}
 
 	// Remove the name of the controller from the description
 	controller.Description = strings.TrimPrefix(controller.Description, controller.Name)

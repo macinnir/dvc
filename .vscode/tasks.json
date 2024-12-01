@@ -8,7 +8,7 @@
         {
             "label": "install",
             "type": "shell",
-            "command": "go install",
+            "command": "make install",
             "problemMatcher": [
                 "$go"
             ],
@@ -19,6 +19,10 @@
                 "panel": "shared",
                 "showReuseMessage": true,
                 "clear": true,
+            }, 
+            "group": {
+                "kind": "build",
+                "isDefault": true
             }
         },
         {

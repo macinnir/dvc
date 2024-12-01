@@ -2,10 +2,10 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
+	"sync"
 	"text/template"
 	"time"
 
@@ -442,19 +442,34 @@ func GenRepos(basePackage string, tables []*schema.Table, cache map[string]*lib.
 	lib.EnsureDir(lib.RepoGenDir)
 	lib.EnsureDir(lib.CollectionGenDir)
 
+	var wg sync.WaitGroup
+	mutex := &sync.Mutex{}
+
 	for tableName := range cache {
 
-		var table = tables[tableMap[tableName]]
+		wg.Add(1)
 
-		if e := GenerateGoRepo(basePackage, cache[tableName], table, lib.RepoGenDir); e != nil {
-			return e
-		}
+		go func(tableName string) {
 
-		GenerateRepoCollection(basePackage, tableName)
-		GenerateRepoCollectionItem(basePackage, tableName)
-		generatedRepoCount++
+			defer wg.Done()
+
+			var table = tables[tableMap[tableName]]
+
+			if e := GenerateGoRepo(basePackage, cache[tableName], table, lib.RepoGenDir); e != nil {
+				panic(e)
+			}
+
+			GenerateRepoCollection(basePackage, tableName)
+			GenerateRepoCollectionItem(basePackage, tableName)
+			mutex.Lock()
+			generatedRepoCount++
+			mutex.Unlock()
+		}(tableName)
 	}
-	fmt.Printf("Generated %d repos in %f seconds.\n", generatedRepoCount, time.Since(start).Seconds())
+
+	wg.Wait()
+
+	lib.LogAdd(start, "%d repos", generatedRepoCount)
 
 	return nil
 }
@@ -463,7 +478,7 @@ func GenRepos(basePackage string, tables []*schema.Table, cache map[string]*lib.
 func GenerateGoRepo(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, table.Name+"Repo.go")
-	fmt.Println("Generating Repo file to path: ", p)
+	// fmt.Println("Generating Repo file to path: ", p)
 
 	data := struct {
 		BasePackage   string

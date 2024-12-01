@@ -2,7 +2,6 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"text/template"
@@ -83,7 +82,7 @@ func GenRepoInterfaces(basePackage string, tables []*schema.Table, cache map[str
 		}
 		generatedCacheCount++
 	}
-	fmt.Printf("Generated %d repo interfaces in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
+	lib.LogAdd(start, "%d repo interfaces", generatedCacheCount)
 
 	return nil
 }
@@ -94,7 +93,7 @@ func GenRepoInterfaces(basePackage string, tables []*schema.Table, cache map[str
 func GenerateGoRepoInterface(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, "I"+table.Name+"Repo.go")
-	fmt.Println("Generating Cache file to path: ", p)
+	// fmt.Println("Generating Cache file to path: ", p)
 
 	data := struct {
 		BasePackage string

@@ -2,12 +2,13 @@ package gen
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -15,10 +16,11 @@ import (
 
 func GenTSRoutes(controllers []*lib.Controller, config *lib.Config) error {
 
+	var start = time.Now()
 	lib.EnsureDir(config.TypescriptRoutesPath)
 
 	// Clean out any old files
-	files, e := ioutil.ReadDir(config.TypescriptRoutesPath)
+	files, e := os.ReadDir(config.TypescriptRoutesPath)
 
 	if e != nil {
 		return e
@@ -28,26 +30,46 @@ func GenTSRoutes(controllers []*lib.Controller, config *lib.Config) error {
 		os.Remove(path.Join(config.TypescriptRoutesPath, files[k].Name()))
 	}
 
+	var wg sync.WaitGroup
+	var mutex = sync.Mutex{}
+
+	var controllerCount = 0
+
 	for k := range controllers {
 
-		g := NewTSRouteGenerator(controllers[k])
+		wg.Add(1)
 
-		routes, e := g.genTSRoutesFromController(controllers[k])
-		if e != nil {
-			return e
-		}
+		go func(controller *lib.Controller) {
 
-		filePath := path.Join(config.TypescriptRoutesPath, controllers[k].Name+".ts")
-		e = ioutil.WriteFile(
-			filePath,
-			[]byte(routes),
-			0777,
-		)
+			defer wg.Done()
 
-		if e != nil {
-			log.Fatalf("Error writing file %s: %s", filePath, e.Error())
-		}
+			g := NewTSRouteGenerator(controller)
+
+			routes, e := g.genTSRoutesFromController(controller)
+			if e != nil {
+				log.Fatalf("Error generating routes for %s: %s", controller.Name, e.Error())
+			}
+
+			filePath := path.Join(config.TypescriptRoutesPath, controller.Name+".ts")
+			e = os.WriteFile(
+				filePath,
+				[]byte(routes),
+				0777,
+			)
+
+			if e != nil {
+				log.Fatalf("Error writing file %s: %s", filePath, e.Error())
+			}
+
+			mutex.Lock()
+			controllerCount++
+			mutex.Unlock()
+
+		}(controllers[k])
 	}
+
+	wg.Wait()
+	lib.LogAdd(start, "%d typescript route files", controllerCount)
 
 	return nil
 }

@@ -12,34 +12,51 @@ import (
 
 func ImportString(sb io.Writer, a, b, c string) {
 
-	fmt.Fprintf(sb, "import { %s", b)
+	fmt.Fprint(sb, "import { "+b)
 
 	// If it starts as an array, do not include the import
 	if a[0:1] != "[" {
-		fmt.Fprintf(sb, ", new%s", b)
+		fmt.Fprint(sb, ", new"+b)
 	}
 
-	fmt.Fprintf(sb, " } from '%s';\n", c)
+	fmt.Fprint(sb, " } from '"+c+"';\n")
 
 }
 
-func ImportStrings(sb io.Writer, columns map[string]string) {
+func ImportStrings(sb io.Writer, columns map[string]string, typeName string) {
 
 	imported := map[string]struct{}{}
 
-	// imports := [][]string{}
+	var sortedCols = make([]string, 0, len(columns))
 	for name := range columns {
+		sortedCols = append(sortedCols, name)
+	}
 
+	sort.Strings(sortedCols)
+
+	// imports := [][]string{}
+	for _, name := range sortedCols {
+
+		// Golang properties are only public if they start with an uppercase letter
+		// Embedded (inherited) data types start with #embedded (e.g. [#embedded1] => "*models.User")
 		if !unicode.IsUpper(rune(name[0])) && name[0:1] != "#" {
 			continue
 		}
 
 		dataType := columns[name]
-
 		baseType := schema.ExtractBaseGoType(dataType)
+
+		if typeName == "QuestionAggregate" {
+			fmt.Println("Column " + name + " Data Type " + dataType + " Base Type " + baseType)
+		}
 
 		if !schema.IsGoTypeBaseType(baseType) {
 
+			if typeName == "QuestionAggregate" {
+				fmt.Println("Not BaseType " + baseType)
+			}
+
+			// Constants are not imported
 			if len(baseType) > 10 && baseType[0:10] == "constants." {
 				continue
 			}
@@ -58,6 +75,10 @@ func ImportStrings(sb io.Writer, columns map[string]string) {
 			} else {
 				ImportString(sb, dataType, baseType, "./"+baseType)
 			}
+		} else {
+			if typeName == "QuestionAggregate" {
+				fmt.Println("BaseType " + baseType)
+			}
 		}
 	}
 }
@@ -71,6 +92,8 @@ func ImportStrings2(columns map[string]string) string {
 	// imports := [][]string{}
 	for name := range columns {
 
+		// Golang properties are only public if they start with an uppercase letter
+		// Embedded (inherited) properties start with #embedded
 		if !unicode.IsUpper(rune(name[0])) && name[0:1] != "#" {
 			continue
 		}
@@ -132,7 +155,7 @@ func ColumnMapToNames(columns map[string]string) []string {
 }
 
 func TSFileHeader(sb io.Writer, name string) {
-	fmt.Fprintf(sb, `/**
+	fmt.Fprint(sb, `/**
  * Generated Code; DO NOT EDIT
  *
  * `+name+`

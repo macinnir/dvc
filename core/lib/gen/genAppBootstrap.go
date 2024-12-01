@@ -1,7 +1,6 @@
 package gen
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -107,7 +106,7 @@ func (a *App) Finish() {
 
 	ioutil.WriteFile(lib.AppBootstrapFile, []byte(sb.String()), 0777)
 
-	fmt.Printf("Generated app bootstrap file to %s in %f seconds\n", lib.AppBootstrapFile, time.Since(start).Seconds())
+	lib.LogAdd(start, "app bootstrap file to %s", lib.AppBootstrapFile)
 
 	return e
 }

@@ -206,9 +206,8 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 	}
 	goRoutesTemplate.Execute(&buf, routesTplValues)
 	lib.EnsureDir(filepath.Dir(lib.RoutesBootstrapFile))
-	ioutil.WriteFile(lib.RoutesBootstrapFile, buf.Bytes(), 0777)
-	fmt.Printf("Generated routes bootstrap file to `%s` in %f seconds\n", lib.RoutesBootstrapFile, time.Since(start).Seconds())
-
+	os.WriteFile(lib.RoutesBootstrapFile, buf.Bytes(), 0777)
+	lib.LogAdd(start, "routes bootstrap file to %s", lib.RoutesBootstrapFile)
 	start = time.Now()
 	// DTOS
 	dtos := genDTOSMap(lib.CoreDTOsDir)
@@ -249,15 +248,16 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 	}
 
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
-	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
-	fmt.Printf("Generated routes to `%s` in %f seconds\n", lib.RoutesFilePath, time.Since(start).Seconds())
+	os.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
+	lib.LogAdd(start, "routes to %s", lib.RoutesFilePath)
 
 	start = time.Now()
 	// Controller Bootstrap
 	var controllerBootstrapFile = GenControllerBootstrap(config.BasePackage, dirs)
 	lib.EnsureDir(filepath.Dir(lib.ControllersBootstrapGenFile))
-	ioutil.WriteFile(lib.ControllersBootstrapGenFile, []byte(controllerBootstrapFile), 0777)
-	fmt.Printf("Generated ControllerBootstrapGenFile to `%s` in %f seconds\n", lib.ControllersBootstrapGenFile, time.Since(start).Seconds())
+	os.WriteFile(lib.ControllersBootstrapGenFile, []byte(controllerBootstrapFile), 0777)
+
+	lib.LogAdd(start, "ControllerBootstrapGenFile to `%s`", lib.ControllersBootstrapGenFile)
 
 	return routesContainer, nil
 }

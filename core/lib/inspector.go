@@ -6,7 +6,6 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
-	"log"
 	"sort"
 	"strings"
 
@@ -117,7 +116,7 @@ type ParsedStruct struct {
 // }
 
 // ParseStruct parses a struct
-func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocuments bool, pkgName string) ([]Method, []string, string) {
+func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocuments bool, pkgName string) ([]Method, []string, string, error) {
 
 	var methods []Method
 	var imports = []string{}
@@ -129,7 +128,7 @@ func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocu
 	var fset = token.NewFileSet()
 
 	if file, e = parser.ParseFile(fset, "", src, parser.ParseComments); e != nil {
-		log.Fatal(e.Error())
+		return nil, nil, "", e
 	}
 
 	for _, i := range file.Imports {
@@ -182,7 +181,7 @@ func ParseStruct(src []byte, structName string, copyDocuments bool, copyTypeDocu
 
 	sort.Slice(methods, func(i, j int) bool { return methods[i].Name < methods[j].Name })
 
-	return methods, imports, typeDoc
+	return methods, imports, typeDoc, nil
 }
 
 // Method describes code and Documents for a method

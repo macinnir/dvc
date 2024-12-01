@@ -2,7 +2,6 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
@@ -238,7 +237,7 @@ func GenCaches(tables []*schema.Table, basePackage string, config map[string]*li
 	var generatedCacheCount = 0
 	lib.EnsureDir(lib.CacheGenDir)
 
-	fmt.Println("Generating caches", config)
+	// fmt.Println("Generating caches", config)
 	for k := range config {
 
 		var table = tables[tableMap[k]]
@@ -248,7 +247,7 @@ func GenCaches(tables []*schema.Table, basePackage string, config map[string]*li
 		}
 		generatedCacheCount++
 	}
-	fmt.Printf("Generated %d caches in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
+	lib.LogAdd(start, "%d caches", generatedCacheCount)
 
 	return nil
 }
@@ -257,7 +256,7 @@ func GenCaches(tables []*schema.Table, basePackage string, config map[string]*li
 func GenerateGoCache(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, table.Name+"Cache.go")
-	fmt.Println("Generating Cache file to path: ", p)
+	// fmt.Println("Generating Cache file to path: ", p)
 
 	data := struct {
 		BasePackage string

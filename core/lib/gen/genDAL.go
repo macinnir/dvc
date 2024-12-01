@@ -10,6 +10,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -666,14 +667,24 @@ func GenDALs(tables []*schema.Table, config *lib.Config) error {
 	generatedDALCount := 0
 	lib.EnsureDir(lib.DalsGenDir)
 
+	var wg sync.WaitGroup
+	mutex := sync.Mutex{}
+
 	for k := range tables {
-		if e := GenerateGoDAL(config, tables[k], lib.DalsGenDir); e != nil {
-			return fmt.Errorf("GenDALs(%s): %w", tables[k].Name, e)
-		}
-		generatedDALCount++
+		wg.Add(1)
+		go func(table *schema.Table) {
+			defer wg.Done()
+			if e := GenerateGoDAL(config, table, lib.DalsGenDir); e != nil {
+				panic(fmt.Errorf("GenDALs(%s): %w", table.Name, e))
+			}
+			mutex.Lock()
+			generatedDALCount++
+			mutex.Unlock()
+		}(tables[k])
 	}
 
-	fmt.Printf("Generated %d dals in %f seconds.\n", generatedDALCount, time.Since(start).Seconds())
+	wg.Wait()
+	lib.LogAdd(start, "%d DALs", generatedDALCount)
 	return nil
 }
 
@@ -1244,7 +1255,7 @@ func GenerateDALsBootstrapFile(config *lib.Config, schemaList *schema.SchemaList
 		return e
 	}
 
-	fmt.Printf("Generated dal bootstrap file to %s in %f seconds\n", lib.DALBootstrapFile, time.Since(start).Seconds())
+	lib.LogAdd(start, "dal bootstrap file to %s", lib.DALBootstrapFile)
 
 	return nil
 }

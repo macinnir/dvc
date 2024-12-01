@@ -3,6 +3,9 @@ package importer
 import (
 	"errors"
 	"fmt"
+	"log"
+	"sync"
+	"time"
 
 	"github.com/macinnir/dvc/core/connectors"
 	"github.com/macinnir/dvc/core/lib"
@@ -37,32 +40,50 @@ func FetchAllUniqueSchemas(config *lib.Config) (*schema.SchemaList, error) {
 	}
 
 	// 2. Loop through each database and get a copy its schema
+	var wg sync.WaitGroup
+	var mutex = sync.Mutex{}
+
 	for k := range schemaNames {
 
-		schemaName := schemaNames[k]
+		wg.Add(1)
 
-		connector, e := connectors.DBConnectorFactory(configs[schemaName])
-		if e != nil {
-			return nil, e
-		}
-		executor := executor.NewExecutor(
-			configs[schemaName],
-			connector,
-		).Connect()
+		go func(k int) {
 
-		var s *schema.Database
-		s, e = connector.FetchDatabase(
-			schemaName,
-			executor,
-			configs[schemaName].Name,
-		)
+			defer wg.Done()
 
-		if e != nil {
-			return nil, e
-		}
+			var start = time.Now()
 
-		schemaList.Schemas = append(schemaList.Schemas, s.ToSchema(schemaName))
+			schemaName := schemaNames[k]
+
+			connector, e := connectors.DBConnectorFactory(configs[schemaName])
+			if e != nil {
+				log.Fatalf("Error creating connector for schema `%s`: %s", schemaName, e.Error())
+			}
+			executor := executor.NewExecutor(
+				configs[schemaName],
+				connector,
+			).Connect()
+
+			var s *schema.Database
+			s, e = connector.FetchDatabase(
+				schemaName,
+				executor,
+				configs[schemaName].Name,
+			)
+
+			if e != nil {
+				log.Fatalf("Error fetching schema `%s`: %s", schemaName, e.Error())
+			}
+
+			mutex.Lock()
+			schemaList.Schemas = append(schemaList.Schemas, s.ToSchema(schemaName))
+			lib.LogAdd(start, "Fetched schema `%s`", schemaNames[k])
+			mutex.Unlock()
+		}(k)
 	}
+
+	wg.Wait()
+
 	// database.Enums = c.connector.FetchEnums(server)
 
 	return schemaList, nil

@@ -83,8 +83,9 @@ func TestMethod_GetLines(t *testing.T) {
 }
 
 func TestParseStruct(t *testing.T) {
-	methods, imports, typeDoc := ParseStruct(src, "Person", true, true, "")
+	methods, imports, typeDoc, e := ParseStruct(src, "Person", true, true, "")
 
+	assert.Nil(t, e, "ParseStruct returned an error")
 	assert.Equal(t, "Name() (string)", methods[0].Code)
 
 	imp := imports[0]
@@ -154,6 +155,7 @@ func TestFormatFieldList(t *testing.T) {
 }
 
 func TestParseStruct_NoCopyTypeDocs(t *testing.T) {
-	_, _, typeDoc := ParseStruct(src, "Person", true, false, "")
+	_, _, typeDoc, e := ParseStruct(src, "Person", true, false, "")
+	assert.Nil(t, e, "ParseStruct returned an error")
 	assert.Equal(t, "", typeDoc)
 }
