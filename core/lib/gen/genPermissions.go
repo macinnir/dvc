@@ -142,6 +142,8 @@ func BuildTplPermissions(permissionMap map[string]string) []PermissionTplType {
 
 func BuildPermissionsGoFile(permissions []PermissionTplType, permissionsFilePath string) error {
 
+	lib.EnsureDir(lib.GoPermissionsDir)
+
 	var e error
 
 	var tplVals = struct {
