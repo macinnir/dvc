@@ -147,6 +147,8 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 		}
 	}()
 
+	wg.Wait()
+
 	lib.LogAdd(start, "imported all schemas")
 
 	return nil
