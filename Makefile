@@ -12,6 +12,7 @@ build:
 
 # Build and install the application 
 install: 
+	# go install
 	cd cmd/dvc; go install -ldflags "-X main.Version=${version}"
 
 tag: 

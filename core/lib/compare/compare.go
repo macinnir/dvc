@@ -142,7 +142,9 @@ type Compare struct {
 // This comparison assumes the local `schemaFile` is the authority and the remote database is the
 // schema to be updated
 // @param reverse bool If true, the remote and local schema comparison is flipped in that the remote schema is treated as the authority
-// 		and the local schema is treated as the schema to be updated.
+//
+//	and the local schema is treated as the schema to be updated.
+//
 // @command compare [reverse]
 func CompareSchemas(
 	config *lib.Config,
