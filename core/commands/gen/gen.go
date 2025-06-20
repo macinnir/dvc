@@ -164,6 +164,8 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
+		lib.EnsureDir(config.TypescriptDTOsPath)
+
 		if e = gen.CleanTypescriptDTOs(config, routes); e != nil {
 			return e
 		}
@@ -173,6 +175,8 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		}
 
 		tg := gen.NewTypescriptGenerator(config, routes)
+
+		lib.EnsureDir(config.TypescriptAggregatesPath)
 
 		if e = tg.CleanTypescriptAggregates(); e != nil {
 			return e
@@ -190,8 +194,8 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 	// case "models":
 	// 	gen.GenModels(config, force, clean)
-	// case "dals":
-	// 	gen.GenDALs(lib.DalsGenDir, lib.DALDefinitionsGenDir, config, force, clean)
+	case "dals":
+		// gen.GenDALs(lib.DalsGenDir, lib.DALDefinitionsGenDir, config, force, clean)
 	case "interfaces":
 		gen.GenAppBootstrapFile(config.BasePackage)
 		gen.GenInterfaces(lib.DalsGenDir, lib.DALDefinitionsGenDir)
