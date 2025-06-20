@@ -40,10 +40,24 @@ func NewMSSQL(config *lib.ConfigDatabase) *MSSQL {
 
 // Connect connects to a server and returns a new server object
 func (ss *MSSQL) Connect() (server *schema.Server, e error) {
-	// fmt.Println("Connecting to ", ss.config.Name)
+	// fmt.Println("MSSQL.Connect() ", ss.config.Name, " Host: ", ss.config.Host)
 	server = &schema.Server{Host: ss.config.Host}
-	var connectionString = fmt.Sprintf("server=%s;user id=%s;password=%s", ss.config.Host, ss.config.User, ss.config.Pass)
-	server.Connection, e = sql.Open("mssql", connectionString)
+	var connectionString string
+	if len(ss.config.ConnectionString) > 0 {
+		connectionString = ss.config.ConnectionString
+	} else {
+		// connectionString = ss.config.User + ":" + ss.config.Pass + "@tcp(" + ss.config.Host + ")/" + ss.config.Name + "?charset=utf8"
+		connectionString = fmt.Sprintf("server=%s;user id=%s;password=%s", ss.config.Host, ss.config.User, ss.config.Pass)
+	}
+
+	// fmt.Println("Connecting to ", ss.config.Name)
+	server = &schema.Server{
+		Host: ss.config.Host,
+	}
+
+	// fmt.Printf("Connecting with connection string: %s", connectionString)
+
+	server.Connection, e = sql.Open("sqlserver", connectionString)
 	return
 }
 
@@ -164,11 +178,13 @@ func (ss *MSSQL) fetchDatabaseTables(schemaName string, server *schema.Server, d
 	var rows *sql.Rows
 	query := `SELECT 
 		t.[TABLE_NAME]
-	FROM INFORMATION_SCHEMA.TABLES 
+	FROM INFORMATION_SCHEMA.TABLES t
 	WHERE 
 		TABLE_TYPE = 'BASE TABLE'
 		AND
 		TABLE_CATALOG = '` + databaseName + `'`
+
+	// fmt.Println("fetchDatabaseTables()")
 	/// , t.`ENGINE`, t.`VERSION`, t.`ROW_FORMAT`, t.`TABLE_ROWS`, t.`DATA_LENGTH`, t.`TABLE_COLLATION`, COALESCE(t.`AUTO_INCREMENT`, 0) AS `AUTO_INCREMENT`, ccsa.CHARACTER_SET_NAME FROM information_schema.tables t JOIN information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` ccsa ON ccsa.`COLLATION_NAME` = t.`TABLE_COLLATION` WHERE TABLE_SCHEMA = '" + databaseName + "'"
 
 	if rows, e = server.Connection.Query(query); e != nil {
@@ -187,14 +203,14 @@ func (ss *MSSQL) fetchDatabaseTables(schemaName string, server *schema.Server, d
 
 		rows.Scan(
 			&table.Name,
-			&table.Engine,
-			&table.Version,
-			&table.RowFormat,
-			&table.Rows,
-			&table.DataLength,
-			&table.Collation,
-			&table.AutoIncrement,
-			&table.CharacterSet,
+			// &table.Engine,
+			// &table.Version,
+			// &table.RowFormat,
+			// &table.Rows,
+			// &table.DataLength,
+			// &table.Collation,
+			// &table.AutoIncrement,
+			// &table.CharacterSet,
 		)
 
 		table.SchemaName = schemaName
@@ -219,28 +235,51 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 
 	query := fmt.Sprintf(`
 		SELECT
-			COLUMN_NAME,
-			-- ORDINAL_POSITION,
-			COALESCE(COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
-			CASE IS_NULLABLE
+			c.COLUMN_NAME,
+			COALESCE(c.COLUMN_DEFAULT, '') as COLUMN_DEFAULT,
+			CASE c.IS_NULLABLE
 				WHEN 'YES' THEN 1
 				ELSE 0
 			END AS IS_NULLABLE,
-			DATA_TYPE,
-			COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
-			COALESCE(NUMERIC_PRECISION, 0) as NumericPrecision,
-			COALESCE(CHARACTER_SET_NAME, '') AS CharSet,
-			COLUMN_TYPE,
-			COLUMN_KEY,
-			EXTRA,
-			COALESCE(NUMERIC_SCALE, 0) as NumericScale,
-			COALESCE(COLLATION_NAME, '') as Collation
-		FROM information_schema.COLUMNS
+			c.DATA_TYPE,
+			COALESCE(c.CHARACTER_MAXIMUM_LENGTH, 0) as MaxLength,
+			COALESCE(c.NUMERIC_PRECISION, 0) as NumericPrecision,
+			COALESCE(c.CHARACTER_SET_NAME, '') AS CharSet,
+			c.DATA_TYPE AS COLUMN_TYPE,
+
+			CASE 
+				WHEN pk.COLUMN_NAME IS NOT NULL THEN 'PRI' 
+				ELSE '' 
+			END AS COLUMN_KEY,
+			'' AS EXTRA,
+			COALESCE(c.NUMERIC_SCALE, 0) as NumericScale,
+			COALESCE(c.COLLATION_NAME, '') as Collation
+		FROM [`+databaseName+`].information_schema.COLUMNS c
+			
+			LEFT JOIN (
+				SELECT ku.TABLE_CATALOG,ku.TABLE_SCHEMA,ku.TABLE_NAME,ku.COLUMN_NAME
+				FROM [` + databaseName + `].INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc
+				INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS ku ON 
+					tc.CONSTRAINT_TYPE = 'PRIMARY KEY' 
+					AND 
+					tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
+			) pk 
+			ON  
+				c.TABLE_CATALOG = pk.TABLE_CATALOG
+				AND 
+				c.TABLE_SCHEMA = pk.TABLE_SCHEMA
+				AND 
+				c.TABLE_NAME = pk.TABLE_NAME
+				AND 
+				c.COLUMN_NAME = pk.COLUMN_NAME
 		WHERE
-			TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
-	`, databaseName, tableName)
+			c.TABLE_NAME = '%s'
+	`, tableName)
+
+	// fmt.Println("FetchTableColumns()", query)
 
 	if rows, e = server.Connection.Query(query); e != nil {
+		fmt.Println("ERROR: ", e.Error())
 		return
 	}
 
@@ -254,7 +293,6 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 		column := schema.Column{}
 		if e = rows.Scan(
 			&column.Name,
-			// &column.Position,
 			&column.Default,
 			&column.IsNullable,
 			&column.DataType,
@@ -270,7 +308,7 @@ func (ss *MSSQL) FetchTableColumns(server *schema.Server, databaseName string, t
 			return
 		}
 
-		column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
+		// column.IsUnsigned = strings.Contains(strings.ToLower(column.Type), " unsigned")
 		column.FmtType = schema.DataTypeToFormatString(&column)
 		column.GoType = schema.DataTypeToGoTypeString(&column)
 
@@ -355,7 +393,7 @@ func (ss *MSSQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 					if same {
 						comparison.Changes = append(comparison.Changes, &schema.SchemaChange{
 							Type: schema.RenameTable,
-							SQL:  fmt.Sprintf("RENAME TABLE `%s` TO `%s`;\n", dropTableName, createTableName),
+							SQL:  fmt.Sprintf("EXEC sp_rename '%s', '%s';\n", dropTableName, createTableName),
 						})
 
 						delete(dropTableStatements, dropTableName)
@@ -393,13 +431,11 @@ func (ss *MSSQL) CompareEnums(
 	remoteSchema *schema.Schema,
 	localSchema *schema.Schema,
 	tableName string,
-) (sql string) {
+) string {
 
-	sql += ""
+	var sb strings.Builder
 
 	localTable := localSchema.Enums[tableName]
-
-	tableSQL := ""
 
 	// remoteTable := remoteSchema.Enums[tableName]
 	localTableSchema := localSchema.Tables[tableName]
@@ -427,7 +463,7 @@ func (ss *MSSQL) CompareEnums(
 			value, valueExists := localRow[fieldName]
 
 			if !valueExists {
-				panic(fmt.Sprintf("Value for field `%s`.`%s` does not exist in enumerations. Please add this field to enumerations before continuing.", tableName, fieldName))
+				panic(fmt.Sprintf("Value for field [%s].[%s] does not exist in enumerations. Please add this field to enumerations before continuing.", tableName, fieldName))
 			}
 
 			if isFloatingPointType(dataType) || isFixedPointType(dataType) {
@@ -438,13 +474,13 @@ func (ss *MSSQL) CompareEnums(
 				values = append(values, fmt.Sprintf("%.0f", value))
 			}
 		}
-		tableSQL += fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ","))
-	}
-	if len(tableSQL) > 0 {
-		sql += fmt.Sprintf("DELETE FROM `%s`;\n", tableName) + tableSQL
+
+		// Delete all rows from sql table before inserting new rows
+		sb.WriteString(fmt.Sprintf("DELETE FROM [%s];\n", tableName))
+		sb.WriteString(fmt.Sprintf("INSERT INTO [%s] (%s) VALUES (%s);\n", tableName, strings.Join(fields, ","), strings.Join(values, ",")))
 	}
 
-	return
+	return sb.String()
 }
 
 // FetchEnums fetches enum data for all enums listed in config
@@ -464,7 +500,7 @@ func (ss *MSSQL) FetchEnum(server *schema.Server, tableName string) (objects []m
 	var e error
 	var rows *sql.Rows
 
-	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM `%s`", tableName)); e != nil {
+	if rows, e = server.Connection.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName)); e != nil {
 		return
 	}
 
@@ -756,7 +792,7 @@ func createTable(table *schema.Table) []*schema.SchemaChange {
 		cols = append(cols, fmt.Sprintf("PRIMARY KEY(`%s`)", primaryKey))
 	}
 
-	sql := fmt.Sprintf("CREATE TABLE `%s` (\n\t%s\n)", table.Name, strings.Join(cols, ",\n\t"))
+	sql := fmt.Sprintf("CREATE TABLE dbo.[%s] (\n\t%s\n)", table.Name, strings.Join(cols, ",\n\t"))
 
 	if len(table.Engine) > 0 {
 		sql += fmt.Sprintf(" ENGINE = %s", table.Engine)
@@ -798,7 +834,7 @@ func dropTable(table *schema.Table) []*schema.SchemaChange {
 	return []*schema.SchemaChange{
 		{
 			Type:          schema.DropTable,
-			SQL:           fmt.Sprintf("DROP TABLE `%s`;", table.Name),
+			SQL:           fmt.Sprintf("DROP TABLE [%s];", table.Name),
 			IsDestructive: true,
 		},
 	}
@@ -893,10 +929,13 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 	}
 }
 
+// Rename column EXEC sp_rename 'dbo.ErrorLog.ErrorLogID', 'ErrorLogID', 'COLUMN';
+
+// TODO - Add support for column changes
 func alterTableChangeColumn(table *schema.Table, newColumn *schema.Column, oldColumnName string) *schema.SchemaChange {
 	query := createColumnSegment(newColumn)
 
-	sql := fmt.Sprintf("ALTER TABLE `%s` CHANGE `%s` %s", table.Name, oldColumnName, query)
+	sql := fmt.Sprintf("exec [%s] CHANGE [%s] %s", table.Name, oldColumnName, query)
 
 	return &schema.SchemaChange{
 		Type: schema.ChangeColumn,
@@ -908,7 +947,7 @@ func alterTableChangeColumn(table *schema.Table, newColumn *schema.Column, oldCo
 func alterTableCreateColumn(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	query := createColumnSegment(column)
 
-	sql := fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s", table.Name, query)
+	sql := fmt.Sprintf("ALTER TABLE [%s] ADD COLUMN %s", table.Name, query)
 
 	return &schema.SchemaChange{
 		Type: schema.AddColumn,
@@ -920,7 +959,7 @@ func alterTableCreateColumn(table *schema.Table, column *schema.Column) *schema.
 func alterTableDropColumn(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type:          schema.DropColumn,
-		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP COLUMN `%s`;", table.Name, column.Name),
+		SQL:           fmt.Sprintf("ALTER TABLE [%s] DROP COLUMN [%s];", table.Name, column.Name),
 		IsDestructive: true,
 	}
 }
@@ -928,14 +967,16 @@ func alterTableDropColumn(table *schema.Table, column *schema.Column) *schema.Sc
 func addIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.AddIndex,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD INDEX `i_%s_%s` (`%s`);", table.Name, table.Name, column.Name, column.Name),
+		SQL:  fmt.Sprintf("CREATE INDEX [i_%s_%s] ON dbo.[%s] ([%s]);", table.Name, column.Name, table.Name, column.Name),
 	}
 }
 
+// https://learn.microsoft.com/en-us/sql/t-sql/statements/create-index-transact-sql?view=sql-server-ver16
+// Add support for clustered
 func addUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.AddIndex,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD UNIQUE INDEX `ui_%s_%s` (`%s`);", table.Name, table.Name, column.Name, column.Name),
+		SQL:  fmt.Sprintf("CREATE UNIQUE INDEX [ui_%s_%s] ON dbo.[%s] ([%s]);", table.Name, column.Name, table.Name, column.Name),
 	}
 }
 
@@ -943,21 +984,21 @@ func addUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaCh
 func addPrimaryKey(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.AddIndex,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` ADD PRIMARY KEY (`%s`);", table.Name, column.Name),
+		SQL:  fmt.Sprintf("ALTER TABLE [%s] ADD PRIMARY KEY ([%s]);", table.Name, column.Name),
 	}
 }
 
 func alterDatabaseCharacterSet(databaseName, characterSet, collation string) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.ChangeCharacterSet,
-		SQL:  fmt.Sprintf("ALTER DATABASE `%s` CHARACTER SET %s COLLATE %s;", databaseName, characterSet, collation),
+		SQL:  fmt.Sprintf("ALTER DATABASE [%s] CHARACTER SET %s COLLATE %s;", databaseName, characterSet, collation),
 	}
 }
 
 func alterTableCharacterSet(tableName, characterSet, collation string) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type: schema.ChangeCharacterSet,
-		SQL:  fmt.Sprintf("ALTER TABLE `%s` CONVERT TO CHARACTER SET %s COLLATE %s;", tableName, characterSet, collation),
+		SQL:  fmt.Sprintf("ALTER TABLE [%s] CONVERT TO CHARACTER SET %s COLLATE %s;", tableName, characterSet, collation),
 	}
 }
 
@@ -965,7 +1006,7 @@ func alterTableCharacterSet(tableName, characterSet, collation string) *schema.S
 func dropIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type:          schema.DropIndex,
-		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `i_%s_%s`;", table.Name, table.Name, column.Name),
+		SQL:           fmt.Sprintf("ALTER TABLE [%s] DROP INDEX `i_%s_%s`;", table.Name, table.Name, column.Name),
 		IsDestructive: true,
 	}
 }
@@ -974,7 +1015,7 @@ func dropIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange 
 func dropUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type:          schema.DropIndex,
-		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `ui_%s_%s`;", table.Name, table.Name, column.Name),
+		SQL:           fmt.Sprintf("ALTER TABL [%s] DROP INDEX `ui_%s_%s`;", table.Name, table.Name, column.Name),
 		IsDestructive: true,
 	}
 }
@@ -983,7 +1024,7 @@ func dropUniqueIndex(table *schema.Table, column *schema.Column) *schema.SchemaC
 func dropPrimaryKey(table *schema.Table, column *schema.Column) *schema.SchemaChange {
 	return &schema.SchemaChange{
 		Type:          schema.DropIndex,
-		SQL:           fmt.Sprintf("ALTER TABLE `%s` DROP PRIMARY KEY;", table.Name),
+		SQL:           fmt.Sprintf("ALTER TABLE [%s] DROP PRIMARY KEY;", table.Name),
 		IsDestructive: true,
 	}
 }
@@ -1010,7 +1051,7 @@ func hasDefaultString(dataType string) bool {
 // String Types: https://dev.mysql.com/doc/refman/8.0/en/string-types.html
 func isString(dataType string) bool {
 	switch strings.ToLower(dataType) {
-	case ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText, ColTypeDate, ColTypeDateTime:
+	case ColTypeNVarchar, ColTypeVarchar, ColTypeEnum, ColTypeChar, ColTypeTinyText, ColTypeMediumText, ColTypeText, ColTypeLongText, ColTypeDate, ColTypeDateTime:
 		return true
 	}
 	return false
@@ -1095,42 +1136,42 @@ func createColumnSegment(column *schema.Column) (sql string) {
 
 	if isInt(column.DataType) {
 
-		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
+		sql = fmt.Sprintf("[%s] %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
 
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s", SignedSigned)
-		}
+		// if column.IsUnsigned {
+		// 	sql += fmt.Sprintf(" %s", SignedUnsigned)
+		// } else {
+		// 	sql += fmt.Sprintf(" %s", SignedSigned)
+		// }
 
 	} else if isFixedPointType(column.DataType) {
 
-		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
+		sql = fmt.Sprintf("[%s] %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
 
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s", SignedSigned)
-		}
+		// if column.IsUnsigned {
+		// 	sql += fmt.Sprintf(" %s", SignedUnsigned)
+		// } else {
+		// 	sql += fmt.Sprintf(" %s", SignedSigned)
+		// }
 	} else if isFloatingPointType(column.DataType) {
-		sql = fmt.Sprintf("`%s` %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
-		if column.IsUnsigned {
-			sql += fmt.Sprintf(" %s", SignedUnsigned)
-		} else {
-			sql += fmt.Sprintf(" %s", SignedSigned)
-		}
+		sql = fmt.Sprintf("[%s] %s(%d,%d)", column.Name, column.DataType, column.Precision, column.NumericScale)
+		// if column.IsUnsigned {
+		// 	sql += fmt.Sprintf(" %s", SignedUnsigned)
+		// } else {
+		// 	sql += fmt.Sprintf(" %s", SignedSigned)
+		// }
 	} else if isString(column.DataType) {
 		// Use the text from the `Type` field (the `COLUMN_TYPE` column) directly
 		if strings.ToLower(column.DataType) == ColTypeEnum {
-			sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
+			sql = fmt.Sprintf("[%s] %s", column.Name, column.Type)
 		} else if stringHasLength(column.DataType) {
-			sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, column.MaxLength)
+			sql = fmt.Sprintf("[%s] %s(%d)", column.Name, column.DataType, column.MaxLength)
 		} else {
-			sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+			sql = fmt.Sprintf("[%s] %s", column.Name, column.DataType)
 		}
 
 	} else {
-		sql = fmt.Sprintf("`%s` %s", column.Name, column.DataType)
+		sql = fmt.Sprintf("[%s] %s", column.Name, column.DataType)
 	}
 
 	if len(column.CharSet) > 0 {

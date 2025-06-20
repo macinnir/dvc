@@ -66,7 +66,7 @@ func ImportSingleSchema(config *lib.Config, args []string) error {
 	}
 
 	localSchemas := &schema.SchemaList{}
-	srcBytes, _ := ioutil.ReadFile(srcFile)
+	srcBytes, _ := os.ReadFile(srcFile)
 	if e = json.Unmarshal(srcBytes, localSchemas); e != nil {
 		return fmt.Errorf("unmarshal schema: %w", e)
 	}
@@ -100,10 +100,17 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 	var e error
 	var allSchemas *schema.SchemaList
 
+	fmt.Println("Importing all schemas")
+
 	if allSchemas, e = importer.FetchAllUniqueSchemas(config); e != nil {
 		log.Error("Error importing all schemas", zap.Error(e))
 		return e
 	}
+
+	// for k := range allSchemas.Schemas {
+	// 	fmt.Println(k, "Schema: "+allSchemas.Schemas[k].Name)
+	// }
+
 	coreSchemaList := &schema.SchemaList{
 		Schemas: []*schema.Schema{},
 	}
@@ -111,11 +118,6 @@ func ImportAll(log *zap.Logger, config *lib.Config) error {
 	appSchemaList := &schema.SchemaList{
 		Schemas: []*schema.Schema{},
 	}
-
-	// for k := range allSchemas.Schemas {
-	// 	fmt.Println(k, "Schema: "+allSchemas.Schemas[k].Name)
-
-	// }
 
 	// os.Exit(1)
 	for k := range allSchemas.Schemas {

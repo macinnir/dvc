@@ -26,11 +26,15 @@ func LoadLocalSchemas() (*SchemaList, error) {
 		return nil, e
 	}
 
-	if coreSchema, e = loadSchema(lib.CoreSchemasFilePath); e != nil {
-		return nil, e
-	}
+	if lib.FileExists(lib.CoreSchemasFilePath) {
 
-	appSchema.Schemas = append(appSchema.Schemas, coreSchema.Schemas...)
+		if coreSchema, e = loadSchema(lib.CoreSchemasFilePath); e != nil {
+			return nil, e
+		}
+
+		appSchema.Schemas = append(appSchema.Schemas, coreSchema.Schemas...)
+	}
+	
 	appSchema.TableMap = map[string]struct{}{}
 
 	for k := range appSchema.Schemas {
@@ -121,7 +125,7 @@ func DataTypeToFormatString(column *Column) (fieldType string) {
 	switch column.DataType {
 	case "int", "bigint", "tinyint":
 		fieldType = "%d"
-	case "varchar", "enum", "text", "date", "datetime", "char":
+	case "varchar", "enum", "text", "date", "datetime", "char", "nvarchar", "uniqueidentifier":
 		fieldType = "%s"
 	case "decimal":
 		fieldType = "%f"
@@ -139,7 +143,7 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 		fieldType = "int64"
 	case "tinyint":
 		fieldType = "int"
-	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "date", "datetime":
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "date", "datetime", "nvarchar", "uniqueidentifier":
 		fieldType = "string"
 	case "decimal":
 		fieldType = "float64"
@@ -168,7 +172,7 @@ func DataTypeToTypescriptString(dbDataType string) (fieldType string) {
 	fieldType = "number"
 
 	switch dbDataType {
-	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time", "nvarchar":
 		fieldType = "string"
 	}
 

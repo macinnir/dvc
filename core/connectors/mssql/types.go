@@ -9,6 +9,7 @@ const (
 	KeyUNI            = "UNI"
 	KeyMUL            = "MUL"
 	ColTypeVarchar    = "varchar"
+	ColTypeNVarchar   = "nvarchar"
 	ColTypeEnum       = "enum"
 	ColTypeChar       = "char"
 	ColTypeTinyText   = "tinytext"
@@ -28,5 +29,6 @@ const (
 	ColTypeBigint     = "bigint"
 	ColTypeDate       = "date"
 	ColTypeDateTime   = "datetime"
+	ColTypeDateTime2  = "datetime2"
 	ColTypeTime       = "time"
 )

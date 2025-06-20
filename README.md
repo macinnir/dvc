@@ -121,4 +121,4 @@ https://godoc.org/github.com/macinnir/dvc
 https://www.digitalocean.com/community/tutorials/how-to-use-a-private-go-module-in-your-own-project
 https://stackoverflow.com/questions/58305567/how-to-set-goprivate-environment-variable
 
-
+[ ] Remove requirement of "core" schema v "app" schema 
