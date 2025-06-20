@@ -247,9 +247,14 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 		}
 	}
 
-	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
-	os.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
+	routesJSONPretty, _ := json.MarshalIndent(routesContainer, "  ", "    ")
+	os.WriteFile(lib.RoutesFilePath, routesJSONPretty, 0777)
 	lib.LogAdd(start, "routes to %s", lib.RoutesFilePath)
+
+	routesJSON, _ := json.Marshal(routesContainer)
+	routesData := "package apidocs \n\nfunc ShowAPIData() string { \n\treturn `" + string(routesJSON) + "`\n}"
+
+	os.WriteFile("gen/apidocs/apiData.go", []byte(routesData), 0777)
 
 	start = time.Now()
 	// Controller Bootstrap
