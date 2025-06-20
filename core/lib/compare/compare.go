@@ -157,6 +157,10 @@ func CompareSchemas(
 		configMap[config.Databases[k].Key] = config.Databases[k]
 	}
 
+	if localSchemaList == nil {
+		panic("localSchemaList cannot be nil")
+	}
+
 	localSchemaMap := map[string]int{}
 	for k := range localSchemaList.Schemas {
 		localSchemaMap[localSchemaList.Schemas[k].Name] = k
