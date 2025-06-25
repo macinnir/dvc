@@ -465,6 +465,8 @@ func (t *TSRouteGenerator) genUseMutationTSRoute(route *lib.ControllerRoute) (st
 
 func (t *TSRouteGenerator) AddImport(importType string) {
 
+	importType = strings.TrimSpace(importType)
+
 	if len(importType) == 0 {
 		return
 	}
@@ -473,14 +475,20 @@ func (t *TSRouteGenerator) AddImport(importType string) {
 		importType = importType[2:]
 	}
 
+	importType = strings.TrimSpace(importType)
+
 	// Double slice?
 	if len(importType) > 2 && importType[0:2] == "[]" {
 		importType = importType[2:]
 	}
 
+	importType = strings.TrimSpace(importType)
+
 	if len(importType) > 11 && importType[0:11] == "map[string]" {
 		importType = importType[11:]
 	}
+
+	importType = strings.TrimSpace(importType)
 
 	tsType := schema.GoTypeToTypescriptString(importType)
 
