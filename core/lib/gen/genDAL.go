@@ -423,6 +423,25 @@ func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s [
 	return model, nil 
 }
 
+// FromIDsMap returns a map of {{.Table.Name}} objects from primary keys indexed by a set of primary keys
+func (r *{{.Table.Name}}DAL) FromIDsMap(shard int64, {{.PrimaryKey | toArgName}}s []{{.IDType}}) (map[{{.IDType}}]*models.{{.Table.Name}}, error) {
+
+
+	model, e := r.FromIDs(shard, {{.PrimaryKey | toArgName}}s)
+	if e != nil { 
+		return map[{{.IDType}}]*models.{{.Table.Name}}{}, e
+	}
+	
+	result := make(map[{{.IDType}}]*models.{{.Table.Name}})
+	for k := range model {
+		result[model[k].{{.PrimaryKey}}] = model[k]
+	}
+	
+	r.log.Debugf("{{.Table.Name}}DAL.FromIDsMap(%v)", {{.PrimaryKey | toArgName}}s)
+
+	return result, nil 
+}
+
 {{range $col := .UpdateColumns}}
 // Set{{$col.Name}} sets the {{$col.Name}} column on a {{$.Table.Name}} object
 func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}(shard int64, {{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (e error) {
