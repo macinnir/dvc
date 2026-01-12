@@ -24,6 +24,59 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	// 	return e
 	// }
 
+	var showList = false
+	var showSchemaName = ""
+	var showTableName = ""
+
+	for len(args) > 0 {
+		if args[0] == "-l" || args[0] == "--list" {
+			showList = true
+			args = args[1:]
+			continue
+		}
+
+		if args[0] == "-s" || args[0] == "--schema" {
+			showSchemaName = args[1]
+			args = args[2:]
+			continue
+		}
+
+		if args[0] == "-t" || args[0] == "--table" {
+			showTableName = args[1]
+			args = args[2:]
+			continue
+		}
+	}
+
+	if showList {
+		if len(showTableName) > 0 {
+			for k := range localSchemaList.Schemas {
+				localSchema := localSchemaList.Schemas[k]
+				for _, table := range localSchema.ToSortedTables() {
+					if table.Name == showTableName {
+						for _, column := range table.ToSortedColumns() {
+							fmt.Printf("%s\n", column.Name)
+						}
+						return nil
+					}
+				}
+			}
+			return nil
+		} else {
+			for k := range localSchemaList.Schemas {
+				if showSchemaName != "" && localSchemaList.Schemas[k].Name != showSchemaName {
+					continue
+				}
+				localSchema := localSchemaList.Schemas[k]
+				for _, table := range localSchema.ToSortedTables() {
+					fmt.Printf("%s\n", table.Name)
+				}
+				// fmt.Println(localSchema.Name)
+			}
+			return nil
+		}
+	}
+
 	// Options
 	// ls 							Show all Tables
 	// ls [name] 					Show all Columns in table [name] is found
@@ -31,13 +84,15 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	// ls .[fieldPartialName] 		Show all columns with name containing [fieldPartialName]
 	// ls - Show all tables
 	// fmt.Println("args", args)
-	if len(args) == 0 {
+	if len(showTableName) == 0 {
 
 		t := lib.NewCLITable([]string{"Schema", "Table", "Columns", "Collation", "Engine", "Row Format"})
 
 		for k := range localSchemaList.Schemas {
-
 			localSchema := localSchemaList.Schemas[k]
+			if showSchemaName != "" && localSchema.Name != showSchemaName {
+				continue
+			}
 			results := localSchema.ToSortedTables()
 
 			for _, table := range results {
@@ -56,66 +111,66 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	}
 
 	// ls .[fieldPartialName] - Show all columns with names containing [fieldPartialName]
-	if strings.HasPrefix(args[0], ".") {
+	// if strings.HasPrefix(args[0], ".") {
 
-		if args[0] == "." {
-			return nil
-		}
+	// 	if args[0] == "." {
+	// 		return nil
+	// 	}
 
-		fieldSearch := strings.Trim(strings.ToLower(args[0][1:]), " ")
+	// 	fieldSearch := strings.Trim(strings.ToLower(args[0][1:]), " ")
 
-		fmt.Printf("Searching all fields for `%s`\n", fieldSearch)
+	// 	fmt.Printf("Searching all fields for `%s`\n", fieldSearch)
 
-		t := lib.NewCLITable([]string{"Schema", "Table", "Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
+	// 	t := lib.NewCLITable([]string{"Schema", "Table", "Name", "Type", "MaxLength", "Null", "Default", "Extra", "Key"})
 
-		for k := range localSchemaList.Schemas {
+	// 	for k := range localSchemaList.Schemas {
 
-			localSchema := localSchemaList.Schemas[k]
-			sortedTables := localSchema.ToSortedTables()
+	// 		localSchema := localSchemaList.Schemas[k]
+	// 		sortedTables := localSchema.ToSortedTables()
 
-			columns := []*schema.ColumnWithTable{}
+	// 		columns := []*schema.ColumnWithTable{}
 
-			for j := range sortedTables {
-				for k := range sortedTables[j].Columns {
-					if strings.Contains(strings.ToLower(sortedTables[j].Columns[k].Name), fieldSearch) {
-						column := &schema.ColumnWithTable{
-							Column:    sortedTables[j].Columns[k],
-							TableName: sortedTables[j].Name,
-						}
-						columns = append(columns, column)
-					}
-				}
-			}
+	// 		for j := range sortedTables {
+	// 			for k := range sortedTables[j].Columns {
+	// 				if strings.Contains(strings.ToLower(sortedTables[j].Columns[k].Name), fieldSearch) {
+	// 					column := &schema.ColumnWithTable{
+	// 						Column:    sortedTables[j].Columns[k],
+	// 						TableName: sortedTables[j].Name,
+	// 					}
+	// 					columns = append(columns, column)
+	// 				}
+	// 			}
+	// 		}
 
-			for _, col := range columns {
+	// 		for _, col := range columns {
 
-				t.Row()
-				t.Col(localSchema.Name)
-				t.Col(col.TableName)
-				t.Col(col.Name)
-				t.Col(col.DataType)
-				t.Colf("%d", col.MaxLength)
+	// 			t.Row()
+	// 			t.Col(localSchema.Name)
+	// 			t.Col(col.TableName)
+	// 			t.Col(col.Name)
+	// 			t.Col(col.DataType)
+	// 			t.Colf("%d", col.MaxLength)
 
-				if col.IsNullable {
-					t.Col("YES")
-				} else {
-					t.Col("NO")
-				}
+	// 			if col.IsNullable {
+	// 				t.Col("YES")
+	// 			} else {
+	// 				t.Col("NO")
+	// 			}
 
-				t.Col(col.Default)
-				t.Col(col.Extra)
-				t.Col(col.ColumnKey)
-			}
-		}
+	// 			t.Col(col.Default)
+	// 			t.Col(col.Extra)
+	// 			t.Col(col.ColumnKey)
+	// 		}
+	// 	}
 
-		fmt.Println(t.String())
+	// 	fmt.Println(t.String())
 
-		return nil
-	}
+	// 	return nil
+	// }
 
 	// ls [tableName] -  Show all column in the table [tableName]
 	var table *schema.Table
-	tableName := strings.Trim(strings.ToLower(args[0]), " ")
+	tableName := strings.Trim(strings.ToLower(showTableName), " ")
 	schemaName := ""
 
 	for k := range localSchemaList.Schemas {
@@ -124,7 +179,7 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 
 		// findTable
 		for k := range localSchema.Tables {
-			if strings.ToLower(localSchema.Tables[k].Name) == tableName {
+			if strings.ToLower(localSchema.Tables[k].Name) == showTableName {
 				table = localSchema.Tables[k]
 				schemaName = localSchema.Name
 				// Found
@@ -171,7 +226,7 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	for k := range localSchemaList.Schemas {
 		localSchema := localSchemaList.Schemas[k]
 		sortedTables := localSchema.ToSortedTables()
-		tableSearch := strings.Trim(strings.ToLower(args[0]), " ")
+		tableSearch := strings.Trim(strings.ToLower(showTableName), " ")
 
 		for _, table := range sortedTables {
 

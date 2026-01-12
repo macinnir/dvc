@@ -181,7 +181,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		gen.GenAPIDocs(config, routes)
+		// gen.GenAPIDocs(config, routes)
 
 		if e := gen.GenTSRoutes(controllers, config); e != nil {
 			return e

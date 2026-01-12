@@ -166,7 +166,22 @@ func parseControllerMethod(
 
 	isAnyone := false
 
-	for line, doc := range method.Documents {
+	// var n = len(method.Documents)
+	var line = -1
+
+	for i := range method.Documents {
+
+		var doc = strings.TrimSpace(method.Documents[i])
+		// if controller.Name == "Classes" {
+		// 	fmt.Println("DOC:", doc)
+		// }
+
+		// Skip region tags
+		if line == -1 && len(doc) > 10 && doc[0:10] == "// #region" {
+			continue
+		}
+
+		line++
 
 		// This is the title of the method
 		if line == 0 {

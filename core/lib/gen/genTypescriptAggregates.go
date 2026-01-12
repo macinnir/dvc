@@ -191,8 +191,10 @@ func (tg *TypescriptGenerator) GenerateTypescriptFields(sb io.Writer, objectName
 
 func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectName string) {
 
+	if objectName == "QuestionAggregate" {
+		fmt.Println("Generating defaults for ", objectName)
+	}
 	columns := tg.ExtractColumns(objectName)
-
 	columnNames := ColumnMapToNames(columns)
 
 	for k := range columnNames {
@@ -201,7 +203,14 @@ func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectNa
 		fieldType := schema.GoTypeToTypescriptString(goType)
 
 		if len(name) > 9 && name[0:9] == "#embedded" {
-			fmt.Fprintf(sb, "\t..."+schema.GoTypeToTypescriptDefault(fieldType)+",\n")
+
+			typescriptDefault := schema.GoTypeToTypescriptDefault(fieldType)
+			// if objectName == "QuestionAggregate" {
+			// 	fmt.Println("\tEmbedded default for ", objectName, " field ", name, " type ", fieldType, " default ", typescriptDefault)
+			// }
+
+			fmt.Fprintf(sb, "\t..."+typescriptDefault+",\n")
+
 			// tg.GenerateTypescriptDefaults(sb, fieldType)
 			continue
 		}

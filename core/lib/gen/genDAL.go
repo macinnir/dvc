@@ -87,7 +87,7 @@ func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) 
 	e := model.Create(r.db[shard])
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Insert > %s", e.Error())
-		return e		
+		return fmt.Errorf("{{.Table.Name}}DAL.Insert: %w", e)	
 	}
 
 	r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
@@ -96,17 +96,23 @@ func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) 
 }
 
 // CreateMany creates {{.Table.Name}} objects in chunks
-func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+
+	var e error 
 
 	// No records 
 	if len(modelSlice) == 0 {
-		return 
+		return nil
 	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
 		e = r.Create(shard, modelSlice[0])
-		return
+		if e != nil { 
+			return fmt.Errorf("{{.Table.Name}}CreateMany([](%d)): %w", len(modelSlice), e)
+		}
+
+		return nil 
 	}
 
 	chunkSize := 25
@@ -126,7 +132,7 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 		ctx := context.Background()
 		tx, e = r.db[shard].BeginTx(ctx, nil)
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}CreateMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		for insertID, model := range chunk {
@@ -148,41 +154,50 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 		}
 
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}CreateMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		e = tx.Commit()
+		if e != nil {
+			return fmt.Errorf("{{.Table.Name}}CreateMany([](%d)) (Chunk %d Commit): %w", len(modelSlice), chunkID, e)
+		}
 	}
 
-	return
+	return nil 
 
 }
 
 // Update updates an existing {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) Update(shard int64, model *models.{{.Table.Name}}) (e error) {
+func (r *{{.Table.Name}}DAL) Update(shard int64, model *models.{{.Table.Name}}) error {
+	var e error
 {{if .IsLastUpdated}}
 	model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
 	_, e = r.db[shard].Exec("{{.UpdateSQL}}", {{.UpdateArgs}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Update(%d) > %s", model.{{.PrimaryKey}}, e.Error())
+		return fmt.Errorf("{{.Table.Name}}DAL.Update(%d): %w", model.{{.PrimaryKey}}, e)
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.Update(%d)", model.{{.PrimaryKey}})
 	}
-	return
+	return nil
 }
 
 // UpdateMany updates a slice of {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+	var e error
 
 	// No records 
 	if len(modelSlice) == 0 {
-		return 
+		return nil
 	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
 		e = r.Update(shard, modelSlice[0])
-		return
+		if e != nil { 
+			return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)): %w", len(modelSlice), e)
+		}
+		return nil
 	}
 
 	chunkSize := 25
@@ -202,7 +217,7 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 		ctx := context.Background()
 		tx, e = r.db[shard].BeginTx(ctx, nil)
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		for updateID, model := range chunk {
@@ -212,6 +227,7 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 			_, e = tx.ExecContext(ctx, "{{.UpdateSQL}}", {{.UpdateArgs}})
 			if e != nil {
 				r.log.Errorf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, updateID, e.Error())
+				return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)) (Chunk %d.%d): %w", len(modelSlice), chunkID, updateID, e)
 				break
 			} else {
 				r.log.Debugf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, updateID)
@@ -219,39 +235,51 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 		}
 
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		e = tx.Commit()
+
+		if e != nil { 
+			return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)) (Chunk %d Commit): %w", len(modelSlice), chunkID, e)
+		}
 	}
 
-	return
+	return nil
 
 }{{if .IsDeleted}}
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
-func (r *{{.Table.Name}}DAL) Delete(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}) (e error) {
+func (r *{{.Table.Name}}DAL) Delete(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}) error {
+	var e error
 	_, e = r.db[shard].Exec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted` = 1 WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
+		return fmt.Errorf("{{.Table.Name}}DAL.Delete(%d): %w", {{.PrimaryKey | toArgName}}, e)
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", {{.PrimaryKey | toArgName}})
 	}
-	return
+	return nil
 }
 
 // DeleteMany marks {{.Table.Name}} objects in chunks as deleted
-func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+
+	var e error 
 
 	// No records 
 	if len(modelSlice) == 0 {
-		return 
+		return nil
 	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
 		e = r.Delete(shard, modelSlice[0].{{.PrimaryKey}})
-		return
+
+		if e != nil {
+			return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)): %w", len(modelSlice), e)
+		}
+		return nil
 	}
 
 	chunkSize := 25
@@ -271,7 +299,7 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 		ctx := context.Background()
 		tx, e = r.db[shard].BeginTx(ctx, nil)
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		for deleteID, model := range chunk {
@@ -280,6 +308,7 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 			_, e = tx.ExecContext(ctx, "UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted`= 1 WHERE `{{.PrimaryKey}}` = ?" + `", model.{{.PrimaryKey}})
 			if e != nil {
 				r.log.Errorf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, deleteID, e.Error())
+				return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)) (Chunk %d.%d): %w", len(modelSlice), chunkID, deleteID, e)
 				break
 			} else {
 				r.log.Debugf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
@@ -287,39 +316,48 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 		}
 
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		e = tx.Commit()
+
+		if e != nil { 
+			return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)) (Chunk %d Commit): %w", len(modelSlice), chunkID, e)
+		} 
 	}
 
-	return
+	return nil
 
 }{{end}}
 
 // DeleteHard performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) DeleteHard(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}) (e error) {
-	_, e = r.db[shard].Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
+func (r *{{.Table.Name}}DAL) DeleteHard(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}) error {
+	_, e := r.db[shard].Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
+		return fmt.Errorf("{{.Table.Name}}DAL.HardDelete(%d): %w", {{.PrimaryKey | toArgName}}, e)
 	} else {
 		r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", {{.PrimaryKey | toArgName}})
 	}
-	return
+	return nil
 }
 
 // DeleteManyHard deletes {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.Table.Name}}) (e error) {
+func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.Table.Name}}) error {
 
+	var e error
 	// No records 
 	if len(modelSlice) == 0 {
-		return 
+		return nil
 	}
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
 		e = r.DeleteHard(shard, modelSlice[0].{{.PrimaryKey}})
-		return
+		if e != nil {
+			return fmt.Errorf("{{.Table.Name}}DeleteManyHard([](%d)): %w", len(modelSlice), e)
+		}	
+		return nil
 	}
 
 	chunkSize := 25
@@ -339,7 +377,7 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.
 		ctx := context.Background()
 		tx, e = r.db[shard].BeginTx(ctx, nil)
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}DeleteManyHard([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		for deleteID, model := range chunk {
@@ -354,13 +392,17 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.
 		}
 
 		if e != nil {
-			return
+			return fmt.Errorf("{{.Table.Name}}DeleteManyHard([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
 
 		e = tx.Commit()
+
+		if e != nil {
+			return fmt.Errorf("{{.Table.Name}}DeleteManyHard([](%d)) (Chunk %d Commit): %w", len(modelSlice), chunkID, e)
+		}
 	}
 
-	return
+	return nil
 }
 
 // FromID gets a single {{.Table.Name}} object by its Primary Key
@@ -415,7 +457,7 @@ func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s [
 
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.FromIDs(%v) > %s", {{.PrimaryKey | toArgName}}s, e.Error())
-		return []*models.{{.Table.Name}}{}, e
+		return []*models.{{.Table.Name}}{}, fmt.Errorf("{{.Table.Name}}DAL.FromIDs(%v): %w", {{.PrimaryKey | toArgName}}s, e)
 	}
 	
 	r.log.Debugf("{{.Table.Name}}DAL.FromIDs(%v)", {{.PrimaryKey | toArgName}}s)
@@ -429,7 +471,7 @@ func (r *{{.Table.Name}}DAL) FromIDsMap(shard int64, {{.PrimaryKey | toArgName}}
 
 	model, e := r.FromIDs(shard, {{.PrimaryKey | toArgName}}s)
 	if e != nil { 
-		return map[{{.IDType}}]*models.{{.Table.Name}}{}, e
+		return map[{{.IDType}}]*models.{{.Table.Name}}{}, fmt.Errorf("{{.Table.Name}}DAL.FromIDsMap(%v): %w", {{.PrimaryKey | toArgName}}s, e)
 	}
 	
 	result := make(map[{{.IDType}}]*models.{{.Table.Name}})
@@ -444,14 +486,15 @@ func (r *{{.Table.Name}}DAL) FromIDsMap(shard int64, {{.PrimaryKey | toArgName}}
 
 {{range $col := .UpdateColumns}}
 // Set{{$col.Name}} sets the {{$col.Name}} column on a {{$.Table.Name}} object
-func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}(shard int64, {{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (e error) {
-	_, e = r.db[shard].Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
+func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}(shard int64, {{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) error {
+	_, e := r.db[shard].Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error())
+		return fmt.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v): %w", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e)
 	} else {
 		r.log.Debugf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v)", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}})
 	}
-	return
+	return nil 
 }
 
 // ManyFrom{{$col.Name}} returns a slice of {{$.Table.Name}} models from {{$col.Name}}
@@ -472,7 +515,6 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 		q.Limit(limit, offset) 
 	}
 
-	
 	collection, e := q.Run()
 
 	if e != nil {

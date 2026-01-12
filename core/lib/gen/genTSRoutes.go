@@ -8,12 +8,15 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
 func GenTSRoutes(controllers []*lib.Controller, config *lib.Config) error {
+
+	var start = time.Now()
 
 	lib.EnsureDir(config.TypescriptRoutesPath)
 
@@ -48,6 +51,8 @@ func GenTSRoutes(controllers []*lib.Controller, config *lib.Config) error {
 			log.Fatalf("Error writing file %s: %s", filePath, e.Error())
 		}
 	}
+
+	fmt.Printf("Generated TS Routes in %f seconds\n", time.Since(start).Seconds())
 
 	return nil
 }

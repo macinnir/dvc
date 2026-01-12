@@ -144,7 +144,7 @@ func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 		}
 
 		// Skip over test files
-		if baseName[len(baseName)-5:] == "_test" {
+		if len(baseName) > 5 && baseName[len(baseName)-5:] == "_test" {
 			continue
 		}
 
@@ -277,8 +277,6 @@ func genInterface(
 	var typeDoc string
 
 	methods, imports, parsedTypeDoc := lib.ParseStruct(src, structType, copyDocuments, copyTypeDoc, pkgName)
-
-	
 
 	for _, m := range methods {
 		if _, ok := mset[m.Code]; !ok {
