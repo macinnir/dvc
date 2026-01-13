@@ -72,20 +72,22 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 	lib.EnsureDir(tg.config.TypescriptAggregatesPath)
 
 	for name := range tg.routes.Aggregates {
+		fmt.Println("Generating Typescript Aggregate:", name)
 		tsDTOBytes, e := tg.GenerateTypescriptAggregate(name)
 		if e != nil {
 			fmt.Println("ERROR:", e.Error())
 			return e
 		}
 		dest := path.Join(tg.config.TypescriptAggregatesPath, name+".ts")
-		f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
+		err := os.WriteFile(dest, tsDTOBytes, lib.DefaultFileMode)
+		// f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
 		if err != nil {
 			panic(err)
 		}
-		if _, err = f.Write(tsDTOBytes); err != nil {
-			panic(err)
-		}
-		f.Close()
+		// if _, err = f.Write(tsDTOBytes); err != nil {
+		// 	panic(err)
+		// }
+		// f.Close()
 		// ioutil.WriteFile(dest, []byte(str), 0777)
 		generatedCount++
 	}
@@ -99,11 +101,9 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 func (tg *TypescriptGenerator) GenerateTypescriptAggregate(name string) ([]byte, error) {
 
 	columns := tg.routes.Aggregates[name]
-
 	var buf bytes.Buffer
 
 	TSFileHeader(&buf, name)
-
 	ImportStrings(&buf, columns)
 
 	buf.WriteString(`
@@ -191,9 +191,6 @@ func (tg *TypescriptGenerator) GenerateTypescriptFields(sb io.Writer, objectName
 
 func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectName string) {
 
-	if objectName == "QuestionAggregate" {
-		fmt.Println("Generating defaults for ", objectName)
-	}
 	columns := tg.ExtractColumns(objectName)
 	columnNames := ColumnMapToNames(columns)
 
@@ -215,6 +212,7 @@ func (tg *TypescriptGenerator) GenerateTypescriptDefaults(sb io.Writer, objectNa
 			continue
 		}
 
+		// Public properties only
 		if !unicode.IsUpper(rune(name[0])) {
 			continue
 		}
