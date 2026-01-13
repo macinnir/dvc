@@ -5,6 +5,24 @@
     // Variables: https://code.visualstudio.com/docs/editor/variables-reference
     "version": "2.0.0",
     "tasks": [
+         {
+            "label": "build",
+            "type": "shell",
+            "command": "make install",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
         {
             "label": "install",
             "type": "shell",
