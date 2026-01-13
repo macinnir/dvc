@@ -72,7 +72,7 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 	lib.EnsureDir(tg.config.TypescriptAggregatesPath)
 
 	for name := range tg.routes.Aggregates {
-		fmt.Println("Generating Typescript Aggregate:", name)
+		// fmt.Println("Generating Typescript Aggregate:", name)
 		tsDTOBytes, e := tg.GenerateTypescriptAggregate(name)
 		if e != nil {
 			fmt.Println("ERROR:", e.Error())
@@ -104,6 +104,9 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregate(name string) ([]byte,
 	var buf bytes.Buffer
 
 	TSFileHeader(&buf, name)
+	if name == "QuestionAggregate" {
+		fmt.Printf("Columns: %+v\n", columns)
+	}
 	ImportStrings(&buf, columns)
 
 	buf.WriteString(`

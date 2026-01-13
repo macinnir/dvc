@@ -1,7 +1,6 @@
 package gen
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"sort"
@@ -10,99 +9,126 @@ import (
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
-func ImportString(sb io.Writer, a, b, c string) {
+// Additional helper functions for Typescript generation
+func requireConstructor(fullName string) bool {
+	return fullName[0:1] != "["
+}
 
-	fmt.Fprintf(sb, "import { %s", b)
+func ImportString(sb io.Writer, fullName, objectName, importPath string, doIncludeConstructor bool) {
+
+	fmt.Fprintf(sb, "import { %s", objectName)
 
 	// If it starts as an array, do not include the import
-	if a[0:1] != "[" {
-		fmt.Fprintf(sb, ", new%s", b)
+	if doIncludeConstructor {
+		fmt.Fprintf(sb, ", new%s", objectName)
 	}
 
-	fmt.Fprintf(sb, " } from '%s';\n", c)
+	fmt.Fprintf(sb, " } from '%s';\n", importPath)
 
+}
+
+type TypeToImport struct {
+	FullName     string
+	BaseTypeName string
+	ObjectName   string
+	ImportPath   string
+	RequiresNew  bool
+}
+
+func getObjectNameAndImportPath(typeName string) (string, string) {
+	if len(typeName) > 7 && typeName[0:7] == "models." {
+		return typeName[7:], "gen/models/" + typeName[7:]
+	} else if len(typeName) > 5 && typeName[0:5] == "dtos." {
+		return typeName[5:], "gen/dtos/" + typeName[5:]
+	} else {
+		return typeName, "./" + typeName
+	}
+}
+
+func NewTypeToImport(fullName string, baseType string) TypeToImport {
+
+	t := TypeToImport{
+		FullName:     fullName,
+		BaseTypeName: baseType,
+		ImportPath:   "",
+		RequiresNew:  false,
+	}
+
+	t.ObjectName, t.ImportPath = getObjectNameAndImportPath(baseType)
+
+	return t
+}
+
+func isImportable(typeName string) bool {
+	return unicode.IsUpper(rune(typeName[0])) || typeName[0:1] == "#"
+}
+
+func isConstant(typeName string) bool {
+	return len(typeName) > 10 && typeName[0:10] == "constants."
 }
 
 func ImportStrings(sb io.Writer, columns map[string]string) {
 
-	imported := map[string]struct{}{}
+	// Build types to import
+	// var n = 0
+	var imported = map[string]TypeToImport{}
+	var importNames = []string{}
 
-	// imports := [][]string{}
 	for name := range columns {
 
-		if !unicode.IsUpper(rune(name[0])) && name[0:1] != "#" {
+		if !isImportable(name) {
+			continue
+		}
+		var fullName = columns[name]
+		var baseType = schema.ExtractBaseGoType(fullName)
+
+		if schema.IsGoTypeBaseType(baseType) {
 			continue
 		}
 
-		dataType := columns[name]
-
-		baseType := schema.ExtractBaseGoType(dataType)
-
-		if !schema.IsGoTypeBaseType(baseType) {
-
-			if len(baseType) > 10 && baseType[0:10] == "constants." {
-				continue
-			}
-
-			// Already imported
-			if _, ok := imported[baseType]; ok {
-				continue
-			}
-
-			imported[baseType] = struct{}{}
-
-			if len(baseType) > 7 && baseType[0:7] == "models." {
-				ImportString(sb, dataType, baseType[7:], "gen/models/"+baseType[7:])
-			} else if len(baseType) > 5 && baseType[0:5] == "dtos." {
-				ImportString(sb, dataType, baseType[5:], "gen/dtos/"+baseType[5:])
-			} else {
-				ImportString(sb, dataType, baseType, "./"+baseType)
-			}
-		}
-	}
-}
-
-func ImportStrings2(columns map[string]string) string {
-
-	var buf bytes.Buffer
-
-	imported := map[string]struct{}{}
-
-	// imports := [][]string{}
-	for name := range columns {
-
-		if !unicode.IsUpper(rune(name[0])) && name[0:1] != "#" {
+		if isConstant(baseType) {
 			continue
 		}
 
-		dataType := columns[name]
-
-		baseType := schema.ExtractBaseGoType(dataType)
-
-		if !schema.IsGoTypeBaseType(baseType) {
-
-			if len(baseType) > 10 && baseType[0:10] == "constants." {
-				continue
-			}
-
-			// Already imported
-			if _, ok := imported[baseType]; ok {
-				continue
-			}
-
-			imported[baseType] = struct{}{}
-
-			if len(baseType) > 7 && baseType[0:7] == "models." {
-				ImportString(&buf, dataType, baseType[7:], "gen/models/"+baseType[7:])
-			} else if len(baseType) > 5 && baseType[0:5] == "dtos." {
-				ImportString(&buf, dataType, baseType[5:], "gen/dtos/"+baseType[5:])
-			} else {
-				ImportString(&buf, dataType, baseType, "./"+baseType)
-			}
+		var importObj TypeToImport
+		if _, ok := imported[baseType]; ok {
+			importObj = imported[baseType]
+		} else {
+			importObj = NewTypeToImport(fullName, baseType)
+			importNames = append(importNames, baseType)
 		}
+
+		if requireConstructor(fullName) {
+			importObj.RequiresNew = true
+		}
+
+		imported[baseType] = importObj
 	}
 
-	return buf.String()
+	for _, name := range importNames {
+		importType := imported[name]
+		ImportString(sb, importType.FullName, importType.ObjectName, importType.ImportPath, importType.RequiresNew)
+	}
+
+	// for name := range columns {
+
+	// 	n++
+	// 	dataType := columns[name]
+
+	// 	baseType := schema.ExtractBaseGoType(dataType)
+
+	// 	if debug {
+	// 		fmt.Printf("%d. ImportStrings checking column: %s(%s)\n", n, name, dataType)
+	// 		fmt.Printf("\tbaseType: %s\n", baseType)
+	// 	}
+	// 	if !schema.IsGoTypeBaseType(baseType) {
+
+	// 		if debug {
+	// 			fmt.Printf("\tImporting baseType: %s\n", baseType)
+	// 		}
+	// 		ImportString(sb, fullName, importObj.ObjectName, importObj.ImportPath, debug)
+	// 	}
+	// }
 }
 
 func InheritStrings(sb io.Writer, columns map[string]string) []string {

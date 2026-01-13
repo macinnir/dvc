@@ -120,7 +120,7 @@ func GenerateTypescriptDTO(name string, columns map[string]string) ([]byte, erro
 			DefaultValue string
 		}
 	}{
-		Imports: ImportStrings2(columns),
+		Imports: GenDTOImportStrings(columns),
 		Name:    name,
 	}
 
@@ -178,4 +178,47 @@ func GenerateTypescriptDTO(name string, columns map[string]string) ([]byte, erro
 	typescriptDTOTemplate.Execute(&buf, data)
 
 	return buf.Bytes(), nil
+}
+
+func GenDTOImportStrings(columns map[string]string) string {
+
+	var buf bytes.Buffer
+
+	imported := map[string]struct{}{}
+
+	// imports := [][]string{}
+	for name := range columns {
+
+		if !isImportable(name) {
+			continue
+		}
+
+		dataType := columns[name]
+
+		baseType := schema.ExtractBaseGoType(dataType)
+
+		if !schema.IsGoTypeBaseType(baseType) {
+
+			if isConstant(baseType) {
+				continue
+			}
+
+			// Already imported
+			if _, ok := imported[baseType]; ok {
+				continue
+			}
+
+			imported[baseType] = struct{}{}
+
+			if len(baseType) > 7 && baseType[0:7] == "models." {
+				ImportString(&buf, dataType, baseType[7:], "gen/models/"+baseType[7:], false)
+			} else if len(baseType) > 5 && baseType[0:5] == "dtos." {
+				ImportString(&buf, dataType, baseType[5:], "gen/dtos/"+baseType[5:], false)
+			} else {
+				ImportString(&buf, dataType, baseType, "./"+baseType, false)
+			}
+		}
+	}
+
+	return buf.String()
 }

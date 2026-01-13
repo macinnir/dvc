@@ -183,3 +183,39 @@ func TestExtractBaseGoType(t *testing.T) {
 	}
 
 }
+
+func TestIsGoTypeBaseType(t *testing.T) {
+
+	tests := []struct {
+		GoType string
+		IsBase bool
+	}{
+		{"int64", true},
+		{"int", true},
+		{"float64", true},
+		{"string", true},
+		{"null.String", true},
+		{"null.Float", true},
+		{"bool", true},
+		{"[]string", false},
+		{"[]int", false},
+		{"[]int64", false},
+		{"map[int]int", false},
+		{"map[int64]int", false},
+		{"map[int]int64", false},
+		{"map[int64]int64", false},
+		{"map[int]int", false},
+		{"map[float64]int", false},
+		{"map[float64]int64", false},
+		{"map[float64]string", false},
+		{"map[string]string", false},
+		{"*Foo", false},
+		{"[]*Foo", false},
+		{"map[int64]*Foo", false},
+	}
+
+	for k := range tests {
+		assert.Equal(t, tests[k].IsBase, schema.IsGoTypeBaseType(tests[k].GoType), tests[k].GoType)
+	}
+
+}
