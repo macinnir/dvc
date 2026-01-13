@@ -80,15 +80,9 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 		}
 		dest := path.Join(tg.config.TypescriptAggregatesPath, name+".ts")
 		err := os.WriteFile(dest, tsDTOBytes, lib.DefaultFileMode)
-		// f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
 		if err != nil {
 			panic(err)
 		}
-		// if _, err = f.Write(tsDTOBytes); err != nil {
-		// 	panic(err)
-		// }
-		// f.Close()
-		// ioutil.WriteFile(dest, []byte(str), 0777)
 		generatedCount++
 	}
 

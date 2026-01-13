@@ -61,19 +61,13 @@ func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) 
 	for name := range routes.DTOs {
 		tsDTOBytes, _ := GenerateTypescriptDTO(name, routes.DTOs[name])
 		fullFilePath := path.Join(config.TypescriptDTOsPath, name+".ts")
-		// fmt.Println("Generating DTO", name, " => ", fullFilePath)
-		// ioutil.WriteFile(fullFilePath, tsDTOBytes, lib.DefaultFileMode)
-
-		f, err := os.OpenFile(fullFilePath, os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
+		err := os.WriteFile(fullFilePath, tsDTOBytes, lib.DefaultFileMode)
 		if err != nil {
 			panic(err)
 		}
-		if _, err = f.Write(tsDTOBytes); err != nil {
-			panic(err)
-		}
-		f.Close()
 		generatedCount++
 	}
+
 	fmt.Printf("Generated %d typescript DTOs from `%s` in %f seconds\n", generatedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
 
 	return nil
@@ -183,6 +177,8 @@ func GenerateTypescriptDTO(name string, columns map[string]string) ([]byte, erro
 func GenDTOImportStrings(columns map[string]string) string {
 
 	var buf bytes.Buffer
+	ImportStrings(&buf, columns)
+	return buf.String()
 
 	imported := map[string]struct{}{}
 

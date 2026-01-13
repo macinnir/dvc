@@ -682,18 +682,7 @@ func buildGoModel(packageName, fullPath string, table *schema.Table) (e error) {
 		return
 	}
 
-	ioutil.WriteFile(fullPath, outFile, lib.DefaultFileMode)
-
-	// f, err := os.OpenFile(fullPath, os.O_ os.O_CREATE|os.O_WRONLY, lib.DefaultFileMode)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// if _, err = f.Write(outFile); err != nil {
-	// 	panic(err)
-	// }
-	// f.Close()
-	// fmt.Println("Writing file to", fullPath)
-	// e = ioutil.WriteFile(fullPath, outFile, 0644)
+	os.WriteFile(fullPath, outFile, lib.DefaultFileMode)
 	return
 }
 
