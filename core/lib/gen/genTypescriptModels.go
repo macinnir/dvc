@@ -1,11 +1,9 @@
 package gen
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -14,7 +12,7 @@ import (
 // GenerateTypescriptModels returns a string for a typscript types file
 func GenerateTypescriptModels(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
-	var start = time.Now()
+	// var start = time.Now()
 
 	lib.EnsureDir(config.TypescriptModelsPath)
 
@@ -40,7 +38,7 @@ func GenerateTypescriptModels(config *lib.Config, routes *lib.RoutesJSONContaine
 		generatedCount++
 	}
 
-	fmt.Printf("Generated %d typescript models to %s in %f seconds\n", generatedCount, config.TypescriptModelsPath, time.Since(start).Seconds())
+	// fmt.Printf("Generated %d typescript models to %s in %f seconds\n", generatedCount, config.TypescriptModelsPath, time.Since(start).Seconds())
 
 	return nil
 }

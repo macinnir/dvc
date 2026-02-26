@@ -6,7 +6,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -454,7 +453,7 @@ func buildRoutePathHTML(route *lib.ControllerRoute) string {
 
 func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 
-	var start = time.Now()
+	// var start = time.Now()
 
 	dir := "gen/apidocs"
 	lib.EnsureDir(dir)
@@ -994,8 +993,8 @@ func GenAPIDocs(config *lib.Config, routes *lib.RoutesJSONContainer) {
 `)
 
 	ioutil.WriteFile(outFile, []byte(sb.String()), 0777)
-
-	fmt.Printf("Generated API Docs to `%s` in %f seconds\n", outFile, time.Since(start).Seconds())
+	// TODO Verbose Flag
+	// fmt.Printf("Generated API Docs to `%s` in %f seconds\n", outFile, time.Since(start).Seconds())
 
 }
 

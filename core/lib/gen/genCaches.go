@@ -2,12 +2,10 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -234,11 +232,11 @@ func GenCaches(tables []*schema.Table, basePackage string, config map[string]*li
 		tableMap[tables[k].Name] = k
 	}
 
-	start := time.Now()
+	// start := time.Now()
 	var generatedCacheCount = 0
 	lib.EnsureDir(lib.CacheGenDir)
-
-	fmt.Println("Generating caches", config)
+	// TODO Verbose flag
+	// fmt.Println("Generating caches", config)
 	for k := range config {
 
 		var table = tables[tableMap[k]]
@@ -248,7 +246,8 @@ func GenCaches(tables []*schema.Table, basePackage string, config map[string]*li
 		}
 		generatedCacheCount++
 	}
-	fmt.Printf("Generated %d caches in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d caches in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
 
 	return nil
 }
@@ -257,7 +256,8 @@ func GenCaches(tables []*schema.Table, basePackage string, config map[string]*li
 func GenerateGoCache(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, table.Name+"Cache.go")
-	fmt.Println("Generating Cache file to path: ", p)
+	// TODO Verbose mode
+	// fmt.Println("Generating Cache file to path: ", p)
 
 	data := struct {
 		BasePackage string

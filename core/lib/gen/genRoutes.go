@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -112,7 +111,12 @@ func LoadRoutes(config *lib.Config) (*lib.RoutesJSONContainer, error) {
 	return routes, nil
 }
 
-var goRoutesTemplate = template.Must(template.New("go-routes-file").Parse(`// Generated Code; DO NOT EDIT.
+var goRoutesTemplate = template.Must(
+	template.New("go-routes-file").
+		Funcs(template.FuncMap{
+			"hasPrefix": strings.HasPrefix,
+		}).
+		Parse(`// Generated Code; DO NOT EDIT.
 
 package routes
 
@@ -158,16 +162,20 @@ func MapRoutesToControllers(r *mux.Router, app *app.App, res request.IResponseLo
 		{{range .Queries}}
 		// Query Arg {{.VariableName}}
 		// {{.Pattern}}{{if eq .Type "int64"}}
-		var {{.VariableName}} = req.ArgInt64("{{.VariableName}}",{{ if eq .Pattern "-?[0-9]+" }}-1{{else}}0{{end}}){{else}}
-		var {{.VariableName}} = req.Arg("{{.VariableName}}", ""){{end}}{{end}}
-
+		var {{.VariableName}} = req.ArgInt64("{{.VariableName}}",{{ if eq .Pattern "-?[0-9]+" }}-1{{else}}0{{end}})
+	{{else}}
+		{{if hasPrefix .Pattern "-?" }}var {{.VariableName}} = req.RootRequest.URL.Query().Get("{{.VariableName}}")
+		{{else}}var {{.VariableName}} = req.Arg("{{.VariableName}}", "")
+		{{end}}
+	{{end}}{{end}}
 		c.{{.Package}}.{{.Controller}}.{{.Name}}(w, req{{range .Params}}, {{.Name}}{{end}}{{range .Queries}}, {{.VariableName}}{{end}}{{if gt (len .BodyType) 0}}, body{{end}})
-
 	})).
-		Methods("{{.Method}}").{{if gt (len .Queries) 0}}
-		Queries({{range .Queries}}
-			"{{.VariableName}}", "{{.ValueRaw}}",{{end}}
-		).{{end}}
+		Methods("{{.Method}}").
+		{{if gt (len .RequiredQueries) 0}}
+			Queries({{range .RequiredQueries}}
+				"{{.VariableName}}", "{{.ValueRaw}}",{{end}}			
+			).
+		{{end}}
 		Name("{{.Name}}")
 	{{end}}
 	{{end}}
@@ -187,7 +195,7 @@ type RoutesTplValues struct {
 func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.Controller, dirs []string, config *lib.Config) (*lib.RoutesJSONContainer, error) {
 
 	var buf bytes.Buffer
-	var start = time.Now()
+	// var start = time.Now()
 	var e error
 
 	var routesTplValues = RoutesTplValues{
@@ -207,9 +215,10 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 	goRoutesTemplate.Execute(&buf, routesTplValues)
 	lib.EnsureDir(filepath.Dir(lib.RoutesBootstrapFile))
 	ioutil.WriteFile(lib.RoutesBootstrapFile, buf.Bytes(), 0777)
-	fmt.Printf("Generated routes bootstrap file to `%s` in %f seconds\n", lib.RoutesBootstrapFile, time.Since(start).Seconds())
+	// TODO Verbose mode
+	// fmt.Printf("Generated routes bootstrap file to `%s` in %f seconds\n", lib.RoutesBootstrapFile, time.Since(start).Seconds())
 
-	start = time.Now()
+	// start = time.Now()
 	// DTOS
 	dtos := genDTOSMap(lib.CoreDTOsDir)
 	appDTOs := genDTOSMap(lib.AppDTOsDir)
@@ -250,14 +259,15 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 
 	routesJSON, _ := json.MarshalIndent(routesContainer, "  ", "    ")
 	ioutil.WriteFile(lib.RoutesFilePath, routesJSON, 0777)
-	fmt.Printf("Generated routes to `%s` in %f seconds\n", lib.RoutesFilePath, time.Since(start).Seconds())
+	// fmt.Printf("Generated routes to `%s` in %f seconds\n", lib.RoutesFilePath, time.Since(start).Seconds())
 
-	start = time.Now()
+	// start = time.Now()
 	// Controller Bootstrap
 	var controllerBootstrapFile = GenControllerBootstrap(config.BasePackage, dirs)
 	lib.EnsureDir(filepath.Dir(lib.ControllersBootstrapGenFile))
 	ioutil.WriteFile(lib.ControllersBootstrapGenFile, []byte(controllerBootstrapFile), 0777)
-	fmt.Printf("Generated ControllerBootstrapGenFile to `%s` in %f seconds\n", lib.ControllersBootstrapGenFile, time.Since(start).Seconds())
+	// TODO Verbose mode
+	// fmt.Printf("Generated ControllerBootstrapGenFile to `%s` in %f seconds\n", lib.ControllersBootstrapGenFile, time.Since(start).Seconds())
 
 	return routesContainer, nil
 }
@@ -350,7 +360,7 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 		if len(route.Queries) > 0 {
 			for _, query := range route.Queries {
 				s = append(s, fmt.Sprintf("\t\t// Query Arg %s", query.VariableName))
-				s = append(s, fmt.Sprintf("\t\t// %s", query.Pattern))
+				s = append(s, fmt.Sprintf("\t\t// `%s` - %s", query.Pattern, query.Pattern[0:2]))
 
 				if query.Type == "int64" {
 					defaultValue := "0"
@@ -359,7 +369,11 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 					}
 					s = append(s, fmt.Sprintf("\t\t%s := req.ArgInt64(\"%s\", %s)\n", query.VariableName, query.VariableName, defaultValue))
 				} else {
-					s = append(s, fmt.Sprintf("\t\t%s := req.Arg(\"%s\", \"\")\n", query.VariableName, query.VariableName))
+					if query.Pattern[0:2] == "-?" {
+						s = append(s, fmt.Sprintf("\t\t%s := req.RootRequest.URL.Query().Get(\"%s\")", query.VariableName, query.VariableName))
+					} else {
+						s = append(s, fmt.Sprintf("\t\t%s := req.Arg(\"%s\", \"\")\n", query.VariableName, query.VariableName))
+					}
 				}
 
 				args = append(args, query.VariableName)
@@ -378,11 +392,21 @@ func buildRoutesCodeFromController(controller *lib.Controller) (out string, e er
 		s = append(s, fmt.Sprintf("\t\tMethods(\"%s\").", route.Method))
 
 		if len(route.Queries) > 0 {
-			s = append(s, "\t\tQueries(")
+			var maybeQueries = []string{}
 			for _, query := range route.Queries {
-				s = append(s, fmt.Sprintf("\t\t\t\"%s\", \"%s\",", query.Name, query.ValueRaw))
+				if query.Pattern[0:2] == "-?" {
+					continue
+				}
+				maybeQueries = append(maybeQueries, fmt.Sprintf("\t\t\t\"%s\", \"%s\",", query.VariableName, query.ValueRaw))
 			}
-			s = append(s, "\t\t).")
+			if len(maybeQueries) > 0 {
+				s = append(s, "\t\tQueries(")
+				s = append(s, maybeQueries...)
+				// for _, query := range route.Queries {
+				// 	s = append(s, fmt.Sprintf("\t\t\t\"%s\", \"%s\",", query.Name, query.ValueRaw))
+				// }
+				s = append(s, "\t\t).")
+			}
 		}
 
 		s = append(s, fmt.Sprintf("\t\tName(\"%s\")\n", route.Name))
@@ -583,16 +607,43 @@ func genAggregatesMap(dir string) map[string]map[string]string {
 
 				fieldName := ""
 				fieldType := ""
+
 				if len(parts) > 1 {
 					fieldName = parts[0]
 					fieldType = parts[1]
+
+					var isSlice = len(fieldType) > 2 && fieldType[0:2] == "[]"
+					var containsDotSeparator = strings.Contains(fieldType, ".")
+					var isPointer = false
+					if isSlice {
+						fieldType = fieldType[2:]
+						isPointer = len(fieldType) > 1 && fieldType[0:1] == "*"
+						if isPointer && !containsDotSeparator {
+							fieldType = "[]*aggregates." + fieldType[1:]
+						} else {
+							fieldType = "[]" + fieldType
+						}
+					} else {
+						if !containsDotSeparator && isPointer {
+							fieldType = "*aggregates." + fieldType[1:]
+						}
+					}
+
 				} else {
-					// This is an embedded type
-					if strings.Contains(parts[0], ".") {
+
+					var containsDotSeparator = strings.Contains(parts[0], ".")
+					var isPointer = len(parts[0]) > 1 && parts[0][0:1] == "*"
+					// This is an embedded type (DTO or model)
+					if containsDotSeparator || isPointer {
 						// sParts := strings.Split(parts[0], ".")
 						// fieldName = sParts[1]
 						fieldType = parts[0]
 						fieldName = "#embedded" + fmt.Sprint(k)
+
+						// Has a pointer but no dot separator, so it's an embedded struct in the same `aggregates` package
+						if !containsDotSeparator && isPointer {
+							fieldType = "*aggregates." + fieldType[1:]
+						}
 					}
 
 					// fmt.Println(">>>> " + strings.TrimSpace(parts[0]))

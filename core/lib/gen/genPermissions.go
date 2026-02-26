@@ -10,7 +10,6 @@ import (
 	"path"
 	"sort"
 	"text/template"
-	"time"
 	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
@@ -68,11 +67,12 @@ func LoadPermissionsFromJSON() map[string]string {
 // 0.000568
 func GenTSPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
 
-	var start = time.Now()
+	// var start = time.Now()
 	lib.EnsureDir(config.TypescriptPermissionsPath)
 	var tsPermissionsPath = path.Join(config.TypescriptPermissionsPath, "permissions.ts")
 	BuildTypescriptPermissions(permissions, tsPermissionsPath)
-	fmt.Printf("Generated %d ts permissions to %s in %f seconds\n", len(permissions), tsPermissionsPath, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d ts permissions to %s in %f seconds\n", len(permissions), tsPermissionsPath, time.Since(start).Seconds())
 
 	return
 }
@@ -80,10 +80,11 @@ func GenTSPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
 // 0.018100
 // 0.000900
 func GenGoPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
-	var start = time.Now()
+	// var start = time.Now()
 	var permissionsFilePath = path.Join(lib.GoPermissionsDir, "permissions.go")
 	BuildPermissionsGoFile(permissions, permissionsFilePath)
-	fmt.Printf("Generated %d go permissions to %s in %f seconds\n", len(permissions), permissionsFilePath, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d go permissions to %s in %f seconds\n", len(permissions), permissionsFilePath, time.Since(start).Seconds())
 	return
 }
 

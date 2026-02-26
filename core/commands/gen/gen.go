@@ -147,7 +147,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		fmt.Printf("###### Found %d permissions\n", len(routes.Permissions))
+		// fmt.Printf("###### Found %d permissions\n", len(routes.Permissions))
 
 		tplPermissions := gen.BuildTplPermissions(routes.Permissions)
 
@@ -181,7 +181,11 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		// gen.GenAPIDocs(config, routes)
+		gen.GenAPIDocs(config, routes)
+
+		if e := gen.GenAPIData(config, routes); e != nil {
+			return e
+		}
 
 		if e := gen.GenTSRoutes(controllers, config); e != nil {
 			return e

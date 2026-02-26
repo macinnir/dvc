@@ -103,6 +103,10 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 	controllerName := extractControllerNameFromFileName(filePath)
 
+	// if filePath == "app/api/attis/CategoriesController.go" {
+	// 	fmt.Println("Parsing controller file:", filePath)
+	// 	fmt.Println("Controller name:", controllerName)
+	// }
 	if controllerName == "" {
 		return nil, nil
 	}
@@ -133,6 +137,9 @@ func (cf *ControllerFetcher) BuildControllerObjFromControllerFile(filePath strin
 
 	for k := range methods {
 
+		// if controllerName == "Categories" && methods[k].Name == "DownloadTermImportTemplate" {
+		// 	fmt.Println("Parsing method:", methods[k].Name)
+		// }
 		route := parseControllerMethod(pkgName, methods[k], controller)
 
 		routeSignature := route.Method + " " + route.Path
@@ -157,6 +164,11 @@ func parseControllerMethod(
 
 	var e error
 
+	// if controller.Name == "Categories" && method.Name == "DownloadTermImportTemplate" {
+	// 	fmt.Println("Parsing method:", controller.Name+"."+method.Name)
+	// }
+	// fmt.Println("Parsing method:", controller.Name+"."+method.Name)
+
 	route := &lib.ControllerRoute{
 		Package:    strings.ToUpper(packageName[0:1]) + packageName[1:],
 		Controller: controller.Name,
@@ -178,6 +190,7 @@ func parseControllerMethod(
 
 		// Skip region tags
 		if line == -1 && len(doc) > 10 && doc[0:10] == "// #region" {
+			fmt.Println("Skipping region", doc)
 			continue
 		}
 
@@ -246,7 +259,9 @@ func parseControllerMethod(
 		var e error
 		// @route
 		if len(doc) > 9 && doc[0:9] == "// "+RouteTagRoute {
-
+			// if doc == "// @route GET /imports/templates/terms" {
+			// 	fmt.Println("Parsing route string:", doc)
+			// }
 			if e = queryparser.ParseRouteString(route, doc); e != nil {
 				log.Fatalf("method `%s.%s`: `%s`", controller.Name, route.Name, e.Error())
 			}

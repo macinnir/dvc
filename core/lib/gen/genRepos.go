@@ -2,12 +2,10 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"sort"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -437,7 +435,7 @@ func GenRepos(basePackage string, tables []*schema.Table, cache map[string]*lib.
 		tableMap[tables[k].Name] = k
 	}
 
-	start := time.Now()
+	// start := time.Now()
 	var generatedRepoCount = 0
 	lib.EnsureDir(lib.RepoGenDir)
 	lib.EnsureDir(lib.CollectionGenDir)
@@ -454,7 +452,8 @@ func GenRepos(basePackage string, tables []*schema.Table, cache map[string]*lib.
 		GenerateRepoCollectionItem(basePackage, tableName)
 		generatedRepoCount++
 	}
-	fmt.Printf("Generated %d repos in %f seconds.\n", generatedRepoCount, time.Since(start).Seconds())
+	// TODO Verbose mode
+	// fmt.Printf("Generated %d repos in %f seconds.\n", generatedRepoCount, time.Since(start).Seconds())
 
 	return nil
 }
@@ -463,7 +462,8 @@ func GenRepos(basePackage string, tables []*schema.Table, cache map[string]*lib.
 func GenerateGoRepo(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, table.Name+"Repo.go")
-	fmt.Println("Generating Repo file to path: ", p)
+	// TODO Verbose mode
+	// fmt.Println("Generating Repo file to path: ", p)
 
 	data := struct {
 		BasePackage   string

@@ -2,11 +2,9 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -70,7 +68,7 @@ func GenRepoInterfaces(basePackage string, tables []*schema.Table, cache map[str
 		tableMap[tables[k].Name] = k
 	}
 
-	start := time.Now()
+	// start := time.Now()
 	var generatedCacheCount = 0
 	lib.EnsureDir(lib.RepoInterfaceGenDir)
 
@@ -83,7 +81,7 @@ func GenRepoInterfaces(basePackage string, tables []*schema.Table, cache map[str
 		}
 		generatedCacheCount++
 	}
-	fmt.Printf("Generated %d repo interfaces in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
+	// fmt.Printf("Generated %d repo interfaces in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
 
 	return nil
 }
@@ -94,7 +92,8 @@ func GenRepoInterfaces(basePackage string, tables []*schema.Table, cache map[str
 func GenerateGoRepoInterface(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, "I"+table.Name+"Repo.go")
-	fmt.Println("Generating Cache file to path: ", p)
+	// TODO Verbose mode
+	// fmt.Println("Generating Cache file to path: ", p)
 
 	data := struct {
 		BasePackage string

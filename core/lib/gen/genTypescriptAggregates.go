@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
@@ -29,7 +28,7 @@ func NewTypescriptGenerator(config *lib.Config, routes *lib.RoutesJSONContainer)
 
 func (tg *TypescriptGenerator) CleanTypescriptAggregates() error {
 
-	var start = time.Now()
+	// var start = time.Now()
 	var e error
 	var files []os.FileInfo
 	var removedCount = 0
@@ -58,7 +57,8 @@ func (tg *TypescriptGenerator) CleanTypescriptAggregates() error {
 
 	}
 
-	fmt.Printf("Removed %d typescript Aggregates from `%s` in %f seconds\n", removedCount, tg.config.TypescriptAggregatesPath, time.Since(start).Seconds())
+	// TODO Verbose mode
+	// fmt.Printf("Removed %d typescript Aggregates from `%s` in %f seconds\n", removedCount, tg.config.TypescriptAggregatesPath, time.Since(start).Seconds())
 
 	return nil
 }
@@ -66,7 +66,7 @@ func (tg *TypescriptGenerator) CleanTypescriptAggregates() error {
 // 0.008535
 func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 
-	var start = time.Now()
+	// var start = time.Now()
 	var generatedCount = 0
 
 	lib.EnsureDir(tg.config.TypescriptAggregatesPath)
@@ -86,7 +86,8 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregates() error {
 		generatedCount++
 	}
 
-	fmt.Printf("Generated %d typescript Aggregates from `%s` in %f seconds\n", generatedCount, tg.config.TypescriptAggregatesPath, time.Since(start).Seconds())
+	// TODO Verbose
+	// fmt.Printf("Generated %d typescript Aggregates from `%s` in %f seconds\n", generatedCount, tg.config.TypescriptAggregatesPath, time.Since(start).Seconds())
 
 	return nil
 }
@@ -98,9 +99,7 @@ func (tg *TypescriptGenerator) GenerateTypescriptAggregate(name string) ([]byte,
 	var buf bytes.Buffer
 
 	TSFileHeader(&buf, name)
-	if name == "QuestionAggregate" {
-		fmt.Printf("Columns: %+v\n", columns)
-	}
+
 	ImportStrings(&buf, columns)
 
 	buf.WriteString(`
@@ -132,14 +131,15 @@ export type ` + name + ` = `)
 
 func (tg *TypescriptGenerator) ExtractColumns(goType string) map[string]string {
 
+	// Remove pointer if it exists
 	if goType[0:1] == "*" {
 		goType = goType[1:]
 	}
 
 	// fmt.Println("GoType", goType)
-	// if goType == "CustomerAggregate" {
-	// 	fmt.Println(goType, " --> ", goType[len(goType)-9:])
-	// }
+	if goType == "FocusedCollectionAggregate" {
+		fmt.Println(goType, " --> ", goType[len(goType)-9:])
+	}
 
 	if len(goType) > 3 && goType[len(goType)-3:] == "DTO" {
 		return tg.routes.DTOs[goType]
@@ -147,6 +147,9 @@ func (tg *TypescriptGenerator) ExtractColumns(goType string) map[string]string {
 
 	if len(goType) > 9 && goType[len(goType)-9:] == "Aggregate" {
 		cols := tg.routes.Aggregates[goType]
+		if goType == "FocusedCollectionAggregate" {
+			fmt.Println("Extracted columns for ", goType, " are ", cols)
+		}
 		// fmt.Println("Got here", goType, len(cols))
 		// if !ok {
 		// 	fmt.Println("Nope")
@@ -174,6 +177,9 @@ func (tg *TypescriptGenerator) GenerateTypescriptFields(sb io.Writer, objectName
 		}
 
 		goType := columns[columnNames[k]]
+		if objectName == "FocusCollectionAggregate" {
+			fmt.Println("Generating field ", name, " of type ", goType, " for object ", objectName)
+		}
 		fieldType := schema.GoTypeToTypescriptString(goType)
 
 		if len(name) > 9 && name[0:9] == "#embedded" {

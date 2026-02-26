@@ -289,7 +289,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 		comparison.Alterations++
 	}
 
-	// What tables are in local that aren't in remote?
+	// Compare local and remote tables to find out what tables need to be created, dropped, or altered
 	for tableName, table := range localSchema.Tables {
 
 		// Table does not exist on remote schema
@@ -302,7 +302,7 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 		}
 	}
 
-	// What tables are in remote that aren't in local?
+	// Compare local and remote tables to find out what tables need to be created, dropped, or altered
 	for _, table := range remoteSchema.Tables {
 
 		// Table does not exist on local schema
@@ -312,7 +312,6 @@ func (ss *MySQL) CreateChangeSQL(localSchema *schema.Schema, remoteSchema *schem
 	}
 
 	// Rename Table
-
 	if len(dropTableStatements) > 0 && len(createTableStatements) > 0 {
 
 		for dropTableName := range dropTableStatements {
@@ -595,6 +594,7 @@ func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schem
 	addIndexStatements := map[string]*schema.SchemaChange{}
 	dropIndexStatements := map[string]*schema.SchemaChange{}
 
+	// Compare local columns to remote columns to find out what columns need to be created, dropped, or altered
 	for _, column := range localTable.Columns {
 
 		// Column does not exist remotely
@@ -613,12 +613,14 @@ func createTableChangeSQL(comparison *schema.SchemaComparison, localTable *schem
 
 		} else {
 
+			// Column exists remotely, compare the two columns to see if an alteration is necessary
 			remoteColumn := remoteTable.Columns[column.Name]
 			changeColumn(comparison, localTable, column, remoteColumn)
 
 		}
 	}
 
+	// Compare remote columns to local columns to find out what columns need to be created or dropped
 	for _, column := range remoteTable.Columns {
 
 		// Column does not exist locally
@@ -790,7 +792,9 @@ func dropTable(table *schema.Table) []*schema.SchemaChange {
 // changeColumn returns an alter table sql statement that adds or removes an index from a column
 // if and only if the one (e.g. local) has a column and the other (e.g. remote) does not
 // Truth table
-// 		Remote 	| 	Local 	| 	Result
+//
+//	Remote 	| 	Local 	| 	Result
+//
 // ---------------------------------------------------------
 // 1. 	MUL		| 	none 	| 	Drop index
 // 2. 	UNI		| 	none 	| 	Drop unique index
@@ -868,7 +872,9 @@ func changeColumn(comparison *schema.SchemaComparison, table *schema.Table, loca
 	if localColumn.DataType != remoteColumn.DataType ||
 		localColumn.CharSet != remoteColumn.CharSet ||
 		localColumn.Collation != remoteColumn.Collation ||
-		localColumn.MaxLength != remoteColumn.MaxLength {
+		localColumn.MaxLength != remoteColumn.MaxLength ||
+		localColumn.IsUnsigned != remoteColumn.IsUnsigned ||
+		localColumn.IsNullable != remoteColumn.IsNullable {
 		comparison.Changes = append(comparison.Changes, alterTableChangeColumn(table, localColumn, localColumn.Name))
 		comparison.Alterations++
 	}

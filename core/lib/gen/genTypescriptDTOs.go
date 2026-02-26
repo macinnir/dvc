@@ -2,12 +2,10 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -15,7 +13,7 @@ import (
 
 func CleanTypescriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
-	var start = time.Now()
+	// var start = time.Now()
 	var e error
 	var files []os.FileInfo
 
@@ -46,14 +44,15 @@ func CleanTypescriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) er
 
 	}
 
-	fmt.Printf("Removed %d typescript DTOs from `%s` in %f seconds\n", removedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Removed %d typescript DTOs from `%s` in %f seconds\n", removedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
 
 	return nil
 }
 
 func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) error {
 
-	var start = time.Now()
+	// var start = time.Now()
 	var generatedCount = 0
 
 	lib.EnsureDir(config.TypescriptDTOsPath)
@@ -68,7 +67,8 @@ func GenerateTypesriptDTOs(config *lib.Config, routes *lib.RoutesJSONContainer) 
 		generatedCount++
 	}
 
-	fmt.Printf("Generated %d typescript DTOs from `%s` in %f seconds\n", generatedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
+	// TODO Verbose
+	// fmt.Printf("Generated %d typescript DTOs from `%s` in %f seconds\n", generatedCount, config.TypescriptDTOsPath, time.Since(start).Seconds())
 
 	return nil
 }

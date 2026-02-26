@@ -2,11 +2,9 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -56,7 +54,7 @@ func GenCacheInterfaces(basePackage string, tables []*schema.Table, cache map[st
 		tableMap[tables[k].Name] = k
 	}
 
-	start := time.Now()
+	// start := time.Now()
 	var generatedCacheCount = 0
 	lib.EnsureDir(lib.CacheInterfaceGenDir)
 
@@ -69,7 +67,8 @@ func GenCacheInterfaces(basePackage string, tables []*schema.Table, cache map[st
 		}
 		generatedCacheCount++
 	}
-	fmt.Printf("Generated %d cache interfaces in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d cache interfaces in %f seconds.\n", generatedCacheCount, time.Since(start).Seconds())
 
 	return nil
 }
@@ -80,7 +79,8 @@ func GenCacheInterfaces(basePackage string, tables []*schema.Table, cache map[st
 func GenerateGoCacheInterface(basePackage string, cacheConfig *lib.CacheConfig, table *schema.Table, dir string) (e error) {
 
 	p := path.Join(dir, "I"+table.Name+"Cache.go")
-	fmt.Println("Generating Cache file to path: ", p)
+	// TODO Verbose mode
+	// fmt.Println("Generating Cache file to path: ", p)
 
 	data := struct {
 		BasePackage string

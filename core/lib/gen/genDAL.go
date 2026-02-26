@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -90,7 +89,7 @@ func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) 
 		return fmt.Errorf("{{.Table.Name}}DAL.Insert: %w", e)	
 	}
 
-	r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
+	// r.log.Debugf("{{.Table.Name}}DAL.Insert(%d)", model.{{.PrimaryKey}})
 
 	return nil
 }
@@ -148,7 +147,7 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 				r.log.Errorf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, insertID, e.Error())
 				break
 			} else {
-				r.log.Debugf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, insertID)
+				// r.log.Debugf("{{.Table.Name}}.CreateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, insertID)
 				model.{{.PrimaryKey}}, _ = result.LastInsertId()
 			}
 		}
@@ -177,7 +176,7 @@ func (r *{{.Table.Name}}DAL) Update(shard int64, model *models.{{.Table.Name}}) 
 		r.log.Errorf("{{.Table.Name}}DAL.Update(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.Update(%d): %w", model.{{.PrimaryKey}}, e)
 	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.Update(%d)", model.{{.PrimaryKey}})
+		// r.log.Debugf("{{.Table.Name}}DAL.Update(%d)", model.{{.PrimaryKey}})
 	}
 	return nil
 }
@@ -228,9 +227,8 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 			if e != nil {
 				r.log.Errorf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, updateID, e.Error())
 				return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)) (Chunk %d.%d): %w", len(modelSlice), chunkID, updateID, e)
-				break
 			} else {
-				r.log.Debugf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, updateID)
+				// r.log.Debugf("{{.Table.Name}}.UpdateMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, updateID)
 			}
 		}
 
@@ -257,7 +255,7 @@ func (r *{{.Table.Name}}DAL) Delete(shard int64, {{.PrimaryKey | toArgName}} {{.
 		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.Delete(%d): %w", {{.PrimaryKey | toArgName}}, e)
 	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", {{.PrimaryKey | toArgName}})
+		// r.log.Debugf("{{.Table.Name}}DAL.Delete(%d)", {{.PrimaryKey | toArgName}})
 	}
 	return nil
 }
@@ -309,9 +307,8 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 			if e != nil {
 				r.log.Errorf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, deleteID, e.Error())
 				return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)) (Chunk %d.%d): %w", len(modelSlice), chunkID, deleteID, e)
-				break
 			} else {
-				r.log.Debugf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
+				// r.log.Debugf("{{.Table.Name}}.DeleteMany([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
 			}
 		}
 
@@ -337,7 +334,7 @@ func (r *{{.Table.Name}}DAL) DeleteHard(shard int64, {{.PrimaryKey | toArgName}}
 		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.HardDelete(%d): %w", {{.PrimaryKey | toArgName}}, e)
 	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", {{.PrimaryKey | toArgName}})
+		// r.log.Debugf("{{.Table.Name}}DAL.HardDelete(%d)", {{.PrimaryKey | toArgName}})
 	}
 	return nil
 }
@@ -387,7 +384,7 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.
 				r.log.Errorf("{{.Table.Name}}.DeleteManyHard([](%d)) (Chunk %d.%d) > %s", len(modelSlice), chunkID, deleteID, e.Error())
 				break
 			} else {
-				r.log.Debugf("{{.Table.Name}}.DeleteManyHard([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
+				// r.log.Debugf("{{.Table.Name}}.DeleteManyHard([](%d)) (Chunk %d.%d)", len(modelSlice), chunkID, deleteID)
 			}
 		}
 
@@ -420,7 +417,7 @@ func (r *{{.Table.Name}}DAL) FromID(shard int64, {{.PrimaryKey | toArgName}} {{.
 
 	switch e { 
 	case sql.ErrNoRows: 
-		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
+		// r.log.Debugf("{{.Table.Name}}DAL.FromID(%d) > NOT FOUND", {{.PrimaryKey | toArgName}})
 
 		if mustExist {
 			e = errors.NewRecordNotFoundError()
@@ -434,7 +431,7 @@ func (r *{{.Table.Name}}DAL) FromID(shard int64, {{.PrimaryKey | toArgName}} {{.
 			return nil, errors.NewRecordNotFoundError()
 		}{{end}}
 
-		r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
+		// r.log.Debugf("{{.Table.Name}}DAL.FromID(%d)", model.{{.PrimaryKey}})
 		return model, nil 
 
 	default: 
@@ -460,7 +457,7 @@ func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s [
 		return []*models.{{.Table.Name}}{}, fmt.Errorf("{{.Table.Name}}DAL.FromIDs(%v): %w", {{.PrimaryKey | toArgName}}s, e)
 	}
 	
-	r.log.Debugf("{{.Table.Name}}DAL.FromIDs(%v)", {{.PrimaryKey | toArgName}}s)
+	// r.log.Debugf("{{.Table.Name}}DAL.FromIDs(%v)", {{.PrimaryKey | toArgName}}s)
 
 	return model, nil 
 }
@@ -479,7 +476,7 @@ func (r *{{.Table.Name}}DAL) FromIDsMap(shard int64, {{.PrimaryKey | toArgName}}
 		result[model[k].{{.PrimaryKey}}] = model[k]
 	}
 	
-	r.log.Debugf("{{.Table.Name}}DAL.FromIDsMap(%v)", {{.PrimaryKey | toArgName}}s)
+	// r.log.Debugf("{{.Table.Name}}DAL.FromIDsMap(%v)", {{.PrimaryKey | toArgName}}s)
 
 	return result, nil 
 }
@@ -492,7 +489,7 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}(shard int64, {{$.PrimaryKey | toA
 		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error())
 		return fmt.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v): %w", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e)
 	} else {
-		r.log.Debugf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v)", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}})
+		// r.log.Debugf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v)", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}})
 	}
 	return nil 
 }
@@ -522,7 +519,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 		return nil, e 
 	} 
 	
-	r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}({{if or (eq $col.GoType "int") (eq $col.GoType "int64")}}%d{{else}}%s{{end}}, %d, %d, %s, %s)", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir)
+	// r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}({{if or (eq $col.GoType "int") (eq $col.GoType "int64")}}%d{{else}}%s{{end}}, %d, %d, %s, %s)", {{$col.Name | toArgName}}, limit, offset, orderBy, orderDir)
 	
 	return collection, nil 
 }
@@ -555,7 +552,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}s(%v, %d, %d, %s, %s) > %s", {{$col.Name | toArgName}}s, limit, offset, orderBy, orderDir, e.Error())
 	} else {
-		r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}s(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
+		// r.log.Debugf("{{$.Table.Name}}DAL.ManyFrom{{$col.Name}}s(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
 	}
 	return collection, e 
 }
@@ -573,7 +570,7 @@ func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}(shard int64, {{$col.Name | 
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.CountFrom{{$col.Name}}({{$col | dataTypeToFormatString}}) > %s", {{$col.Name | toArgName}}, e.Error())
 	} else {
-		r.log.Debugf("{{$.Table.Name}}DAL.CountFrom{{$col.Name}}({{$col | dataTypeToFormatString}})", {{$col.Name | toArgName}})
+		// r.log.Debugf("{{$.Table.Name}}DAL.CountFrom{{$col.Name}}({{$col | dataTypeToFormatString}})", {{$col.Name | toArgName}})
 	}
 
 	return count, e
@@ -598,7 +595,7 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name |
 
 	switch e { 
 	case sql.ErrNoRows: 
-		r.log.Debugf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}(%d) > NOT FOUND", {{$col.Name | toArgName}})
+		// r.log.Debugf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}(%d) > NOT FOUND", {{$col.Name | toArgName}})
 
 		if mustExist {
 			e = errors.NewRecordNotFoundError()
@@ -613,7 +610,7 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name |
 		}{{end}}
 
 		
-		r.log.Debugf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}({{if $col.IsString}}%s{{end}}{{if not $col.IsString}}%d{{end}})", model.{{$col.Name}})
+		// r.log.Debugf("{{$.Table.Name}}DAL.SingleFrom{{$col.Name}}({{if $col.IsString}}%s{{end}}{{if not $col.IsString}}%d{{end}})", model.{{$col.Name}})
 		return model, nil 
 
 	default: 
@@ -643,7 +640,7 @@ func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.ManyPaged(%d, %d, %s, %s) > %s", limit, offset, orderBy, orderDir, e.Error())
 	} else {
-		r.log.Debugf("{{.Table.Name}}DAL.ManyPaged(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
+		// r.log.Debugf("{{.Table.Name}}DAL.ManyPaged(%d, %d, %s, %s)", limit, offset, orderBy, orderDir)
 	}
 	return collection, e 
 }
@@ -680,7 +677,7 @@ func (r *{{$.Table.Name}}DAL) Search{{$col.Name}}(shard int64, queryString strin
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.Search(%s, %d) > %s", queryString, limit, e.Error())
 	} else {
-		r.log.Debugf("{{$.Table.Name}}DAL.Search(%s, %d)", queryString, limit)
+		// r.log.Debugf("{{$.Table.Name}}DAL.Search(%s, %d)", queryString, limit)
 	}
 	return collection, e 
 }
@@ -723,7 +720,7 @@ func (g *Gen) GetOrphanedDals(dir string, database *schema.Schema) []string {
 
 func GenDALs(tables []*schema.Table, config *lib.Config) error {
 
-	start := time.Now()
+	// start := time.Now()
 	generatedDALCount := 0
 	lib.EnsureDir(lib.DalsGenDir)
 
@@ -734,7 +731,8 @@ func GenDALs(tables []*schema.Table, config *lib.Config) error {
 		generatedDALCount++
 	}
 
-	fmt.Printf("Generated %d dals in %f seconds.\n", generatedDALCount, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d dals in %f seconds.\n", generatedDALCount, time.Since(start).Seconds())
 	return nil
 }
 
@@ -751,7 +749,7 @@ func GenerateGoDAL(config *lib.Config, table *schema.Table, dir string) (e error
 
 	// imports := []string{}
 
-	// lib.Debugf("Generating go dal file for table %s at path %s", g.Options, table.Name, p)
+	// // lib.Debugf("Generating go dal file for table %s at path %s", g.Options, table.Name, p)
 
 	var data = struct {
 		BasePackage       string
@@ -1258,7 +1256,7 @@ func BootstrapDAL(db map[string][]db.IDB, log log.ILog) *DAL {
 // GenerateDALsBootstrapFile generates a dal bootstrap file in golang
 func GenerateDALsBootstrapFile(config *lib.Config, schemaList *schema.SchemaList) error {
 
-	var start = time.Now()
+	// var start = time.Now()
 	var e error
 
 	tables := map[string]*schema.Table{}
@@ -1285,7 +1283,7 @@ func GenerateDALsBootstrapFile(config *lib.Config, schemaList *schema.SchemaList
 		DALPackage:    fmt.Sprintf("%s/%s", config.BasePackage, "gen/dal"),
 	}
 
-	// lib.Debugf("Generating dal bootstrap file at path %s", g.Options, p)
+	// // lib.Debugf("Generating dal bootstrap file at path %s", g.Options, p)
 	buffer := bytes.Buffer{}
 
 	e = bootstrapFileTpl.Execute(&buffer, data)
@@ -1305,7 +1303,8 @@ func GenerateDALsBootstrapFile(config *lib.Config, schemaList *schema.SchemaList
 		return e
 	}
 
-	fmt.Printf("Generated dal bootstrap file to %s in %f seconds\n", lib.DALBootstrapFile, time.Since(start).Seconds())
+	// TODO verbose flag
+	// fmt.Printf("Generated dal bootstrap file to %s in %f seconds\n", lib.DALBootstrapFile, time.Since(start).Seconds())
 
 	return nil
 }

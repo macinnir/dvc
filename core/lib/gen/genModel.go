@@ -12,7 +12,6 @@ import (
 	"path"
 	"sort"
 	"text/template"
-	"time"
 
 	"github.com/fatih/structtag"
 	"github.com/macinnir/dvc/core/lib"
@@ -87,7 +86,7 @@ func GetChangedTables(schemaList *schema.SchemaList, tablesCache *cache.TablesCa
 // GenModels generates models
 func GenModels(tables []*schema.Table, config *lib.Config) error {
 
-	start := time.Now()
+	// start := time.Now()
 
 	generatedModelCount := 0
 
@@ -104,7 +103,8 @@ func GenModels(tables []*schema.Table, config *lib.Config) error {
 		generatedModelCount++
 	}
 
-	fmt.Printf("Generated %d models in %f seconds.\n", generatedModelCount, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d models in %f seconds.\n", generatedModelCount, time.Since(start).Seconds())
 	return nil
 }
 
@@ -1607,7 +1607,7 @@ func CleanFiles(name string, dir string, schemaList *schema.SchemaList, prefix, 
 
 	lib.EnsureDir(dir)
 
-	var start = time.Now()
+	// var start = time.Now()
 	var e error
 	var dirHandle *os.File
 
@@ -1633,13 +1633,15 @@ func CleanFiles(name string, dir string, schemaList *schema.SchemaList, prefix, 
 		// go, ts
 		if _, ok := schemaList.TableMap[modelName]; !ok {
 			fullFilePath := path.Join(dir, fileName)
-			fmt.Printf("Deleting `%s` (`%s`)\n", fullFilePath, modelName)
+			// TODO Verbose flag
+			// fmt.Printf("Deleting `%s` (`%s`)\n", fullFilePath, modelName)
 			os.Remove(fullFilePath)
 			removedCount++
 		}
 	}
 
-	fmt.Printf("Removed %d %s from `%s` in %f seconds\n", removedCount, name, dir, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Removed %d %s from `%s` in %f seconds\n", removedCount, name, dir, time.Since(start).Seconds())
 
 	return nil
 }

@@ -78,26 +78,27 @@ type Controller struct {
 
 // ControllerRoute represents a route inside a REST controller
 type ControllerRoute struct {
-	Package        string                 `json:"Package"`
-	Controller     string                 `json:"Controller"`
-	Name           string                 `json:"Name"`
-	Description    string                 `json:"Description"`
-	Raw            string                 `json:"Path"`
-	Path           string                 `json:"-"`
-	Method         string                 `json:"Method"`
-	Params         []ControllerRouteParam `json:"Params"`
-	Queries        []ControllerRouteQuery `json:"Queries"`
-	IsAuth         bool                   `json:"IsAuth"`
-	BodyType       string                 `json:"BodyType"`
-	BodyFormat     string                 `json:"BodyFormat"`
-	HasBody        bool                   `json:"HasBody"`
-	ResponseType   string                 `json:"ResponseType"`
-	ResponseFormat string                 `json:"ResponseFormat"`
-	ResponseCode   int                    `json:"ResponseCode"`
-	Permission     string                 `json:"Permission"`
-	ControllerName string                 `json:"ControllerName"`
-	FileName       string                 `json:"FileName"`
-	LineNo         int                    `json:"LineNo"`
+	Package         string                 `json:"Package"`
+	Controller      string                 `json:"Controller"`
+	Name            string                 `json:"Name"`
+	Description     string                 `json:"Description"`
+	Raw             string                 `json:"Path"`
+	Path            string                 `json:"-"`
+	Method          string                 `json:"Method"`
+	Params          []ControllerRouteParam `json:"Params"`
+	Queries         []ControllerRouteQuery `json:"Queries"`
+	RequiredQueries []ControllerRouteQuery `json:"RequiredQueries"`
+	IsAuth          bool                   `json:"IsAuth"`
+	BodyType        string                 `json:"BodyType"`
+	BodyFormat      string                 `json:"BodyFormat"`
+	HasBody         bool                   `json:"HasBody"`
+	ResponseType    string                 `json:"ResponseType"`
+	ResponseFormat  string                 `json:"ResponseFormat"`
+	ResponseCode    int                    `json:"ResponseCode"`
+	Permission      string                 `json:"Permission"`
+	ControllerName  string                 `json:"ControllerName"`
+	FileName        string                 `json:"FileName"`
+	LineNo          int                    `json:"LineNo"`
 }
 
 // ControllerRouteParam represents a param inside a controller route

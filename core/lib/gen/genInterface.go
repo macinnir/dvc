@@ -7,7 +7,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/macinnir/dvc/core/lib"
@@ -157,11 +156,12 @@ func fetchSrcFilesForInterfaces(srcDir string) ([]string, error) {
 
 func GenInterfaces(srcDir, destDir string) error {
 
-	fmt.Println("Generating interface files from", srcDir, " => ", destDir)
+	// TODO Verbose flag
+	// fmt.Println("Generating interface files from", srcDir, " => ", destDir)
 
 	lib.EnsureDir(destDir)
 
-	var start = time.Now()
+	// var start = time.Now()
 	var e error
 	var generatedInterfaces = 0
 	var files []string
@@ -213,7 +213,8 @@ func GenInterfaces(srcDir, destDir string) error {
 	// 	}
 	// }
 
-	fmt.Printf("Generated %d interfaces to %s in %f seconds\n", generatedInterfaces, destDir, time.Since(start).Seconds())
+	// TODO Verbose flag
+	// fmt.Printf("Generated %d interfaces to %s in %f seconds\n", generatedInterfaces, destDir, time.Since(start).Seconds())
 
 	return nil
 

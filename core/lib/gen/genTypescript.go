@@ -10,6 +10,7 @@ import (
 )
 
 // Additional helper functions for Typescript generation
+// Don't require a constructor if it is an array, as we can just use the array literal syntax in that case
 func requireConstructor(fullName string) bool {
 	return fullName[0:1] != "["
 }
@@ -40,6 +41,8 @@ func getObjectNameAndImportPath(typeName string) (string, string) {
 		return typeName[7:], "gen/models/" + typeName[7:]
 	} else if len(typeName) > 5 && typeName[0:5] == "dtos." {
 		return typeName[5:], "gen/dtos/" + typeName[5:]
+	} else if len(typeName) > 11 && typeName[0:11] == "aggregates." {
+		return typeName[11:], "gen/aggregates/" + typeName[11:]
 	} else {
 		return typeName, "./" + typeName
 	}

@@ -1,13 +1,11 @@
 package gen
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/macinnir/dvc/core/lib"
 )
@@ -19,7 +17,7 @@ import (
 // GenAppBootstrapFile generates the services bootstrap file
 func GenAppBootstrapFile(basePackage string) error {
 
-	var start = time.Now()
+	// var start = time.Now()
 
 	lib.EnsureDir(lib.AppServicesDir)
 
@@ -107,7 +105,8 @@ func (a *App) Finish() {
 
 	ioutil.WriteFile(lib.AppBootstrapFile, []byte(sb.String()), 0777)
 
-	fmt.Printf("Generated app bootstrap file to %s in %f seconds\n", lib.AppBootstrapFile, time.Since(start).Seconds())
+	// TODO Verbose mode
+	// fmt.Printf("Generated app bootstrap file to %s in %f seconds\n", lib.AppBootstrapFile, time.Since(start).Seconds())
 
 	return e
 }

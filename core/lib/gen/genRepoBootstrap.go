@@ -105,6 +105,7 @@ func GenRepoBootstrapFile(basePackage string, cache map[string]*lib.CacheConfig)
 var repoBootstrapFileTpl = template.Must(template.New("repo-bootstrap").Funcs(template.FuncMap{
 	"toArgName": toArgName,
 }).Parse(`// Generated Code; DO NOT EDIT.
+// Repos Boostrap File
 package repos
 
 import (

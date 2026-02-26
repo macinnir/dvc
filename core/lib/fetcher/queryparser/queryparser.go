@@ -62,7 +62,8 @@ func ExtractQueriesFromRoutePath(routePath string) (string, []lib.ControllerRout
 }
 
 // ParseURLQuerySegment parses a query segment in a URL query to a lib.ControllerRouteQueryObject
-// 	e.g. foo={foo:[0-9]+}
+//
+//	e.g. foo={foo:[0-9]+}
 func ParseURLQuerySegment(pattern string) lib.ControllerRouteQuery {
 
 	queryParts := strings.Split(pattern, "=")
@@ -100,7 +101,7 @@ func ParseURLQuerySegment(pattern string) lib.ControllerRouteQuery {
 }
 
 func ParseRouteString(route *lib.ControllerRoute, routeString string) error {
-
+	
 	lineParts := strings.SplitN(routeString, " ", 4)
 	if len(lineParts) < 4 {
 		return fmt.Errorf("invalid route comment `%s`", routeString)
@@ -109,6 +110,12 @@ func ParseRouteString(route *lib.ControllerRoute, routeString string) error {
 	route.Raw = lineParts[3]
 
 	route.Path, route.Queries = ExtractQueriesFromRoutePath(route.Raw)
+	for _, q := range route.Queries {
+		if q.Type != "int64" && strings.HasPrefix(q.Pattern, "-?") {
+			continue
+		}
+		route.RequiredQueries = append(route.RequiredQueries, q)
+	}
 
 	params, _ := ExtractParamsFromRoutePath(route.Path)
 	route.Params = append(route.Params, params...)
