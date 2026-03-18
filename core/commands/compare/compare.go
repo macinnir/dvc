@@ -125,6 +125,7 @@ func CompareAll(config *lib.Config, summarize, apply bool) error {
 	var e error
 	var remoteSchemas map[string]*schema.Schema
 	remoteSchemas, e = importer.FetchAllSchemas(config)
+
 	if e != nil {
 		return fmt.Errorf("Error importing schemas: %w", e)
 	}

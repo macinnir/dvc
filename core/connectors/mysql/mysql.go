@@ -1021,6 +1021,14 @@ func isInt(dataType string) bool {
 	return false
 }
 
+func isVector(dataType string) bool {
+	switch strings.ToLower(dataType) {
+	case ColTypeVector:
+		return true
+	}
+	return false
+}
+
 // Fixed Point Types
 // https://dev.mysql.com/doc/refman/8.0/en/fixed-point-types.html
 func isFixedPointType(dataType string) bool {
@@ -1080,7 +1088,11 @@ func intColLength(dataType string, isUnsigned bool) int {
 // INT SIGNED 	11 columns
 func createColumnSegment(column *schema.Column) (sql string) {
 
-	if isInt(column.DataType) {
+	if isVector(column.DataType) {
+
+		sql = fmt.Sprintf("`%s` %s", column.Name, column.Type)
+
+	} else if isInt(column.DataType) {
 
 		sql = fmt.Sprintf("`%s` %s(%d)", column.Name, column.DataType, intColLength(column.DataType, column.IsUnsigned))
 

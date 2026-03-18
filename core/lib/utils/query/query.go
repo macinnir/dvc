@@ -23,7 +23,7 @@ type IModel interface {
 	Update(db db.IDB) error
 	Create(db db.IDB) error
 	Delete(db db.IDB) error
-	FromID(db db.IDB, id int64) (IModel, error)
+	// FromID(db db.IDB, id int64) (IModel, error)
 
 	// Table_Column_Values() map[string]interface{}
 }
@@ -85,8 +85,9 @@ type Field struct {
 }
 
 // NewField creates a new field.
-// 	NewField(FieldTypeBasic, "Foo")
-// 	NewField(FieldTypeBasic, "Foo", "Bar") <-- `Foo` AS `Bar`
+//
+//	NewField(FieldTypeBasic, "Foo")
+//	NewField(FieldTypeBasic, "Foo", "Bar") <-- `Foo` AS `Bar`
 func NewField(fieldType FieldType, column Column, opts ...string) *Field {
 
 	as := ""
@@ -104,7 +105,8 @@ func NewField(fieldType FieldType, column Column, opts ...string) *Field {
 }
 
 // NewRawField creates a new field.
-// 	NewRawField("`t`.`Foo` AS `Bar`)
+//
+//	NewRawField("`t`.`Foo` AS `Bar`)
 func NewRawField(raw string) *Field {
 
 	return &Field{
@@ -198,11 +200,12 @@ func (q *Q) OrderBy(col Column, dir OrderDir) *Q {
 }
 
 // Fields injects fields as raw strings into the field clause of the query
-// 	sql, e := query.Select(&testassets.Job{}).
-// 		Fields(
-// 			NewField(FieldTypeBasic, "JobID"),
-// 			NewField(FieldTypeBasic, "Name", "Foo"),
-// 		)
+//
+//	sql, e := query.Select(&testassets.Job{}).
+//		Fields(
+//			NewField(FieldTypeBasic, "JobID"),
+//			NewField(FieldTypeBasic, "Name", "Foo"),
+//		)
 func (q *Q) Fields(fields ...*Field) *Q {
 	q.fields = fields
 	return q
@@ -245,8 +248,9 @@ func (q *Q) FieldRaw(fieldStr, as string) *Q {
 }
 
 // Count creates a count statement
-// 	q.Count(query.Column("Foo"), "FooCounted")
-// 	COALESCE(COUNT(`t`.`Foo`), 0) AS `FooCounted`
+//
+//	q.Count(query.Column("Foo"), "FooCounted")
+//	COALESCE(COUNT(`t`.`Foo`), 0) AS `FooCounted`
 func (q *Q) Count(name Column, as string) *Q {
 
 	if _, ok := q.columnTypes[name]; !ok {
@@ -261,7 +265,8 @@ func (q *Q) Count(name Column, as string) *Q {
 }
 
 // Sum creates a sum statement
-// 	q.Sum(query.Column("Foo"), "FooSummed")
+//
+//	q.Sum(query.Column("Foo"), "FooSummed")
 //	COALESCE(SUM(`t`.`Foo`), 0) AS `FooSummed`
 func (q *Q) Sum(name Column, as string) *Q {
 
@@ -277,7 +282,8 @@ func (q *Q) Sum(name Column, as string) *Q {
 }
 
 // Avg creates an Avg statement
-// 	q.Avg(query.Column("Foo"), "FooAveraged")
+//
+//	q.Avg(query.Column("Foo"), "FooAveraged")
 //	COALESCE(AVG(`t`.`Foo`), 0) AS `FooAveraged`
 func (q *Q) Avg(name Column, as string) *Q {
 
@@ -293,7 +299,8 @@ func (q *Q) Avg(name Column, as string) *Q {
 }
 
 // Min creates a min statement
-// 	q.Min(query.Column("Foo"), "MinFoo")
+//
+//	q.Min(query.Column("Foo"), "MinFoo")
 //	COALESCE(MIN(`t`.`Foo`), 0) AS `MinFoo`
 func (q *Q) Min(name Column, as string) *Q {
 
@@ -309,7 +316,8 @@ func (q *Q) Min(name Column, as string) *Q {
 }
 
 // Max creates a max statement
-// 	q.Max(query.Column("Foo"), "MaxFoo")
+//
+//	q.Max(query.Column("Foo"), "MaxFoo")
 //	COALESCE(MAX(`t`.`Foo`), 0) AS `MaxFoo`
 func (q *Q) Max(name Column, as string) *Q {
 
@@ -326,23 +334,23 @@ func (q *Q) Max(name Column, as string) *Q {
 
 // Where creates or adds to an existing where clause
 //
-// 	- Simple
-// 	q.Where(query.EQ(query.Column("A"), "B"))
-// 	WHERE `t`.`B` = `t`.`B`
+//   - Simple
+//     q.Where(query.EQ(query.Column("A"), "B"))
+//     WHERE `t`.`B` = `t`.`B`
 //
-//	- Multiple Arguments
-// 	q.Where(query.EQ(query.Column("A"), "B"), query.And(), query.EQ(query.Column("C"), "D"))
-//	WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
+//   - Multiple Arguments
+//     q.Where(query.EQ(query.Column("A"), "B"), query.And(), query.EQ(query.Column("C"), "D"))
+//     WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
 //
-//	- Daisy Chain
-// 	q.Where(query.EQ(query.Column("A"), "B")).Where(query.And()).Where(query.EQ(query.Column("C"), "D"))
-//	WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
+//   - Daisy Chain
+//     q.Where(query.EQ(query.Column("A"), "B")).Where(query.And()).Where(query.EQ(query.Column("C"), "D"))
+//     WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
 //
-//	- Separate lines
-// 	q.Where(query.EQ(query.Column("A"), "B"))
-// 	q.Where(query.And())
-// 	q.Where(query.EQ(query.Column("C"), "D"))
-//	WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
+//   - Separate lines
+//     q.Where(query.EQ(query.Column("A"), "B"))
+//     q.Where(query.And())
+//     q.Where(query.EQ(query.Column("C"), "D"))
+//     WHERE `t`.`A` = 'B' AND `t`.`C` = 'D'
 func (q *Q) Where(args ...*WherePart) *Q {
 	// allow for multiple where calls in single query
 	if q.where == nil {
@@ -430,27 +438,21 @@ func (q *Q) String() (string, error) {
 		}
 
 		sb.WriteString(" FROM")
-		// sql += fmt.Sprintf("SEsLECT %s FROM", fields)
 	case QueryTypeInsert:
 		sb.WriteString("INSERT INTO")
-		// sql += "INSERT INTO"
 		q.alias = ""
 	case QueryTypeUpdate:
 		sb.WriteString("UPDATE")
-		// sql += "UPDATE"
 		q.alias = ""
 	case QueryTypeDelete:
 		sb.WriteString("DELETE FROM")
-		// sql += "DELETE FROM"s
 		q.alias = ""
 	}
 
 	sb.WriteString(" `" + string(q.model.Table_Name()) + "`")
-	// sql += " `" + q.model.Table_Name() + "`"
 
 	if len(q.alias) > 0 && q.queryType == QueryTypeSelect {
 		sb.WriteString(" `" + q.alias + "`")
-		// sql += " `" + q.alias + "`"
 	}
 
 	if q.queryType == QueryTypeUpdate && len(q.sets) > 0 {
@@ -479,7 +481,6 @@ func (q *Q) String() (string, error) {
 		}
 
 		sb.WriteString(strings.Join(setStmts, ", "))
-		// sql += strings.Join(setStmts, ", ")
 	}
 
 	if q.queryType == QueryTypeInsert && len(q.sets) > 0 {
@@ -515,10 +516,6 @@ func (q *Q) String() (string, error) {
 			sb.WriteString(" WHERE ")
 			sb.WriteString(whereClause)
 		}
-		// fmt.Println(q.where.WhereParts, q.queryType)
-		// q.errorInvalidColumn(QUERY_ERROR_EMPTY_WHERE_CLAUSE, "WHERE", "")
-		// q.error(fmt.Sprintf("EMPTY_WHERE_CLAUSE: `%s`", q.model.Table_Name()))
-
 	}
 
 	if q.queryType == QueryTypeSelect && len(q.orderBy) > 0 {
@@ -537,12 +534,10 @@ func (q *Q) String() (string, error) {
 
 	if q.limit > 0 {
 		sb.WriteString(" LIMIT " + fmt.Sprint(q.limit))
-		// sql += fmt.Sprintf(" LIMIT %d", q.limit)
 	}
 
 	if q.offset > 0 {
 		sb.WriteString(" OFFSET " + fmt.Sprint(q.offset))
-		// sql += fmt.Sprintf(" OFFSET %d", q.offset)
 	}
 
 	var e error
@@ -557,10 +552,8 @@ func (q *Q) String() (string, error) {
 func (q *Q) col(colName string) string {
 	if len(q.alias) > 0 {
 		return "`" + q.alias + "`.`" + colName + "`"
-		// return fmt.Sprintf("`%s`.`%s`", q.alias, colName)
 	}
 	return "`" + string(colName) + "`"
-	// return fmt.Sprintf("`%s`", colName)
 }
 
 func isConjunction(whereType WhereType) bool {
@@ -577,8 +570,6 @@ func isConjunction(whereType WhereType) bool {
 func (q *Q) printWhereClause(columnTypes map[Column]string, whereParts []*WherePart) string {
 
 	sb := strings.Builder{}
-
-	// prevWasConjunction := false
 
 	for k := range whereParts {
 
@@ -771,15 +762,15 @@ const (
 // This object is an exposed part of the api to make conditional queries easier
 // EXAMPLE:
 //
-// 	wheres := []query.WherePart{
-// 		query.EQ(models.ObjectRelationship_Column_IsDeleted, 0),
-// 	}
-// 	if objectTypeFrom != constants.ObjectTypeUnknown {
-// 		wheres = append(wheres, query.And(), query.EQ(models.ObjectRelationship_Column_ObjectTypeFrom, objectTypeFrom))
-// 	}
-// 	if objectIDFrom > 0 {
-// 		wheres = append(wheres, query.And(), query.EQ(models.ObjectRelationship_Column_ObjectIDFrom, objectIDFrom))
-// 	}
+//	wheres := []query.WherePart{
+//		query.EQ(models.ObjectRelationship_Column_IsDeleted, 0),
+//	}
+//	if objectTypeFrom != constants.ObjectTypeUnknown {
+//		wheres = append(wheres, query.And(), query.EQ(models.ObjectRelationship_Column_ObjectTypeFrom, objectTypeFrom))
+//	}
+//	if objectIDFrom > 0 {
+//		wheres = append(wheres, query.And(), query.EQ(models.ObjectRelationship_Column_ObjectIDFrom, objectIDFrom))
+//	}
 type WherePart struct {
 	whereType WhereType
 	fieldName string
@@ -821,11 +812,13 @@ func EQ(fieldName Column, value interface{}) *WherePart {
 // Example for a subselect
 //
 // query.Select(&models.UserGroupUser{}).Alias("ugu").FieldRaw("1", "n").Where(
-// 	query.EQF("UserID", "`u`.`UserID`"),
-// 	query.And(),
-// 	query.EQ("UserGroupID", groupID),
-// 	query.And(),
-// 	query.EQ("IsDeleted", 0),
+//
+//	query.EQF("UserID", "`u`.`UserID`"),
+//	query.And(),
+//	query.EQ("UserGroupID", groupID),
+//	query.And(),
+//	query.EQ("IsDeleted", 0),
+//
 // ),
 func EQF(fieldName1, fieldName2 string) *WherePart {
 	return newWherePart(
@@ -864,7 +857,8 @@ func GT(fieldName Column, value interface{}) *WherePart {
 }
 
 // LTOE is a less than or equals (<=) statement between a table column and a value
-//  `t`.`Col` <= value
+//
+//	`t`.`Col` <= value
 func LTOE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeLessThanOrEqualTo,
@@ -874,7 +868,8 @@ func LTOE(fieldName Column, value interface{}) *WherePart {
 }
 
 // GTOE is a greater than or equals statement (>=) between a table column and a value
-// 	`t`.`Col` >= value
+//
+//	`t`.`Col` >= value
 func GTOE(fieldName Column, value interface{}) *WherePart {
 	return newWherePart(
 		WhereTypeGreaterThanOrEqualTo,
@@ -884,7 +879,8 @@ func GTOE(fieldName Column, value interface{}) *WherePart {
 }
 
 // Mod is applies modulo operation on column and value testing if it equals remainder
-// 	MOD(`t`.`Field`, value) = remainder
+//
+//	MOD(`t`.`Field`, value) = remainder
 func Mod(fieldName Column, value, remainder int64) *WherePart {
 	return newWherePart(
 		WhereTypeMod,
@@ -1163,7 +1159,8 @@ func PE() *WherePart {
 // when conditionally adding WHERE clauses starting with a conjunction (AND/OR,etc)
 // separating them.
 // e.g. SELECT * FROM `Foo` WHERE 1=1
-//      SELECT * FROM `Foo` WHERE 1=1 AND FooID = 123;
+//
+//	SELECT * FROM `Foo` WHERE 1=1 AND FooID = 123;
 func WhereAll() *WherePart {
 	return newWherePart(
 		WhereTypeAll,

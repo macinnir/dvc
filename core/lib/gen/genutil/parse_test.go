@@ -1,4 +1,4 @@
-package gen
+package genutil
 
 import (
 	"testing"
@@ -26,69 +26,9 @@ type Foo struct {
 }
 `)
 
-var tableB *schema.Table = &schema.Table{
-	Name: "School",
-	Columns: map[string]*schema.Column{
-		"SchoolID":    {Name: "SchoolID", DataType: "int", IsNullable: false},
-		"Address":     {Name: "Address", DataType: "varchar", IsNullable: false},
-		"Address2":    {Name: "Address2", DataType: "varchar", IsNullable: false},
-		"City":        {Name: "City", DataType: "varchar", IsNullable: false},
-		"State":       {Name: "State", DataType: "varchar", IsNullable: false},
-		"County":      {Name: "County", DataType: "varchar", IsNullable: false},
-		"DateCreated": {Name: "County", DataType: "datetime", IsNullable: true},
-		"LastUpdated": {Name: "LastUpdated", DataType: "bigint", IsNullable: false},
-		"IsDeleted":   {Name: "IsDeleted", DataType: "tinyint", IsNullable: false},
-		"Name":        {Name: "Name", DataType: "varchar", IsNullable: false},
-		"Zip":         {Name: "Zip", DataType: "varchar", IsNullable: false},
-	},
-}
-
-var structB []byte = []byte(`package models
-
-import (
-	` + NullPackage + `
-)
-
-// School represents a School domain object
-type School struct {
-	SchoolID    int64       ` + "`db:\"SchoolID\" json:\"SchoolID\"`" + `
-	Name        string      ` + "`db:\"Name\" json:\"Name\"`" + `
-	IsDeleted   int         ` + "`db:\"IsDeleted\" json:\"IsDeleted\"`" + `
-	Address     string      ` + "`db:\"Address\" json:\"Address\"`" + `
-	Address2    string      ` + "`db:\"Address2\" json:\"Address2\"`" + `
-	City        string      ` + "`db:\"City\" json:\"City\"`" + `
-	State       string      ` + "`db:\"State\" json:\"State\"`" + `
-	Zip         string      ` + "`db:\"Zip\" json:\"Zip\"`" + `
-	County      string      ` + "`db:\"County\" json:\"County\"`" + `
-	DateCreated null.String ` + "`db:\"DateCreated\" json:\"DateCreated\"`" + `
-}
-`)
-
-var structBUpdated []byte = []byte(`package models
-
-import (
-	` + NullPackage + `
-)
-
-// School represents a School domain object
-type School struct {
-	SchoolID    int64       ` + "`db:\"SchoolID\" json:\"SchoolID\"`" + `
-	Name        string      ` + "`db:\"Name\" json:\"Name\"`" + `
-	IsDeleted   int         ` + "`db:\"IsDeleted\" json:\"IsDeleted\"`" + `
-	Address     string      ` + "`db:\"Address\" json:\"Address\"`" + `
-	Address2    string      ` + "`db:\"Address2\" json:\"Address2\"`" + `
-	City        string      ` + "`db:\"City\" json:\"City\"`" + `
-	State       string      ` + "`db:\"State\" json:\"State\"`" + `
-	Zip         string      ` + "`db:\"Zip\" json:\"Zip\"`" + `
-	County      string      ` + "`db:\"County\" json:\"County\"`" + `
-	DateCreated null.String ` + "`db:\"DateCreated\" json:\"DateCreated\"`" + `
-	LastUpdated int64       ` + "`db:\"LastUpdated\" json:\"LastUpdated\"`" + `
-}
-`)
-
 func TestParseStringToGoStruct(t *testing.T) {
 
-	modelNode, e := parseStringToGoStruct(structBytes)
+	modelNode, e := ParseStringToGoStruct(structBytes)
 
 	require.Nil(t, e)
 	assert.Equal(t, "Foo", modelNode.Name)
@@ -136,10 +76,10 @@ func TestResolveTableToModel_WithNulls(t *testing.T) {
 	model.Fields = &lib.GoStructFields{}
 	model.Fields.Append(&lib.GoStructField{Name: "One", DataType: "string"})
 
-	resolveTableToModel(model, table)
+	ResolveTableToModel(model, table)
 
 	require.Equal(t, 1, model.Imports.Len())
-	assert.Equal(t, NullPackage, model.Imports.Get(0))
+	assert.Equal(t, lib.NullPackage, model.Imports.Get(0))
 	assert.Equal(t, 2, model.Fields.Len())
 	assert.Equal(t, "NullableCol", model.Fields.Get(1).Name)
 	assert.Equal(t, "null.String", model.Fields.Get(1).DataType)
@@ -159,10 +99,10 @@ func TestResolveTableToModel_UpdatedType(t *testing.T) {
 	model.Fields.Append(&lib.GoStructField{Name: "One", DataType: "string"})
 	model.Fields.Append(&lib.GoStructField{Name: "NullableCol", DataType: "string"})
 
-	resolveTableToModel(model, table)
+	ResolveTableToModel(model, table)
 
 	require.Equal(t, 1, model.Imports.Len())
-	assert.Equal(t, NullPackage, model.Imports.Get(0))
+	assert.Equal(t, lib.NullPackage, model.Imports.Get(0))
 	assert.Equal(t, 2, model.Fields.Len())
 	assert.Equal(t, "NullableCol", model.Fields.Get(1).Name)
 	assert.Equal(t, "null.Int", model.Fields.Get(1).DataType)
@@ -177,37 +117,16 @@ func TestResolveTableToModel_RemoveColumn(t *testing.T) {
 
 	// Model has no null import
 	model := lib.NewGoStruct()
-	model.Imports = &lib.GoFileImports{NullPackage}
+	model.Imports = &lib.GoFileImports{lib.NullPackage}
 	model.Fields = &lib.GoStructFields{}
 	model.Fields.Append(&lib.GoStructField{Name: "One", DataType: "string"})
 	model.Fields.Append(&lib.GoStructField{Name: "Two", DataType: "null.String"})
 
-	resolveTableToModel(model, table)
+	ResolveTableToModel(model, table)
 
 	require.Equal(t, 0, model.Imports.Len())
 	assert.Equal(t, 1, model.Fields.Len())
 	assert.Equal(t, "One", model.Fields.Get(0).Name)
-}
-
-func TestBuildModelNodeFromTable(t *testing.T) {
-	table := &schema.Table{
-		Name: "Foo",
-		Columns: map[string]*schema.Column{
-			"Foo1":    {Name: "Foo1", DataType: "int"},
-			"NullFoo": {Name: "NullFoo", DataType: "datetime", IsNullable: true},
-		},
-	}
-	m, e := buildModelNodeFromTable(table)
-	require.Nil(t, e)
-	assert.Equal(t, "Foo", m.Name)
-	require.Equal(t, 1, m.Imports.Len())
-	assert.Equal(t, NullPackage, m.Imports.Get(0))
-	require.Equal(t, 2, m.Fields.Len())
-	assert.Equal(t, "Foo1", m.Fields.Get(0).Name)
-	assert.Equal(t, "int64", m.Fields.Get(0).DataType)
-	assert.Equal(t, "NullFoo", m.Fields.Get(1).Name)
-	assert.Equal(t, "null.String", m.Fields.Get(1).DataType)
-	assert.Contains(t, *m.Imports, NullPackage)
 }
 
 func TestParseFileNameToModelName(t *testing.T) {
@@ -228,7 +147,7 @@ func TestParseFileNameToModelName(t *testing.T) {
 
 		ts := tests[k]
 
-		var result = parseFileNameToModelName(ts.file, ts.prefix, ts.suffix)
+		var result = ParseFileNameToModelName(ts.file, ts.prefix, ts.suffix)
 		assert.Equal(t, ts.result, result)
 
 	}

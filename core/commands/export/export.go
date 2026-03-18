@@ -10,7 +10,6 @@ const CommandName = "export"
 // Export export SQL create statements to standard out
 func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 
-	return nil
 	// var e error
 	// var sql string
 
@@ -22,4 +21,5 @@ func Cmd(logger *zap.Logger, config *lib.Config, args []string) error {
 	// }
 
 	// fmt.Println(sql)
+	return nil
 }

@@ -51,5 +51,7 @@ const (
 	ControllersBootstrapGenFile = "gen/routes/controllers.go"
 	LibRequests                 = "github.com/macinnir/dvc/core/lib/utils/request"
 	LibUtils                    = "github.com/macinnir/dvc/core/lib/utils"
-	// Generated Go file containing constants for all route permissions
+
+	// NullPackage is the package name used for handling nulls
+	NullPackage = "\"gopkg.in/guregu/null.v3\""
 )

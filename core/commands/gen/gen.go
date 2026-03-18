@@ -8,6 +8,8 @@ import (
 	"github.com/macinnir/dvc/core/lib/cache"
 	"github.com/macinnir/dvc/core/lib/fetcher"
 	"github.com/macinnir/dvc/core/lib/gen"
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
+	"github.com/macinnir/dvc/core/lib/gen/model"
 	"github.com/macinnir/dvc/core/lib/schema"
 	"go.uber.org/zap"
 )
@@ -48,7 +50,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 		var schemaList, _ = schema.LoadLocalSchemas()
 		var changedTables []*schema.Table
-		changedTables, e = gen.GetChangedTables(schemaList, tableCache, force)
+		changedTables, e = genutil.GetChangedTables(schemaList, tableCache, force)
 		if e != nil {
 			return e
 		}
@@ -61,32 +63,32 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 		if clean {
 
 			// Clean Models
-			e = gen.CleanFiles("go models", lib.ModelsGenDir, schemaList, "", "")
+			e = genutil.CleanFiles("go models", lib.ModelsGenDir, schemaList, "", "")
 			if e != nil {
 				return e
 			}
 
 			// Clean Typescript
-			e = gen.CleanFiles("typescript models", config.TypescriptModelsPath, schemaList, "", "")
+			e = genutil.CleanFiles("typescript models", config.TypescriptModelsPath, schemaList, "", "")
 			if e != nil {
 				return e
 			}
 
 			// Clean DALs
-			e = gen.CleanFiles("go dals", lib.DalsGenDir, schemaList, "", "DAL")
+			e = genutil.CleanFiles("go dals", lib.DalsGenDir, schemaList, "", "DAL")
 			if e != nil {
 				return e
 			}
 
 			// Clean DAL Interfaces
-			e = gen.CleanFiles("go dal interfaces", lib.DALDefinitionsGenDir, schemaList, "I", "DAL")
+			e = genutil.CleanFiles("go dal interfaces", lib.DALDefinitionsGenDir, schemaList, "I", "DAL")
 			if e != nil {
 				return e
 			}
 		}
 
 		if len(changedTables) > 0 {
-			gen.GenModels(changedTables, config)
+			model.GenModels(changedTables, config)
 		}
 
 		if len(changedTables) > 0 {
@@ -181,11 +183,11 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		gen.GenAPIDocs(config, routes)
+		// gen.GenAPIDocs(config, routes)
 
-		if e := gen.GenAPIData(config, routes); e != nil {
-			return e
-		}
+		// if e := gen.GenAPIData(config, routes); e != nil {
+		// 	return e
+		// }
 
 		if e := gen.GenTSRoutes(controllers, config); e != nil {
 			return e
@@ -249,7 +251,7 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 			return e
 		}
 
-		gen.GenAPIDocs(config, r)
+		// gen.GenAPIDocs(config, r)
 
 	// case "tsdtos":
 	// 	fmt.Println("Generating Typescript DTOs")

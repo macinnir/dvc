@@ -16,6 +16,7 @@ import (
 	"text/template"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
@@ -446,7 +447,7 @@ func genDTOSMap(dir string) map[string]map[string]string {
 
 		fullPath := path.Join(dir, name)
 
-		model, e := ParseFileToGoStruct(fullPath)
+		model, e := genutil.ParseFileToGoStruct(fullPath)
 		if e != nil {
 			panic(e)
 		}

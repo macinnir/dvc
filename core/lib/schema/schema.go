@@ -135,6 +135,8 @@ func DataTypeToGoTypeString(column *Column) (fieldType string) {
 	fieldType = "int64"
 
 	switch column.DataType {
+	case "vector":
+		fieldType = "string"
 	case "int", "bigint":
 		fieldType = "int64"
 	case "tinyint":
@@ -168,7 +170,7 @@ func DataTypeToTypescriptString(dbDataType string) (fieldType string) {
 	fieldType = "number"
 
 	switch dbDataType {
-	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time":
+	case "char", "varchar", "tinytext", "mediumtext", "text", "longtext", "enum", "set", "datetime", "date", "time", "vector":
 		fieldType = "string"
 	}
 

@@ -29,4 +29,5 @@ const (
 	ColTypeDate       = "date"
 	ColTypeDateTime   = "datetime"
 	ColTypeTime       = "time"
+	ColTypeVector     = "vector"
 )
