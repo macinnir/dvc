@@ -187,6 +187,7 @@ func GenInterfaces(srcDir, destDir string) error {
 
 	var genInterfaceMap = map[string]struct{}{}
 	for k := range files {
+
 		var srcFile = files[k]
 		baseName := filepath.Base(srcFile)
 		var structName = baseName[0 : len(baseName)-3]
@@ -201,6 +202,7 @@ func GenInterfaces(srcDir, destDir string) error {
 		}
 
 		destFile := path.Join(destSubDir, interfaceName+".go")
+		// fmt.Println("Generating interface for ", srcFile, "to path", destFile)
 		genInterfaceMap[destFile] = struct{}{}
 		// fmt.Println("Generating", destFile)
 		GenInterface2(structName, srcFile, packageName, interfaceName, destSubDir, destFile)

@@ -1,6 +1,7 @@
 package genutil
 
 import (
+	"fmt"
 	"os"
 	"path"
 
@@ -36,11 +37,16 @@ func CleanFiles(name string, dir string, schemaList *schema.SchemaList, prefix, 
 		var fileName = modelFiles[k]
 		var modelName = ParseFileNameToModelName(fileName, prefix, suffix)
 
+		// TODO This needs to be configurable
+		if fileName == "mocks_test.go" {
+			continue
+		}
+
 		// go, ts
 		if _, ok := schemaList.TableMap[modelName]; !ok {
 			fullFilePath := path.Join(dir, fileName)
 			// TODO Verbose flag
-			// fmt.Printf("Deleting `%s` (`%s`)\n", fullFilePath, modelName)
+			fmt.Printf("Deleting `%s` (`%s`)\n", fullFilePath, modelName)
 			os.Remove(fullFilePath)
 			removedCount++
 		}

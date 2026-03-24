@@ -190,7 +190,7 @@ func parseControllerMethod(
 
 		// Skip region tags
 		if line == -1 && len(doc) > 10 && doc[0:10] == "// #region" {
-			fmt.Println("Skipping region", doc)
+			// fmt.Println("Skipping region", doc)
 			continue
 		}
 

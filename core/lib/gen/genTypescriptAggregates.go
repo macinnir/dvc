@@ -137,9 +137,9 @@ func (tg *TypescriptGenerator) ExtractColumns(goType string) map[string]string {
 	}
 
 	// fmt.Println("GoType", goType)
-	if goType == "FocusedCollectionAggregate" {
-		fmt.Println(goType, " --> ", goType[len(goType)-9:])
-	}
+	// if goType == "FocusedCollectionAggregate" {
+	// 	fmt.Println(goType, " --> ", goType[len(goType)-9:])
+	// }
 
 	if len(goType) > 3 && goType[len(goType)-3:] == "DTO" {
 		return tg.routes.DTOs[goType]

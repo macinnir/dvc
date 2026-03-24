@@ -69,6 +69,28 @@ type Config struct {
 	} `json:"dirs"`
 }
 
+// TODO revisit this
+//
+//	"User": {
+//	     "Aggregate": {
+//	        "Location": "core/definitions/aggregates",
+//	        "Properties": [
+//	           {
+//	              "On": "ProfileID",
+//	              "Property": "Profile",
+//	              "Table": "Profile",
+//	              "Type": "Single"
+//	           }
+//	        ]
+//	     },
+//	     "HasHashID": true,
+//	     "Indices": [
+//	        {
+//	           "Field": "Email",
+//	           "Unique": true
+//	        }
+//	     ]
+//	  }
 type CacheConfig struct {
 	Indices   []*CacheConfigIndex
 	Aggregate *CacheConfigAggregate

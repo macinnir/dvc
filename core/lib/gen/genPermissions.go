@@ -88,12 +88,13 @@ func GenGoPerms(config *lib.Config, permissions []PermissionTplType) (e error) {
 	return
 }
 
-var goPermissionsFileTemplate = template.Must(template.New("go-permissions-file").Parse(`// Generated Code; DO NOT EDIT.
+var goPermissionsTpl = `// Generated Code; DO NOT EDIT.
 
 package permissions
 
 import (
 	"github.com/macinnir/dvc/core/lib/utils"
+	"sort"
 )
 
 const (
@@ -103,7 +104,7 @@ const (
 	{{end}}
 )
 
-// Permissions returns a slice of permissions 
+// Permissions returns a slice of permissions?
 func Permissions() map[utils.Permission]string {
 
 	return map[utils.Permission]string {
@@ -112,7 +113,31 @@ func Permissions() map[utils.Permission]string {
 	}
 
 }
-`))
+
+// PermissionsList returns a slice of permissions and descriptions
+func PermissionsList() [][]string {
+	permissionMap := Permissions()
+	perms := make([]string, 0, len(permissionMap))
+	descriptions := map[string]string{}
+	for k := range permissionMap {
+		perms = append(perms, string(k))
+		descriptions[string(k)] = permissionMap[k]
+	}
+
+	sort.Strings(perms)
+
+	var p = [][]string{}
+	for k := range perms {
+
+		p = append(p, []string{
+			perms[k], descriptions[perms[k]],
+		})
+
+	}
+
+	return p
+}
+`
 
 type PermissionTplType struct {
 	Title       string
@@ -153,6 +178,7 @@ func BuildPermissionsGoFile(permissions []PermissionTplType, permissionsFilePath
 
 	var buffer = bytes.Buffer{}
 
+	var goPermissionsFileTemplate = template.Must(template.New("go-permissions-file2").Parse(goPermissionsTpl))
 	goPermissionsFileTemplate.Execute(&buffer, tplVals)
 
 	var formatted []byte
