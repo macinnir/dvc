@@ -37,7 +37,7 @@ type Controllers struct {
 }
 
 // NewControllers bootstraps all of the controller modules 
-func NewControllers(s *app.App, r request.IResponseLogger) *Controllers {
+func NewControllers(s *types.App, r request.IResponseLogger) *Controllers {
 	return &Controllers {
 		{{ range .Controllers }}
 		{{.Title}}: {{.Name}}.NewControllers(s, r),{{ end }} 
@@ -79,7 +79,7 @@ func GenControllerBootstrap(basePackageName string, dirs []string) string {
 		}
 	}
 
-	vals.Imports[len(dirs)] = path.Join(basePackageName, "core/app")
+	vals.Imports[len(dirs)] = path.Join(basePackageName, "core/app/types")
 	vals.Imports[len(dirs)+1] = "github.com/macinnir/dvc/core/lib/utils/request"
 
 	var buf bytes.Buffer
@@ -128,7 +128,7 @@ import (
 )
 
 // MapRoutesToControllers maps the routes to the controllers
-func MapRoutesToControllers(r *mux.Router, app *app.App, res request.IResponseLogger) {
+func MapRoutesToControllers(r *mux.Router, app *types.App, res request.IResponseLogger) {
 
 	var auth = app.Auth
 	var log = app.Utils.Logger
@@ -201,12 +201,10 @@ func GenRoutesAndPermissions(schemaList *schema.SchemaList, controllers []*lib.C
 
 	var routesTplValues = RoutesTplValues{
 		Imports: []string{
-			// path.Join(config.BasePackage, config.Dirs.IntegrationInterfaces),
-			// path.Join(config.BasePackage, config.Dirs.Aggregates),
 			"net/http",
 			"github.com/gorilla/mux",
 			lib.LibRequests,
-			path.Join(config.BasePackage, "core/app"),
+			path.Join(config.BasePackage, "core/app/types"),
 			path.Join(config.BasePackage, lib.CoreDTOsDir),
 			path.Join(config.BasePackage, lib.GoPermissionsDir),
 		},

@@ -57,7 +57,7 @@ type Caches struct {
 }
 
 // BootstrapCache bootstraps the cache
-func BootstrapCaches(cache redis.IRedis) *Caches {
+func BootstrapCaches(cache redis.RedisInterface) *Caches {
 
 	return &Caches{ {{range $index := .Caches}}
 		{{$index}}: New{{$index}}Cache(cache),{{end}}

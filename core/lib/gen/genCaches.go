@@ -57,12 +57,12 @@ func {{$.Table.Name}}_Index_{{range $column := $index.Columns}}{{$column.Name}}_
 
 // {{.Table.Name}}Cache is a cache for {{.Table.Name}} objects
 type {{.Table.Name}}Cache struct {
-	cache redis.IRedis
+	cache redis.RedisInterface
 }
 
 // New{{.Table.Name}}Cache returns a new instance of {{.Table.Name}}Cache
 func New{{.Table.Name}}Cache(
-	cache redis.IRedis, 
+	cache redis.RedisInterface, 
 ) *{{.Table.Name}}Cache {
 	return &{{.Table.Name}}Cache{
 		cache,

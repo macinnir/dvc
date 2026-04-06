@@ -15,4 +15,6 @@ type IUserContainer interface {
 	Permissions() []string
 	// SettingMgr returns the settings implementation for a user
 	SettingMgr() *SettingsManager
+	// Role returns the role of the user
+	Role() string
 }
