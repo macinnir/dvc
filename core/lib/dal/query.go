@@ -224,93 +224,125 @@ func (q *Query) buildDelete() string {
 }
 
 func (q *Query) buildCount() string {
-	query := "SELECT COUNT(DISTINCT " + fmt.Sprintf("`%s`.`%s`", q.Table.Alias, q.Table.Fields["id"].Name) + ") FROM `" + q.Table.Name + "` `" + q.Table.Alias + "`"
+
+	var sb strings.Builder
+
+	sb.WriteString("SELECT COUNT(DISTINCT " + fmt.Sprintf("`%s`.`%s`", q.Table.Alias, q.Table.Fields["id"].Name) + ") FROM `" + q.Table.Name + "` `" + q.Table.Alias + "`")
 
 	where := q.buildWhere()
 
 	if len(where) > 0 {
-		query = query + " WHERE " + where
+		sb.WriteString(" WHERE " + where)
 	}
 
-	return query
+	return sb.String()
 }
 
 func (q *Query) buildSelect() string {
 
-	query := "SELECT "
-	colStrings := []string{}
-	for _, fk := range q.Table.FieldKeys {
+	var sb strings.Builder
+
+	sb.WriteString("SELECT ")
+
+	// colStrings := []string{}
+
+	for i, fk := range q.Table.FieldKeys {
 		f := q.Table.Fields[fk]
-		colStrings = append(colStrings, fmt.Sprintf("`%s`.`%s`", q.Table.Alias, f.Name))
+		sb.WriteString(fmt.Sprintf("`%s`.`%s`", q.Table.Alias, f.Name))
+		if i < len(q.Table.FieldKeys)-1 || len(q.SelectJoinFields) > 0 {
+			sb.WriteString(", ")
+		}
+		// colStrings = append(colStrings, fmt.Sprintf("`%s`.`%s`", q.Table.Alias, f.Name))
 	}
 
 	if len(q.SelectJoinFields) > 0 {
-		for _, jf := range q.SelectJoinFields {
-			colStrings = append(colStrings, fmt.Sprintf("%s", jf))
+		for i, jf := range q.SelectJoinFields {
+			// colStrings = append(colStrings, fmt.Sprintf("%s", jf))
+			sb.WriteString(jf)
+			if i < len(q.SelectJoinFields)-1 {
+				sb.WriteString(", ")
+			}
 		}
 	}
 
-	query = query + strings.Join(colStrings, ", ") + " FROM `" + q.Table.Name + "` `" + q.Table.Alias + "`"
+	sb.WriteString(" FROM `" + q.Table.Name + "` `" + q.Table.Alias + "`")
+
+	// query = query + strings.Join(colStrings, ", ") + " FROM `" + q.Table.Name + "` `" + q.Table.Alias + "`"
 
 	if len(q.Joins) > 0 {
 
-		joinStrings := ""
+		// joinStrings := ""
 
 		for _, j := range q.Joins {
 
-			onFields := []string{}
+			// onFields := []string{}
+			sb.WriteString(" JOIN `" + j.Table.Name + "` `" + j.Table.Alias + "` ON ")
 
-			for _, f := range j.Fields {
+			for i, f := range j.Fields {
 
 				onField, eq := q.parseFilterName(f.FieldName)
 
 				if len(f.JoinTable) > 0 && len(f.JoinField) > 0 {
-					onField = fmt.Sprintf("`%s`.`%s` %s `%s`.`%s`", j.Table.Alias, onField, eq, q.Dal.Schema.Tables[f.JoinTable].Alias, f.JoinField)
+					// onField = fmt.Sprintf("`%s`.`%s` %s `%s`.`%s`", j.Table.Alias, onField, eq, q.Dal.Schema.Tables[f.JoinTable].Alias, f.JoinField)
+					sb.WriteString("`" + j.Table.Alias + "`.`" + onField + "` " + eq + " `" + q.Dal.Schema.Tables[f.JoinTable].Alias + "`.`" + f.JoinField + "`")
+					// fmt.Sprintf("`%s`.`%s` %s `%s`.`%s`", j.Table.Alias, onField, eq, q.Dal.Schema.Tables[f.JoinTable].Alias, f.JoinField))
 				} else {
-					onField = fmt.Sprintf("`%s`.`%s` %s ?", j.Table.Alias, onField, eq)
-					q.Values = append(q.Values, f.Value)
+					// onField = fmt.Sprintf("`%s`.`%s` %s ?", j.Table.Alias, onField, eq)
+					// q.Values = append(q.Values, f.Value)
+					sb.WriteString(onField)
 				}
 
-				onFields = append(onFields, onField)
+				if i < len(j.Fields)-1 {
+					sb.WriteString(" AND ")
+				}
+
+				// onFields = append(onFields, onField)
 			}
 
-			joinString := fmt.Sprintf("JOIN `%s` `%s` ON %s", j.Table.Name, j.Table.Alias, strings.Join(onFields, " AND "))
-			joinStrings = joinStrings + " " + joinString
+			// joinString := fmt.Sprintf("JOIN `%s` `%s` ON %s", j.Table.Name, j.Table.Alias, strings.Join(onFields, " AND "))
+			// joinStrings = joinStrings + " " + joinString
 		}
 
-		query = query + joinStrings
+		// query = query + joinStrings
 	}
 
 	where := q.buildWhere()
 
 	if len(where) > 0 {
-		query = query + " WHERE " + where
+		sb.WriteString(" WHERE " + where)
+		// query = query + " WHERE " + where
 	}
 
 	if len(q.GroupBy) > 0 {
-		query = query + " GROUP BY " + q.GroupBy
+		sb.WriteString(" GROUP BY " + q.GroupBy)
+		// query = query + " GROUP BY " + q.GroupBy
 	}
 
 	if len(q.OrderBy) > 0 {
 
-		query = query + " ORDER BY " + q.OrderBy
+		sb.WriteString(" ORDER BY " + q.OrderBy)
+		// query = query + " ORDER BY " + q.OrderBy
 
 		if len(q.OrderDir) > 0 {
-			query = query + " " + q.OrderDir
+			sb.WriteString(" " + strings.ToUpper(q.OrderDir))
+			// query = query + " " + q.OrderDir
 		} else {
-			query = query + " ASC"
+			sb.WriteString(" ASC")
+			// query = query + " ASC"
 		}
 	}
 
 	if q.resultLimit > 0 {
-		query = query + " LIMIT " + strconv.Itoa(q.resultLimit)
+		// query = query + " LIMIT " + strconv.Itoa(q.resultLimit)
+		sb.WriteString(" LIMIT " + strconv.Itoa(q.resultLimit))
 	}
 
 	if q.resultOffset > 0 {
-		query = query + " OFFSET " + strconv.Itoa(q.resultOffset)
+		// query = query + " OFFSET " + strconv.Itoa(q.resultOffset)
+		sb.WriteString(" OFFSET " + strconv.Itoa(q.resultOffset))
 	}
 
-	return query
+	return sb.String()
 }
 
 func (q *Query) parseFilterName(filterName string) (realFilterName string, eq string) {
@@ -379,7 +411,7 @@ func (q *Query) buildWhere() string {
 	return where
 }
 
-//SQL returns the raw sql string
+// SQL returns the raw sql string
 func (q *Query) buildSQL() string {
 
 	if len(q.sql) > 0 {

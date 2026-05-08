@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/macinnir/dvc/core/lib/utils/db"
 	"github.com/macinnir/dvc/core/lib/utils/query"
 )
 
@@ -98,7 +97,7 @@ func (c *FiscalYear) Table_SchemaName() string {
 }
 
 // FromID returns a FromID query statement
-func (c *FiscalYear) FromID(db db.IDB, id int64) (query.IModel, error) {
+func (c *FiscalYear) FromID(db query.DBInterface, id int64) (query.IModel, error) {
 	model := &FiscalYear{}
 	return model, nil
 }
@@ -110,7 +109,7 @@ func (c *FiscalYear) String() string {
 }
 
 // Update updates a FiscalYear record
-func (c *FiscalYear) Update(db db.IDB) error {
+func (c *FiscalYear) Update(db query.DBInterface) error {
 	var e error
 	var ql string
 	ql, _ = query.Update(c).
@@ -133,7 +132,7 @@ func (c *FiscalYear) Update(db db.IDB) error {
 }
 
 // Create inserts a FiscalYear record
-func (c *FiscalYear) Create(db db.IDB) error {
+func (c *FiscalYear) Create(db query.DBInterface) error {
 
 	var e error
 	q := query.Insert(c)
@@ -165,7 +164,7 @@ func (c *FiscalYear) Create(db db.IDB) error {
 }
 
 // Destroy deletes a FiscalYear record
-func (c *FiscalYear) Delete(db db.IDB) error {
+func (c *FiscalYear) Delete(db query.DBInterface) error {
 	var e error
 	ql, _ := query.Delete(c).
 		Where(
@@ -180,7 +179,7 @@ func (c *FiscalYear) Delete(db db.IDB) error {
 	return e
 }
 
-func (r *FiscalYear) Raw(db db.IDB, queryRaw string) ([]*FiscalYear, error) {
+func (r *FiscalYear) Raw(db query.DBInterface, queryRaw string) ([]*FiscalYear, error) {
 
 	// var e error
 	model := []*FiscalYear{}
@@ -197,12 +196,12 @@ func (r *FiscalYear) Raw(db db.IDB, queryRaw string) ([]*FiscalYear, error) {
 }
 
 type FiscalYearDALSelector struct {
-	db       db.IDB
+	db       query.DBInterface
 	q        *query.Q
 	isSingle bool
 }
 
-func (r *FiscalYear) Select(db db.IDB) *FiscalYearDALSelector {
+func (r *FiscalYear) Select(db query.DBInterface) *FiscalYearDALSelector {
 	return &FiscalYearDALSelector{
 		db: db,
 		q:  query.Select(r),
@@ -260,11 +259,11 @@ func (r *FiscalYearDALSelector) Run() ([]*FiscalYear, error) {
 
 // Counter
 type FiscalYearDALCounter struct {
-	db db.IDB
+	db query.DBInterface
 	q  *query.Q
 }
 
-func (r *FiscalYear) Count(db db.IDB) *FiscalYearDALCounter {
+func (r *FiscalYear) Count(db query.DBInterface) *FiscalYearDALCounter {
 	return &FiscalYearDALCounter{
 		db: db,
 		q:  query.Select(r).Count(r.Table_PrimaryKey(), "c"),
@@ -303,11 +302,11 @@ func (ds *FiscalYearDALCounter) Run() (int64, error) {
 
 // Summer
 type FiscalYearDALSummer struct {
-	db db.IDB
+	db query.DBInterface
 	q  *query.Q
 }
 
-func (r *FiscalYear) Sum(db db.IDB, col query.Column) *FiscalYearDALSummer {
+func (r *FiscalYear) Sum(db query.DBInterface, col query.Column) *FiscalYearDALSummer {
 	return &FiscalYearDALSummer{
 		db: db,
 		q:  query.Select(r).Sum(col, "c"),
@@ -339,11 +338,11 @@ func (ds *FiscalYearDALSummer) Run() (float64, error) {
 }
 
 type FiscalYearDALGetter struct {
-	db db.IDB
+	db query.DBInterface
 	q  *query.Q
 }
 
-func (r *FiscalYear) Get(db db.IDB) *FiscalYearDALGetter {
+func (r *FiscalYear) Get(db query.DBInterface) *FiscalYearDALGetter {
 	return &FiscalYearDALGetter{
 		db: db,
 		q:  query.Select(r),

@@ -3,7 +3,6 @@ package testassets
 import (
 	"encoding/json"
 
-	"github.com/macinnir/dvc/core/lib/utils/db"
 	"github.com/macinnir/dvc/core/lib/utils/query"
 )
 
@@ -115,18 +114,18 @@ func (c *TaskBatchSchedule) String() string {
 	return string(bytes)
 }
 
-func (c *TaskBatchSchedule) Create(db db.IDB) error {
+func (c *TaskBatchSchedule) Create(db query.DBInterface) error {
 	return nil
 }
 
-func (c *TaskBatchSchedule) Update(db db.IDB) error {
+func (c *TaskBatchSchedule) Update(db query.DBInterface) error {
 	return nil
 }
 
-func (c *TaskBatchSchedule) Delete(db db.IDB) error {
+func (c *TaskBatchSchedule) Delete(db query.DBInterface) error {
 	return nil
 }
 
-func (c *TaskBatchSchedule) FromID(db db.IDB, id int64) (query.IModel, error) {
+func (c *TaskBatchSchedule) FromID(db query.DBInterface, id int64) (query.IModel, error) {
 	return nil, nil
 }
