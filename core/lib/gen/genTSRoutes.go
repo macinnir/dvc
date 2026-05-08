@@ -118,9 +118,9 @@ import axios from 'axios';
 
 	var rest strings.Builder
 
-	hasUseQuery := false
-	hasUseMutation := false
-	hasQueryCache := false
+	// hasUseQuery := false
+	// hasUseMutation := false
+	// hasQueryCache := false
 
 	for _, route := range controller.Routes {
 
@@ -134,47 +134,48 @@ import axios from 'axios';
 `)
 		}
 		rest.WriteString(t.genTSRoute(controller, route))
-
-		if route.Method == "GET" {
-			rest.WriteString(`
-` + t.genUseTSRoute(route))
-			hasUseQuery = true
-		}
-		if route.Method == "PUT" || route.Method == "POST" || route.Method == "DELETE" {
-
-			var mutation string
-			mutation, hasQueryCache = t.genUseMutationTSRoute(route)
-			rest.WriteString(`
-` + mutation)
-			hasUseMutation = true
-		}
-		rest.WriteString(`
-`)
-
 	}
 
-	if hasUseQuery || hasUseMutation {
-		s.WriteString(`import { `)
+	// 		if route.Method == "GET" {
+	// 			rest.WriteString(`
+	// ` + t.genUseTSRoute(route))
+	// 			hasUseQuery = true
+	// 		}
+	// 		if route.Method == "PUT" || route.Method == "POST" || route.Method == "DELETE" {
 
-		if hasUseQuery {
-			s.WriteString(`useQuery`)
-		}
+	// 			var mutation string
+	// 			mutation, hasQueryCache = t.genUseMutationTSRoute(route)
+	// 			rest.WriteString(`
+	// ` + mutation)
+	// 			hasUseMutation = true
+	// 		}
+	// 		rest.WriteString(`
+	// `)
 
-		if hasUseMutation && hasUseQuery {
-			s.WriteString(", ")
-		}
+	// 	}
 
-		if hasUseMutation {
-			s.WriteString("useMutation")
-		}
+	// 	if hasUseQuery || hasUseMutation {
+	// 		s.WriteString(`import { `)
 
-		if hasQueryCache {
-			s.WriteString(", queryCache")
-		}
+	// 		if hasUseQuery {
+	// 			s.WriteString(`useQuery`)
+	// 		}
 
-		s.WriteString(` } from 'react-query';
-`)
-	}
+	// 		if hasUseMutation && hasUseQuery {
+	// 			s.WriteString(", ")
+	// 		}
+
+	// 		if hasUseMutation {
+	// 			s.WriteString("useMutation")
+	// 		}
+
+	// 		if hasQueryCache {
+	// 			s.WriteString(", queryCache")
+	// 		}
+
+	// 		s.WriteString(` } from 'react-query';
+	// `)
+	// 	}
 	var imports = []string{}
 	for k := range t.imports {
 		if len(k) == 0 {

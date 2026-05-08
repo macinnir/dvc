@@ -31,7 +31,7 @@ import (
 	"{{ .BasePackage }}/gen/definitions/caches" 
 	"{{ .BasePackage }}/gen/definitions/dal" 
 	"{{ .BasePackage }}/core/components/config" 
-	{{ if .CacheConfig.HasHashID }}"{{ .BasePackage }}/core/utils/hashids"{{end}}{{ if gt (len .CacheConfig.Location) 0}}
+	{{ if .CacheConfig.HasHashID }}"{{ .BasePackage }}/app/providers/hashid"{{end}}{{ if gt (len .CacheConfig.Location) 0}}
 	"{{ .BasePackage }}/{{ .CacheConfig.Location }}"{{end}}{{if gt (len .CacheConfig.Search) 0}}
 	"github.com/macinnir/dvc/core/lib/utils/query"{{end}}
 
@@ -44,7 +44,7 @@ type {{.Table.Name}}Repo struct {
 	config *config.Config
 	{{.Table.Name | toArgName}}Cache caches.I{{.Table.Name}}Cache
 	{{.Table.Name | toArgName}}DAL dal.I{{.Table.Name}}DAL
-	{{ if .CacheConfig.HasHashID }}idHasher             *hashids.IDHasher{{end}}{{ if gt (len .CacheConfig.Properties) 0}}{{range $agg := .CacheConfig.Properties}}
+	{{ if .CacheConfig.HasHashID }}idHasher             hashid.IDHasherInterface{{end}}{{ if gt (len .CacheConfig.Properties) 0}}{{range $agg := .CacheConfig.Properties}}
 	{{$agg.Aggregate.Table | toArgName}}Repo *{{$agg.Aggregate.Table}}Repo{{end}}{{end}}
 }
 
@@ -53,7 +53,7 @@ func New{{.Table.Name}}Repo(
 	config *config.Config, 
 	{{.Table.Name | toArgName}}Cache caches.I{{.Table.Name}}Cache,
 	{{.Table.Name | toArgName}}DAL dal.I{{.Table.Name}}DAL, 
-	{{ if .CacheConfig.HasHashID }}idHasher             *hashids.IDHasher,{{end}}{{ if gt (len .CacheConfig.Properties) 0}}{{range $agg := .CacheConfig.Properties}}
+	{{ if .CacheConfig.HasHashID }}idHasher             hashid.IDHasherInterface,{{end}}{{ if gt (len .CacheConfig.Properties) 0}}{{range $agg := .CacheConfig.Properties}}
 	{{$agg.Aggregate.Table | toArgName}}Repo *{{$agg.Aggregate.Table}}Repo,{{end}}{{end}}
 ) *{{.Table.Name}}Repo {
 	return &{{.Table.Name}}Repo{

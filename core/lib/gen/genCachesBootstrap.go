@@ -47,7 +47,7 @@ var cacheBootstrapFileTpl = template.Must(template.New("cache-bootstrap").Parse(
 package caches
 
 import (
-	"{{ .BasePackage }}/core/components/redis" 
+	"{{ .BasePackage }}/app/providers/redis" 
 )
 
 // Cache is a container for all cache providers
@@ -57,7 +57,7 @@ type Caches struct {
 }
 
 // BootstrapCache bootstraps the cache
-func BootstrapCaches(cache redis.RedisInterface) *Caches {
+func BootstrapCaches(cache redis.RedisProviderInterface) *Caches { 
 
 	return &Caches{ {{range $index := .Caches}}
 		{{$index}}: New{{$index}}Cache(cache),{{end}}

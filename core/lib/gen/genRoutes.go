@@ -131,7 +131,7 @@ import (
 func MapRoutesToControllers(r *mux.Router, app *types.App, res request.IResponseLogger) {
 
 	var auth = app.Auth
-	var log = app.Utils.Logger
+	var log = app.Providers.Logger
 	var c = NewControllers(app, res)
 
 	{{range .Controllers}}

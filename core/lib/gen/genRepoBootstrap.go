@@ -112,7 +112,7 @@ import (
 	"{{ .BasePackage }}/gen/caches" 
 	"{{ .BasePackage }}/gen/definitions"
 	"{{ .BasePackage }}/core/components/config"
-	"{{ .BasePackage }}/core/utils/hashids"
+	"{{ .BasePackage }}/app/providers/hashid"
 )
 
 // Cache is a container for all cache providers
@@ -125,7 +125,7 @@ func BootstrapRepos(
 	caches *caches.Caches,
 	dal *definitions.DAL, 
 	config *config.Config, 
-	idHasher *hashids.IDHasher, 
+	idHasher hashid.IDHasherInterface, 
 ) *Repos {
 
 	{{range $cache := .Caches}} 
