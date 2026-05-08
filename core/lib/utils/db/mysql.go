@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/macinnir/dvc/core/lib/utils/log"
+	"github.com/macinnir/dvc/core/lib/utils/query"
 
 	// Mysql Package
 	"database/sql"
@@ -28,7 +29,7 @@ type MySQL struct {
 }
 
 // New returns a new MySQL object
-func NewMySQL(config *Config, log log.ILog) IDB {
+func NewMySQL(config *Config, log log.ILog) query.DBInterface {
 	m := &MySQL{
 		config: config,
 		log:    log,

@@ -118,7 +118,7 @@ func (c *{{ $.Name }}) String() string {
 }
 
 // Update updates a {{ $.Name }} record
-func (c *{{ $.Name }}) Update(db db.IDB) error {
+func (c *{{ $.Name }}) Update(db query.DBInterface) error {
 	var e error 
 	var ql string 
 	ql, _ = query.Update(c).{{ range .UpdateColumns }}
@@ -134,7 +134,7 @@ func (c *{{ $.Name }}) Update(db db.IDB) error {
 }
 
 // Create inserts a {{ $.Name }} record
-func (c *{{ $.Name }}) Create(db db.IDB) error {
+func (c *{{ $.Name }}) Create(db query.DBInterface) error {
 	
 	var e error 
 	
@@ -165,7 +165,7 @@ func (c *{{ $.Name }}) Create(db db.IDB) error {
 
 
 // Destroy deletes a {{ $.Name }} record
-func (c *{{ $.Name }}) Delete(db db.IDB) error {
+func (c *{{ $.Name }}) Delete(db query.DBInterface) error {
 	var e error 
 	ql, _ := query.Delete(c).
 		Where(
@@ -180,7 +180,7 @@ func (c *{{ $.Name }}) Delete(db db.IDB) error {
 	return e
 }
 
-func (r *{{ $.Name }}) Raw(db db.IDB, queryRaw string) ([]*{{ $.Name }}, error) {
+func (r *{{ $.Name }}) Raw(db query.DBInterface, queryRaw string) ([]*{{ $.Name }}, error) {
 
 	var e error
 	model := []*{{ $.Name }}{}
@@ -221,16 +221,16 @@ func (r *{{ $.Name }}) Raw(db db.IDB, queryRaw string) ([]*{{ $.Name }}, error) 
 }
 
 type I{{ $.Name }}DALSelector interface { 
-	Select(db db.IDB) I{{ $.Name }}DALSelector
+	Select(db query.DBInterface) I{{ $.Name }}DALSelector
 }
 
 type {{ $.Name }}DALSelector struct {
-	db    	 db.IDB
+	db    	 query.DBInterface
 	q     	 *query.Q
 	isSingle bool 
 }
 
-func (r *{{ $.Name }}) Select(db db.IDB) *{{ $.Name }}DALSelector {
+func (r *{{ $.Name }}) Select(db query.DBInterface) *{{ $.Name }}DALSelector {
 	return &{{ $.Name }}DALSelector{
 		db:    db,
 		q:     query.Select(r),
@@ -310,11 +310,11 @@ func (r *{{ $.Name }}DALSelector) Run() ([]*{{ $.Name }}, error) {
 
 // Counter 
 type {{ $.Name }}DALCounter struct {
-	db    db.IDB
+	db    query.DBInterface
 	q     *query.Q
 }
 
-func (r *{{ $.Name }}) Count(db db.IDB) *{{ $.Name }}DALCounter {
+func (r *{{ $.Name }}) Count(db query.DBInterface) *{{ $.Name }}DALCounter {
 	return &{{ $.Name }}DALCounter{
 		db:    db,
 		q:     query.Select(r).Count(r.Table_PrimaryKey(), "c"),
@@ -354,11 +354,11 @@ func (ds *{{ $.Name }}DALCounter) Run() (int64, error) {
 
 // Summer
 type {{ $.Name }}DALSummer struct {
-	db    db.IDB
+	db    query.DBInterface
 	q     *query.Q
 }
 
-func (r *{{ $.Name }}) Sum(db db.IDB, col query.Column) *{{ $.Name }}DALSummer {
+func (r *{{ $.Name }}) Sum(db query.DBInterface, col query.Column) *{{ $.Name }}DALSummer {
 	return &{{ $.Name }}DALSummer{
 		db:    db,
 		q:     query.Select(r).Sum(col, "c"),
@@ -393,11 +393,11 @@ func (ds *{{ $.Name }}DALSummer) Run() (float64, error) {
 
 // Minner
 type {{ $.Name }}DALMinner struct {
-	db    db.IDB
+	db    query.DBInterface
 	q     *query.Q
 }
 
-func (r *{{ $.Name }}) Min(db db.IDB, col query.Column) *{{ $.Name }}DALMinner {
+func (r *{{ $.Name }}) Min(db query.DBInterface, col query.Column) *{{ $.Name }}DALMinner {
 	return &{{ $.Name }}DALMinner{
 		db:    db,
 		q:     query.Select(r).Min(col, "c"),
@@ -432,11 +432,11 @@ func (ds *{{ $.Name }}DALMinner) Run() (float64, error) {
 
 // Maxer
 type {{ $.Name }}DALMaxer struct {
-	db    db.IDB
+	db    query.DBInterface
 	q     *query.Q
 }
 
-func (r *{{ $.Name }}) Max(db db.IDB, col query.Column) *{{ $.Name }}DALMaxer {
+func (r *{{ $.Name }}) Max(db query.DBInterface, col query.Column) *{{ $.Name }}DALMaxer {
 	return &{{ $.Name }}DALMaxer{
 		db:    db,
 		q:     query.Select(r).Max(col, "c"),
@@ -472,11 +472,11 @@ func (ds *{{ $.Name }}DALMaxer) Run() (float64, error) {
 
 
 type {{ $.Name }}DALGetter struct {
-	db    	 db.IDB
+	db    	 query.DBInterface
 	q     	 *query.Q
 }
 
-func (r *{{ $.Name }}) Get(db db.IDB) *{{ $.Name }}DALGetter {
+func (r *{{ $.Name }}) Get(db query.DBInterface) *{{ $.Name }}DALGetter {
 	return &{{ $.Name }}DALGetter{
 		db:    db,
 		q:     query.Select(r),

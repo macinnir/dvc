@@ -367,7 +367,7 @@ const (
 	return
 }
 
-var bootstrapFileTpl = template.Must(template.New("repos-bootstrap").Parse(`// Generated Code; DO NOT EDIT.
+var bootstrapFileTpl = template.Must(template.New("dals-bootstrap").Parse(`// Generated Code; DO NOT EDIT.
 package definitions
 
 import (
@@ -384,7 +384,7 @@ type DAL struct {
 }
 
 // BootstrapDAL bootstraps all of the DAL methods
-func BootstrapDAL(db map[string][]db.IDB, log log.ILog) *DAL {
+func BootstrapDAL(db map[string][]query.DBInterface, log log.ILog) *DAL {
 
 	d := &DAL{}
 	{{range .Tables}}
@@ -417,7 +417,7 @@ func GenerateDALsBootstrapFile(config *lib.Config, schemaList *schema.SchemaList
 	}{
 		BasePackage:   config.BasePackage,
 		Tables:        tables,
-		DBPackage:     "github.com/macinnir/dvc/core/lib/utils/db",
+		DBPackage:     "github.com/macinnir/dvc/core/lib/utils/query",
 		LogPackage:    "github.com/macinnir/dvc/core/lib/utils/log",
 		ModelsPackage: fmt.Sprintf("%s/%s", config.BasePackage, "gen/definitions/models"),
 		DALPackage:    fmt.Sprintf("%s/%s", config.BasePackage, "gen/dal"),

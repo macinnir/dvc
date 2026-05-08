@@ -13,7 +13,7 @@ require (
 	github.com/hokaccha/go-prettyjson v0.0.0-20211117102719-0474bc63780f // indirect
 	github.com/rs/xid v1.2.1
 	github.com/speps/go-hashids/v2 v2.0.1
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.11.1
 	github.com/tealeg/xlsx v1.0.5
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5

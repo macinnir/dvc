@@ -31,12 +31,12 @@ import (
 
 // {{.Table.Name}}DAL is a data repository for {{.Table.Name}} objects
 type {{.Table.Name}}DAL struct {
-	db  []db.IDB
+	db  []query.DBInterface
 	log log.ILog
 }
 
 // New{{.Table.Name}}DAL returns a new instance of {{.Table.Name}}Repo
-func New{{.Table.Name}}DAL(db []db.IDB, log log.ILog) *{{.Table.Name}}DAL {
+func New{{.Table.Name}}DAL(db []query.DBInterface, log log.ILog) *{{.Table.Name}}DAL {
 	return &{{.Table.Name}}DAL{db, log}
 }
 
