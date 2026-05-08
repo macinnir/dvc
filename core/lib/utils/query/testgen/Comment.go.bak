@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/macinnir/dvc/core/lib/utils/db"
 	"github.com/macinnir/dvc/core/lib/utils/query"
 	"gopkg.in/guregu/null.v3"
 )
@@ -156,7 +157,7 @@ func (c *Comment) String() string {
 	return string(bytes)
 }
 
-func (c *Comment) Create() string {
+func (c *Comment) Create(db db.IDB) string {
 
 	var sql string
 	sql, _ = query.Insert(c).
@@ -169,7 +170,7 @@ func (c *Comment) Create() string {
 	return sql
 }
 
-func (c *Comment) Update() string {
+func (c *Comment) Update(db db.IDB) string {
 	var sql string
 	sql, _ = query.Update(c).
 		Set("Content", c.Content.String).
@@ -180,7 +181,7 @@ func (c *Comment) Update() string {
 	return sql
 }
 
-func (c *Comment) Destroy() string {
+func (c *Comment) Destroy(db db.IDB) string {
 	sql, _ := query.Delete(c).
 		Where(
 			query.EQ("CommentID", c.CommentID),

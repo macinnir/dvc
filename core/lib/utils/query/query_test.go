@@ -82,6 +82,17 @@ func TestQuerySelect(t *testing.T) {
 	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE 1=1 OR ( `t`.`DateCreated` > 2 AND `t`.`Content` = 'foo' ) AND ( `t`.`ObjectID` BETWEEN 1 AND 2 ) AND `t`.`Content` IN ( 'foo', 'bar', 'baz' ) AND `t`.`Content` <> 'quux' AND `t`.`ObjectID` <> 5 ORDER BY `t`.`Content` ASC LIMIT 1 OFFSET 2", sql)
 }
 
+func TestQuerySelect_MultipleWhere(t *testing.T) {
+	q := query.Select(&testassets.Comment{}).
+		Where(query.EQ("Content", "foo"))
+	q.Where(query.And())
+	q.Where(query.EQ("Name", "bar"))
+	sql, e := q.String()
+
+	require.Nil(t, e)
+	assert.Equal(t, "SELECT `t`.* FROM `Comment` `t` WHERE `t`.`Content` = 'foo' AND `t`.`Name` = 'bar'", sql)
+}
+
 func TestQuerySelect_LimitPage(t *testing.T) {
 	sql, e := query.Select(&testassets.Comment{}).LimitPage(10, 5).String()
 	require.Nil(t, e)
@@ -716,8 +727,9 @@ func TestMax(t *testing.T) {
 	assert.Equal(t, "SELECT COALESCE(MAX(`t`.`Year`), 0) AS `MaxYear` FROM `FiscalYear` `t` WHERE `t`.`IsDeleted` = 0", q1)
 }
 
-func ExampleMod(t *testing.T) {
+func ExampleMod() {
 	query.Mod("foo", 2, 1)
+	fmt.Println("MOD(`t`.`foo`, 2) = 1")
 
 	// Output: MOD(`t`.`foo`, 2) = 1
 }

@@ -64,7 +64,6 @@ func BenchmarkQuerySave_Create(b *testing.B) {
 // 2267 ns/op
 // 2088 ns/op 		1696 B/op 		28 allocs/op
 // 1810 ns/op 		1552 B/op		27 allocs/op
-//
 func BenchmarkQuerySave_Update(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		(&Comment{
