@@ -40,42 +40,42 @@ func New{{.Table.Name}}DAL(db []query.DBInterface, log log.ILog) *{{.Table.Name}
 	return &{{.Table.Name}}DAL{db, log}
 }
 
-func (r *{{.Table.Name}}DAL) Raw(shard int64, q string, args ...interface{}) ([]*models.{{.Table.Name}}, error) { 
-	return (&models.{{.Table.Name}}{}).Raw(r.db[shard], fmt.Sprintf(q, args...)) 
+func (r *{{.Table.Name}}DAL) Raw(q string, args ...interface{}) ([]*models.{{.Table.Name}}, error) { 
+	return (&models.{{.Table.Name}}{}).Raw(r.db[0], fmt.Sprintf(q, args...)) 
 }
 
-func (r *{{.Table.Name}}DAL) Select(shard int64) *models.{{.Table.Name}}DALSelector { 
-	return (&models.{{.Table.Name}}{}).Select(r.db[shard])
+func (r *{{.Table.Name}}DAL) Select() *models.{{.Table.Name}}DALSelector { 
+	return (&models.{{.Table.Name}}{}).Select(r.db[0])
 }
 
-func (r *{{.Table.Name}}DAL) Count(shard int64) *models.{{.Table.Name}}DALCounter { 
-	return (&models.{{.Table.Name}}{}).Count(r.db[shard])
+func (r *{{.Table.Name}}DAL) Count() *models.{{.Table.Name}}DALCounter { 
+	return (&models.{{.Table.Name}}{}).Count(r.db[0])
 }
 
-func (r *{{.Table.Name}}DAL) Sum(shard int64, col query.Column) *models.{{.Table.Name}}DALSummer { 
-	return (&models.{{.Table.Name}}{}).Sum(r.db[shard], col)
+func (r *{{.Table.Name}}DAL) Sum(col query.Column) *models.{{.Table.Name}}DALSummer { 
+	return (&models.{{.Table.Name}}{}).Sum(r.db[0], col)
 }
 
-func (r *{{.Table.Name}}DAL) Min(shard int64, col query.Column) *models.{{.Table.Name}}DALMinner { 
-	return (&models.{{.Table.Name}}{}).Min(r.db[shard], col)
+func (r *{{.Table.Name}}DAL) Min(col query.Column) *models.{{.Table.Name}}DALMinner { 
+	return (&models.{{.Table.Name}}{}).Min(r.db[0], col)
 }
 
-func (r *{{.Table.Name}}DAL) Max(shard int64, col query.Column) *models.{{.Table.Name}}DALMaxer { 
-	return (&models.{{.Table.Name}}{}).Max(r.db[shard], col)
+func (r *{{.Table.Name}}DAL) Max(col query.Column) *models.{{.Table.Name}}DALMaxer { 
+	return (&models.{{.Table.Name}}{}).Max(r.db[0], col)
 }
 
-func (r *{{.Table.Name}}DAL) Get(shard int64) *models.{{.Table.Name}}DALGetter { 
-	return (&models.{{.Table.Name}}{}).Get(r.db[shard])
+func (r *{{.Table.Name}}DAL) Get() *models.{{.Table.Name}}DALGetter { 
+	return (&models.{{.Table.Name}}{}).Get(r.db[0])
 }
 
 // Create creates a new {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) error { {{if .IsDateCreated}}
+func (r *{{.Table.Name}}DAL) Create(model *models.{{.Table.Name}}) error { {{if .IsDateCreated}}
 	
 	model.DateCreated = time.Now().UnixNano() / 1000000{{end}}
 	{{if .IsLastUpdated}}
 	model.LastUpdated = time.Now().UnixNano() / 1000000
 	{{end}}
-	e := model.Create(r.db[shard])
+	e := model.Create(r.db[0])
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Insert > %s", e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.Insert: %w", e)	
@@ -87,7 +87,7 @@ func (r *{{.Table.Name}}DAL) Create(shard int64, model *models.{{.Table.Name}}) 
 }
 
 // CreateMany creates {{.Table.Name}} objects in chunks
-func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+func (r *{{.Table.Name}}DAL) CreateMany(modelSlice []*models.{{.Table.Name}}) error {
 
 	var e error 
 
@@ -98,7 +98,7 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
-		e = r.Create(shard, modelSlice[0])
+		e = r.Create(modelSlice[0])
 		if e != nil { 
 			return fmt.Errorf("{{.Table.Name}}CreateMany([](%d)): %w", len(modelSlice), e)
 		}
@@ -121,7 +121,7 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 
 		var tx *sql.Tx
 		ctx := context.Background()
-		tx, e = r.db[shard].BeginTx(ctx, nil)
+		tx, e = r.db[0].BeginTx(ctx, nil)
 		if e != nil {
 			return fmt.Errorf("{{.Table.Name}}CreateMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
@@ -159,11 +159,11 @@ func (r *{{.Table.Name}}DAL) CreateMany(shard int64, modelSlice []*models.{{.Tab
 }
 
 // Update updates an existing {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) Update(shard int64, model *models.{{.Table.Name}}) error {
+func (r *{{.Table.Name}}DAL) Update(model *models.{{.Table.Name}}) error {
 	var e error
 {{if .IsLastUpdated}}
 	model.LastUpdated = time.Now().UnixNano() / 1000000{{end}}
-	_, e = r.db[shard].Exec("{{.UpdateSQL}}", {{.UpdateArgs}})
+	_, e = r.db[0].Exec("{{.UpdateSQL}}", {{.UpdateArgs}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Update(%d) > %s", model.{{.PrimaryKey}}, e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.Update(%d): %w", model.{{.PrimaryKey}}, e)
@@ -174,7 +174,7 @@ func (r *{{.Table.Name}}DAL) Update(shard int64, model *models.{{.Table.Name}}) 
 }
 
 // UpdateMany updates a slice of {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+func (r {{.Table.Name}}DAL) UpdateMany(modelSlice []*models.{{.Table.Name}}) error {
 	var e error
 
 	// No records 
@@ -184,7 +184,7 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
-		e = r.Update(shard, modelSlice[0])
+		e = r.Update(modelSlice[0])
 		if e != nil { 
 			return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)): %w", len(modelSlice), e)
 		}
@@ -206,7 +206,7 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 
 		var tx *sql.Tx
 		ctx := context.Background()
-		tx, e = r.db[shard].BeginTx(ctx, nil)
+		tx, e = r.db[0].BeginTx(ctx, nil)
 		if e != nil {
 			return fmt.Errorf("{{.Table.Name}}UpdateMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
@@ -240,9 +240,9 @@ func (r {{.Table.Name}}DAL) UpdateMany(shard int64, modelSlice []*models.{{.Tabl
 }{{if .IsDeleted}}
 
 // Delete marks an existing {{.Table.Name}} entry in the database as deleted
-func (r *{{.Table.Name}}DAL) Delete(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}) error {
+func (r *{{.Table.Name}}DAL) Delete({{.PrimaryKey | toArgName}} {{.IDType}}) error {
 	var e error
-	_, e = r.db[shard].Exec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted` = 1 WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
+	_, e = r.db[0].Exec("UPDATE ` + "`{{.Table.Name}}` SET `IsDeleted` = 1 WHERE `{{.PrimaryKey}}` = ?" + `", {{.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.Delete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.Delete(%d): %w", {{.PrimaryKey | toArgName}}, e)
@@ -253,7 +253,7 @@ func (r *{{.Table.Name}}DAL) Delete(shard int64, {{.PrimaryKey | toArgName}} {{.
 }
 
 // DeleteMany marks {{.Table.Name}} objects in chunks as deleted
-func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+func (r {{.Table.Name}}DAL) DeleteMany(modelSlice []*models.{{.Table.Name}}) error {
 
 	var e error 
 
@@ -264,7 +264,7 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
-		e = r.Delete(shard, modelSlice[0].{{.PrimaryKey}})
+		e = r.Delete(modelSlice[0].{{.PrimaryKey}})
 
 		if e != nil {
 			return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)): %w", len(modelSlice), e)
@@ -287,7 +287,7 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 
 		var tx *sql.Tx
 		ctx := context.Background()
-		tx, e = r.db[shard].BeginTx(ctx, nil)
+		tx, e = r.db[0].BeginTx(ctx, nil)
 		if e != nil {
 			return fmt.Errorf("{{.Table.Name}}DeleteMany([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
@@ -320,8 +320,8 @@ func (r {{.Table.Name}}DAL) DeleteMany(shard int64, modelSlice []*models.{{.Tabl
 }{{end}}
 
 // DeleteHard performs a SQL DELETE operation on a {{.Table.Name}} entry in the database
-func (r *{{.Table.Name}}DAL) DeleteHard(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}) error {
-	_, e := r.db[shard].Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
+func (r *{{.Table.Name}}DAL) DeleteHard({{.PrimaryKey | toArgName}} {{.IDType}}) error {
+	_, e := r.db[0].Exec("DELETE FROM ` + "`{{.Table.Name}}`" + ` WHERE {{.PrimaryKey}} = ?", {{.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{.Table.Name}}DAL.HardDelete(%d) > %s", {{.PrimaryKey | toArgName}}, e.Error())
 		return fmt.Errorf("{{.Table.Name}}DAL.HardDelete(%d): %w", {{.PrimaryKey | toArgName}}, e)
@@ -332,7 +332,7 @@ func (r *{{.Table.Name}}DAL) DeleteHard(shard int64, {{.PrimaryKey | toArgName}}
 }
 
 // DeleteManyHard deletes {{.Table.Name}} objects in chunks
-func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.Table.Name}}) error {
+func (r {{.Table.Name}}DAL) DeleteManyHard(modelSlice []*models.{{.Table.Name}}) error {
 
 	var e error
 	// No records 
@@ -342,7 +342,7 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.
 
 	// Don't use a transaction if only a single value
 	if len(modelSlice) == 1 {
-		e = r.DeleteHard(shard, modelSlice[0].{{.PrimaryKey}})
+		e = r.DeleteHard(modelSlice[0].{{.PrimaryKey}})
 		if e != nil {
 			return fmt.Errorf("{{.Table.Name}}DeleteManyHard([](%d)): %w", len(modelSlice), e)
 		}	
@@ -364,7 +364,7 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.
 
 		var tx *sql.Tx
 		ctx := context.Background()
-		tx, e = r.db[shard].BeginTx(ctx, nil)
+		tx, e = r.db[0].BeginTx(ctx, nil)
 		if e != nil {
 			return fmt.Errorf("{{.Table.Name}}DeleteManyHard([](%d)) (Chunk %d): %w", len(modelSlice), chunkID, e)
 		}
@@ -395,9 +395,9 @@ func (r {{.Table.Name}}DAL) DeleteManyHard(shard int64, modelSlice []*models.{{.
 }
 
 // FromID gets a single {{.Table.Name}} object by its Primary Key
-func (r *{{.Table.Name}}DAL) FromID(shard int64, {{.PrimaryKey | toArgName}} {{.IDType}}, mustExist bool) (*models.{{.Table.Name}}, error) {
+func (r *{{.Table.Name}}DAL) FromID({{.PrimaryKey | toArgName}} {{.IDType}}, mustExist bool) (*models.{{.Table.Name}}, error) {
 
-	model, e := (&models.{{.Table.Name}}{}).Get(r.db[shard]).Where(query.EQ(models.{{.Table.Name}}_Column_{{.PrimaryKey}}, {{.PrimaryKey | toArgName}})).Run()
+	model, e := (&models.{{.Table.Name}}{}).Get(r.db[0]).Where(query.EQ(models.{{.Table.Name}}_Column_{{.PrimaryKey}}, {{.PrimaryKey | toArgName}})).Run()
 
 	if model == nil {
 		if mustExist { 
@@ -433,14 +433,14 @@ func (r *{{.Table.Name}}DAL) FromID(shard int64, {{.PrimaryKey | toArgName}} {{.
 }
 
 // FromIDs returns a slice of {{.Table.Name}} objects by a set of primary keys
-func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s []{{.IDType}}) ([]*models.{{.Table.Name}}, error) {
+func (r *{{.Table.Name}}DAL) FromIDs({{.PrimaryKey | toArgName}}s []{{.IDType}}) ([]*models.{{.Table.Name}}, error) {
 
 	// No records 
 	if len({{.PrimaryKey | toArgName}}s) == 0 {
 		return []*models.{{.Table.Name}}{}, nil 
 	}
 
-	model, e := (&models.{{.Table.Name}}{}).Select(r.db[shard]).Where(
+	model, e := (&models.{{.Table.Name}}{}).Select(r.db[0]).Where(
 		query.INInt64(models.{{.Table.Name}}_Column_{{.PrimaryKey}}, {{.PrimaryKey | toArgName}}s...),
 	).Run()
 
@@ -455,10 +455,10 @@ func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s [
 }
 
 // FromIDsMap returns a map of {{.Table.Name}} objects from primary keys indexed by a set of primary keys
-func (r *{{.Table.Name}}DAL) FromIDsMap(shard int64, {{.PrimaryKey | toArgName}}s []{{.IDType}}) (map[{{.IDType}}]*models.{{.Table.Name}}, error) {
+func (r *{{.Table.Name}}DAL) FromIDsMap({{.PrimaryKey | toArgName}}s []{{.IDType}}) (map[{{.IDType}}]*models.{{.Table.Name}}, error) {
 
 
-	model, e := r.FromIDs(shard, {{.PrimaryKey | toArgName}}s)
+	model, e := r.FromIDs({{.PrimaryKey | toArgName}}s)
 	if e != nil { 
 		return map[{{.IDType}}]*models.{{.Table.Name}}{}, fmt.Errorf("{{.Table.Name}}DAL.FromIDsMap(%v): %w", {{.PrimaryKey | toArgName}}s, e)
 	}
@@ -478,10 +478,10 @@ func (r *{{.Table.Name}}DAL) FromIDsMap(shard int64, {{.PrimaryKey | toArgName}}
 {{if eq $col.DataType "vector"}}
 
 // Get{{$col.Name}} gets the {{$col.Name}} column on a {{$.Table.Name}} object
-func (r *{{$.Table.Name}}DAL) Get{{$col.Name}}(shard int64, {{$.PrimaryKey | toArgName}} {{$.IDType}}) ([]float64, error) {
+func (r *{{$.Table.Name}}DAL) Get{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.IDType}}) ([]float64, error) {
 	
 	var vectorString null.String
-	err := r.db[shard].QueryRow("SELECT VEC_ToText(` + "`{{.Name}}`) AS `{{.Name}}` FROM " + "`{{$.Table.Name}}`" + ` WHERE ` + "`{{$.PrimaryKey}}` = ?" + `", {{$.PrimaryKey | toArgName}}).Scan(&vectorString)
+	err := r.db[0].QueryRow("SELECT VEC_ToText(` + "`{{.Name}}`) AS `{{.Name}}` FROM " + "`{{$.Table.Name}}`" + ` WHERE ` + "`{{$.PrimaryKey}}` = ?" + `", {{$.PrimaryKey | toArgName}}).Scan(&vectorString)
 	if err != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.Get{{$col.Name}}(%d) > %s", {{$.PrimaryKey | toArgName}}, err.Error())
 		return nil, fmt.Errorf("{{$.Table.Name}}DAL.Get{{$col.Name}}(%d): %w", {{$.PrimaryKey | toArgName}}, err)
@@ -517,7 +517,7 @@ func (r *{{$.Table.Name}}DAL) Get{{$col.Name}}(shard int64, {{$.PrimaryKey | toA
 }
 
 // Set{{$col.Name}} sets the {{$col.Name}} column on a {{$.Table.Name}} object
-func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}Vector(shard int64, {{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} []float64) error {
+func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}Vector({{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} []float64) error {
 	
 	stringSlice := make([]string, 0, len({{$col.Name | toArgName}}))
 
@@ -531,7 +531,7 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}Vector(shard int64, {{$.PrimaryKey
 	// 4. Join the string slice into a single string with a delimiter (e.g., a comma and space)
 	result := "[" + strings.Join(stringSlice, ", ") + "]"
 
-	_, e := r.db[shard].Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = VEC_FromText(?) WHERE `{{$.PrimaryKey}}` = ?" + `", result, {{$.PrimaryKey | toArgName}})
+	_, e := r.db[0].Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = VEC_FromText(?) WHERE `{{$.PrimaryKey}}` = ?" + `", result, {{$.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error())
 		return fmt.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v): %w", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e)
@@ -545,8 +545,8 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}Vector(shard int64, {{$.PrimaryKey
 
 {{range $col := .UpdateColumns}}
 // Set{{$col.Name}} sets the {{$col.Name}} column on a {{$.Table.Name}} object
-func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}(shard int64, {{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) error {
-	_, e := r.db[shard].Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
+func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}({{$.PrimaryKey | toArgName}} {{$.IDType}}, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) error {
+	_, e := r.db[0].Exec("UPDATE ` + "`{{$.Table.Name}}` SET `{{$col.Name}}` = ? WHERE `{{$.PrimaryKey}}` = ?" + `", {{$col.Name | toArgName}}, {{$.PrimaryKey | toArgName}})
 	if e != nil {
 		r.log.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v) > %s", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e.Error())
 		return fmt.Errorf("{{$.Table.Name}}DAL.Set{{$col.Name}}(%d, %v): %w", {{$.PrimaryKey | toArgName}}, {{$col.Name | toArgName}}, e)
@@ -557,9 +557,9 @@ func (r *{{$.Table.Name}}DAL) Set{{$col.Name}}(shard int64, {{$.PrimaryKey | toA
 }
 
 // ManyFrom{{$col.Name}} returns a slice of {{$.Table.Name}} models from {{$col.Name}}
-func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) ([]*models.{{$.Table.Name}}, error) {
+func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) ([]*models.{{$.Table.Name}}, error) {
 	
-	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]).Where(
+	q := (&models.{{$.Table.Name}}{}).Select(r.db[0]).Where(
 		query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}), 
 	)
 	
@@ -588,14 +588,14 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}(shard int64, {{$col.Name | t
 
 {{if or (eq $col.GoType "int64") (eq $col.GoType "int")}}
 // ManyFrom{{$col.Name}}s returns a slice of {{$.Table.Name}} models from {{$col.Name}}s
-func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | toArgName}}s []{{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) ([]*models.{{$.Table.Name}}, error) {
+func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s({{$col.Name | toArgName}}s []{{$col | dataTypeToGoTypeString}}, limit, offset int64, orderBy, orderDir string) ([]*models.{{$.Table.Name}}, error) {
 		
 	// No records 
 	if len({{$col.Name | toArgName}}s) == 0 {
 		return nil, nil 
 	}
 
-	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]).Where(
+	q := (&models.{{$.Table.Name}}{}).Select(r.db[0]).Where(
 		query.INInt{{if eq $col.GoType "int64"}}64{{end}}(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s...), {{if $.IsDeleted}}		
 		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0),{{end}}
@@ -621,9 +621,9 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 {{end}}
 
 // CountFrom{{$col.Name}} returns the number of {{$.Table.Name}} records from {{$col.Name}}
-func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}(shard int64, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (int64, error) {
+func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}) (int64, error) {
 	
-	count, e := (&models.{{$.Table.Name}}{}).Count(r.db[shard]).Where(
+	count, e := (&models.{{$.Table.Name}}{}).Count(r.db[0]).Where(
 		query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}),{{if $.IsDeleted}}		
 		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0), {{end}}
@@ -639,9 +639,9 @@ func (r *{{$.Table.Name}}DAL) CountFrom{{$col.Name}}(shard int64, {{$col.Name | 
 }
 
 // SingleFrom{{$col.Name}} returns a single {{$.Table.Name}} record by its {{$col.Name}}
-func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, mustExist bool) (*models.{{$.Table.Name}}, error) {
+func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}({{$col.Name | toArgName}} {{$col | dataTypeToGoTypeString}}, mustExist bool) (*models.{{$.Table.Name}}, error) {
 
-	model, e := (&models.{{$.Table.Name}}{}).Get(r.db[shard]).Where(
+	model, e := (&models.{{$.Table.Name}}{}).Get(r.db[0]).Where(
 		query.EQ(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}),{{if $.IsDeleted}}
 		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0), {{end}}
@@ -682,9 +682,9 @@ func (r *{{$.Table.Name}}DAL) SingleFrom{{$col.Name}}(shard int64, {{$col.Name |
 }{{end}}
 
 // ManyPaged returns a slice of {{.Table.Name}} models
-func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy, orderDir string) ([]*models.{{.Table.Name}}, error) {
+func (r *{{.Table.Name}}DAL) ManyPaged(limit, offset int64, orderBy, orderDir string) ([]*models.{{.Table.Name}}, error) {
 
-	q := (&models.{{.Table.Name}}{}).Select(r.db[shard]){{if $.IsDeleted}}		
+	q := (&models.{{.Table.Name}}{}).Select(r.db[0]){{if $.IsDeleted}}		
 	q.Where(
 		query.EQ(models.{{.Table.Name}}_Column_IsDeleted, 0),
 	)
@@ -708,9 +708,9 @@ func (r *{{.Table.Name}}DAL) ManyPaged(shard int64, limit, offset int64, orderBy
 }
 {{ if gt (len .StringColumns) 0 }}{{ range $col := .StringColumns}}
 // Search{{$col.Name}} searches the {{$col.Name}} field in the {{$.Table.Name}} table
-func (r *{{$.Table.Name}}DAL) Search{{$col.Name}}(shard int64, queryString string, limit, offset int64, leftOrRightOrBoth int) ([]*models.{{$.Table.Name}}, error) { 
+func (r *{{$.Table.Name}}DAL) Search{{$col.Name}}(queryString string, limit, offset int64, leftOrRightOrBoth int) ([]*models.{{$.Table.Name}}, error) { 
 
-	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]){{if $.IsDeleted}}		
+	q := (&models.{{$.Table.Name}}{}).Select(r.db[0]){{if $.IsDeleted}}		
 	q.Where(
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0),
 	){{end}}

@@ -39,7 +39,6 @@ import (
 	"fmt"
 )
 
-
 // {{.Table.Name}}Repo is a repo for {{.Table.Name}} objects
 type {{.Table.Name}}Repo struct {
 	config *config.Config
@@ -81,7 +80,7 @@ func (r *{{.Table.Name}}Repo) FromID(id int64, mustExist bool) (*models.{{.Table
 	}
 
 
-	if model, e = r.{{.Table.Name | toArgName}}DAL.FromID(config.DEFAULT_SHARD, id, mustExist); e != nil { 
+	if model, e = r.{{.Table.Name | toArgName}}DAL.FromID(id, mustExist); e != nil { 
 		return nil, e 
 	}
 
@@ -98,7 +97,7 @@ func (r *{{.Table.Name}}Repo) Reset({{.PrimaryKey | toArgName}} int64) error {
 	var e error 
 	var model *models.{{.Table.Name}}
 
-	if model, e = r.{{.Table.Name | toArgName}}DAL.FromID(config.DEFAULT_SHARD, {{.PrimaryKey | toArgName}}, false); e != nil { 
+	if model, e = r.{{.Table.Name | toArgName}}DAL.FromID({{.PrimaryKey | toArgName}}, false); e != nil { 
 		return e 
 	}
 
@@ -147,7 +146,7 @@ func (r *{{.Table.Name}}Repo) Create(model *models.{{.Table.Name}}) error {
 	
 	var e error 
 
-	if e = r.{{.Table.Name | toArgName}}DAL.Create(config.DEFAULT_SHARD, model); e != nil { 
+	if e = r.{{.Table.Name | toArgName}}DAL.Create(model); e != nil { 
 		return e 
 	}
 
@@ -161,7 +160,7 @@ func (r *{{.Table.Name}}Repo) CreateMany(modelSlice []*models.{{.Table.Name}}) e
 	
 	var  e error 
 
-	if e = r.{{.Table.Name | toArgName}}DAL.CreateMany(config.DEFAULT_SHARD, modelSlice); e != nil { 
+	if e = r.{{.Table.Name | toArgName}}DAL.CreateMany(modelSlice); e != nil { 
 		return e 
 	}
 
@@ -175,7 +174,7 @@ func (r *{{.Table.Name}}Repo) CreateMany(modelSlice []*models.{{.Table.Name}}) e
 // Update updates an existing {{.Table.Name}} model
 func (r *{{.Table.Name}}Repo) Update(model *models.{{.Table.Name}}) error { 
 
-	var e = r.{{.Table.Name | toArgName}}DAL.Update(config.DEFAULT_SHARD, model) 
+	var e = r.{{.Table.Name | toArgName}}DAL.Update(model) 
 	
 	if e == nil { 
 		r.{{.Table.Name | toArgName}}Cache.Save(model) 
@@ -191,13 +190,13 @@ func (r *{{.Table.Name}}Repo) UpdateMany(modelSlice []*models.{{.Table.Name}}) e
 		r.{{.Table.Name | toArgName}}Cache.Save(modelSlice[k]) 
 	}
 
-	return r.{{.Table.Name | toArgName}}DAL.UpdateMany(config.DEFAULT_SHARD, modelSlice)
+	return r.{{.Table.Name | toArgName}}DAL.UpdateMany(modelSlice)
 }
 
 // Delete removes a {{.Table.Name}} object from the cache
 func (r *{{.Table.Name}}Repo) Delete(id int64) error { 
 	r.{{.Table.Name | toArgName}}Cache.Delete(id) 
-	return r.{{.Table.Name | toArgName}}DAL.Delete(config.DEFAULT_SHARD, id)
+	return r.{{.Table.Name | toArgName}}DAL.Delete(id)
 }
 
 // DeleteMany deletes a slice of {{.Table.Name}} objects 
@@ -207,7 +206,7 @@ func (r *{{.Table.Name}}Repo) DeleteMany(modelSlice []*models.{{.Table.Name}}) e
 		r.{{.Table.Name | toArgName}}Cache.Delete(modelSlice[k].{{.PrimaryKey}}) 
 	}
 
-	return r.{{.Table.Name | toArgName}}DAL.DeleteMany(config.DEFAULT_SHARD, modelSlice)
+	return r.{{.Table.Name | toArgName}}DAL.DeleteMany(modelSlice)
 }
 
 // All returns a slice of {{.Table.Name}} objects 
@@ -222,7 +221,7 @@ func (r *{{.Table.Name}}Repo) All(page, limit int64) ([]*models.{{.Table.Name}},
 
 	if len(items) == 0 { 
 		
-		if items, e = r.{{$.Table.Name | toArgName}}DAL.ManyPaged(config.DEFAULT_SHARD, limit, page*limit, "", ""); e != nil {
+		if items, e = r.{{$.Table.Name | toArgName}}DAL.ManyPaged(limit, page*limit, "", ""); e != nil {
 			return nil, fmt.Errorf("{{$.Table.Name}}Repo::All() -> {{$.Table.Name}}DAL.ManyPaged(): %w", e)
 		}
 
@@ -248,7 +247,7 @@ func (r *{{.Table.Name}}Repo) AllAsCollection(page, limit int64) (*collections.{
 
 	if len(collection.Data) == 0 { 
 		
-		if collection.Data, e = r.{{$.Table.Name | toArgName}}DAL.ManyPaged(config.DEFAULT_SHARD, limit, page*limit, "", ""); e != nil {
+		if collection.Data, e = r.{{$.Table.Name | toArgName}}DAL.ManyPaged(limit, page*limit, "", ""); e != nil {
 			return nil, fmt.Errorf("{{$.Table.Name}}Repo::AllAsCollection() -> {{$.Table.Name}}DAL.ManyPaged(): %w", e)
 		}
 
@@ -258,7 +257,7 @@ func (r *{{.Table.Name}}Repo) AllAsCollection(page, limit int64) (*collections.{
 			}
 		}
 
-		if collection.Count, e = r.{{$.Table.Name | toArgName}}DAL.Count(config.DEFAULT_SHARD).Run(); e != nil { 
+		if collection.Count, e = r.{{$.Table.Name | toArgName}}DAL.Count().Run(); e != nil { 
 			return nil, fmt.Errorf("{{$.Table.Name}}Repo::AllAsCollection() -> {{$.Table.Name}}DAL.Count(): %w", e)
 		}
 	}
@@ -283,7 +282,7 @@ func (r *{{$.Table.Name}}Repo) From{{$index.Columns | columnsToMethodName}}({{$i
 
 	if len(items) == 0 { 
 		
-		if items, e = r.{{$.Table.Name | toArgName}}DAL.ManyFrom{{$index.Columns | columnsToMethodName}}(config.DEFAULT_SHARD, {{$index.Columns | columnsToMethodArgs}}, limit, page*limit, "", ""); e != nil {
+		if items, e = r.{{$.Table.Name | toArgName}}DAL.ManyFrom{{$index.Columns | columnsToMethodName}}({{$index.Columns | columnsToMethodArgs}}, limit, page*limit, "", ""); e != nil {
 			return nil, fmt.Errorf("{{$.Table.Name}}Repo::All() -> {{$.Table.Name}}DAL.ManyPaged(): %w", e)
 		}
 
@@ -320,7 +319,7 @@ func (r *{{$.Table.Name}}Repo) From{{$index.Columns | columnsToMethodName}}({{$i
 	
 	if e != nil || model == nil { 
 	
-		if model, e = r.{{$.Table.Name | toArgName}}DAL.SingleFrom{{$index.Columns | columnsToMethodName}}(config.DEFAULT_SHARD, {{$index.Columns | columnsToMethodArgs}}, mustExist); e != nil {
+		if model, e = r.{{$.Table.Name | toArgName}}DAL.SingleFrom{{$index.Columns | columnsToMethodName}}({{$index.Columns | columnsToMethodArgs}}, mustExist); e != nil {
 			return nil, e 
 		}
 
@@ -378,7 +377,7 @@ func (r *{{$.Table.Name}}Repo)Search{{$search.SearchColumns | columnsToMethodNam
 	var e error
 	var model []*models.{{$.Table.Name}}
 
-	q := r.{{$.Table.Name | toArgName}}DAL.Select(config.DEFAULT_SHARD).Where(
+	q := r.{{$.Table.Name | toArgName}}DAL.Select().Where(
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0), 
 		query.And(), 
 	)
