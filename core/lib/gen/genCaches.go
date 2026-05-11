@@ -8,13 +8,14 @@ import (
 	"text/template"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
 var CacheTemplate = template.Must(template.New("template-cache-file").Funcs(template.FuncMap{
 	"dataTypeToGoTypeString": schema.DataTypeToGoTypeString,
 	"dataTypeToFormatString": schema.DataTypeToFormatString,
-	"toArgName":              toArgName,
+	"toArgName":              genutil.ToArgName,
 	"columnsToMethodName":    columnsToMethodName,
 	"columnsToMethodArgs":    columnsToMethodArgs,
 	"columnsToMethodParams":  columnsToMethodParams,

@@ -1,25 +1,25 @@
-package gen
+package dal
 
 import (
 	"text/template"
 
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
 var DALTemplate = template.Must(template.New("template-dal-file").Funcs(template.FuncMap{
 	"dataTypeToGoTypeString": schema.DataTypeToGoTypeString,
 	"dataTypeToFormatString": schema.DataTypeToFormatString,
-	"toArgName":              toArgName,
+	"toArgName":              genutil.ToArgName,
 }).Parse(`// Generated Code; DO NOT EDIT.
 
 package dal
 
 import ( 
 	"{{ .BasePackage }}/gen/definitions/models" 
-	"github.com/macinnir/dvc/core/lib/utils/db"
 	"github.com/macinnir/dvc/core/lib/utils/log"
 	"github.com/macinnir/dvc/core/lib/utils/errors"
-	"github.com/macinnir/dvc/core/lib/utils/query"
+	query "github.com/macinnir/goquery"
 	"database/sql"
 	"context"
 	"fmt"{{ if .HasNull }}
@@ -441,7 +441,7 @@ func (r *{{.Table.Name}}DAL) FromIDs(shard int64, {{.PrimaryKey | toArgName}}s [
 	}
 
 	model, e := (&models.{{.Table.Name}}{}).Select(r.db[shard]).Where(
-		query.INInt64(models.{{.Table.Name}}_Column_{{.PrimaryKey}}, {{.PrimaryKey | toArgName}}s),
+		query.INInt64(models.{{.Table.Name}}_Column_{{.PrimaryKey}}, {{.PrimaryKey | toArgName}}s...),
 	).Run()
 
 	if e != nil {
@@ -596,7 +596,7 @@ func (r *{{$.Table.Name}}DAL) ManyFrom{{$col.Name}}s(shard int64, {{$col.Name | 
 	}
 
 	q := (&models.{{$.Table.Name}}{}).Select(r.db[shard]).Where(
-		query.INInt{{if eq $col.GoType "int64"}}64{{end}}(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s), {{if $.IsDeleted}}		
+		query.INInt{{if eq $col.GoType "int64"}}64{{end}}(models.{{$.Table.Name}}_Column_{{$col.Name}}, {{$col.Name | toArgName}}s...), {{if $.IsDeleted}}		
 		query.And(), 
 		query.EQ(models.{{$.Table.Name}}_Column_IsDeleted, 0),{{end}}
 	)

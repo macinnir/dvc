@@ -7,7 +7,6 @@ package models
 
 import (
 	"github.com/macinnir/dvc/core/lib/utils/query"
-	"github.com/macinnir/dvc/core/lib/utils/db"
 	"encoding/json"
 	"fmt"
 	"database/sql" {{ if .HasNull }}
@@ -468,8 +467,6 @@ func (ds *{{ $.Name }}DALMaxer) Run() (float64, error) {
 		return 0, fmt.Errorf("{{ $.Name }}DALMaxer.QueryRow(%s).Run(): %w", q, e)
 	}
 }
-
-
 
 type {{ $.Name }}DALGetter struct {
 	db    	 query.DBInterface

@@ -7,13 +7,14 @@ import (
 	"text/template"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
 var RepoInterfaceTemplate = template.Must(template.New("template-repo-interface-file").Funcs(template.FuncMap{
 	"dataTypeToGoTypeString": schema.DataTypeToGoTypeString,
 	"dataTypeToFormatString": schema.DataTypeToFormatString,
-	"toArgName":              toArgName,
+	"toArgName":              genutil.ToArgName,
 	"columnsToMethodName":    columnsToMethodName,
 	"columnsToMethodArgs":    columnsToMethodArgs,
 	"columnsToMethodParams":  columnsToMethodParams,

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
 	"github.com/macinnir/dvc/core/lib/schema"
 )
 
@@ -36,12 +37,12 @@ func columnsToMethodArgs(columns []*schema.Column) string {
 	}
 
 	if len(columns) == 1 {
-		return toArgName(columns[0].Name)
+		return genutil.ToArgName(columns[0].Name)
 	}
 
 	var sb strings.Builder
 	for k := range columns {
-		sb.WriteString(toArgName(columns[k].Name))
+		sb.WriteString(genutil.ToArgName(columns[k].Name))
 		if k < len(columns)-1 {
 			sb.WriteString(",")
 		}
@@ -57,12 +58,12 @@ func columnsToMethodParams(columns []*schema.Column) string {
 	}
 
 	if len(columns) == 1 {
-		return toArgName(columns[0].Name) + " " + schema.DataTypeToGoTypeString(columns[0])
+		return genutil.ToArgName(columns[0].Name) + " " + schema.DataTypeToGoTypeString(columns[0])
 	}
 
 	var sb strings.Builder
 	for k := range columns {
-		sb.WriteString(toArgName(columns[k].Name) + " " + schema.DataTypeToGoTypeString(columns[k]))
+		sb.WriteString(genutil.ToArgName(columns[k].Name) + " " + schema.DataTypeToGoTypeString(columns[k]))
 		if k < len(columns)-1 {
 			sb.WriteString(",")
 		}
@@ -120,12 +121,12 @@ func columnValuesToKey(columns []*schema.Column) string {
 	}
 
 	if len(columns) == 1 {
-		return `fmt.Sprint(` + toArgName(columns[0].Name) + `)`
+		return `fmt.Sprint(` + genutil.ToArgName(columns[0].Name) + `)`
 	}
 
 	var sb strings.Builder
 	for k := range columns {
-		sb.WriteString(`fmt.Sprint(` + toArgName(columns[k].Name) + `)`)
+		sb.WriteString(`fmt.Sprint(` + genutil.ToArgName(columns[k].Name) + `)`)
 		if k < len(columns)-1 {
 			sb.WriteString(` + "_" + `)
 		}
@@ -259,11 +260,4 @@ func ParseIndices(cacheConfig *lib.CacheConfig, table *schema.Table) *CacheData 
 	}
 
 	return data
-}
-
-func toArgName(field string) string {
-	if len(field) == 0 {
-		return ""
-	}
-	return strings.ToLower(field[:1]) + field[1:]
 }

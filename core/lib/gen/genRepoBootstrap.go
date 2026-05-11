@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/macinnir/dvc/core/lib"
+	"github.com/macinnir/dvc/core/lib/gen/genutil"
 )
 
 type RepoBootstrapConfig struct {
@@ -103,7 +104,7 @@ func GenRepoBootstrapFile(basePackage string, cache map[string]*lib.CacheConfig)
 }
 
 var repoBootstrapFileTpl = template.Must(template.New("repo-bootstrap").Funcs(template.FuncMap{
-	"toArgName": toArgName,
+	"toArgName": genutil.ToArgName,
 }).Parse(`// Generated Code; DO NOT EDIT.
 // Repos Boostrap File
 package repos

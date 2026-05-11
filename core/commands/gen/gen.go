@@ -8,6 +8,7 @@ import (
 	"github.com/macinnir/dvc/core/lib/cache"
 	"github.com/macinnir/dvc/core/lib/fetcher"
 	"github.com/macinnir/dvc/core/lib/gen"
+	"github.com/macinnir/dvc/core/lib/gen/dal"
 	"github.com/macinnir/dvc/core/lib/gen/genutil"
 	"github.com/macinnir/dvc/core/lib/gen/model"
 	"github.com/macinnir/dvc/core/lib/schema"
@@ -93,11 +94,11 @@ func Cmd(log *zap.Logger, config *lib.Config, args []string) error {
 
 		if len(changedTables) > 0 {
 
-			if e = gen.GenDALs(changedTables, config); e != nil {
+			if e = dal.GenDALs(changedTables, config); e != nil {
 				return e
 			}
 
-			if e = gen.GenerateDALsBootstrapFile(config, schemaList); e != nil {
+			if e = dal.GenerateDALsBootstrapFile(config, schemaList); e != nil {
 				return e
 			}
 		}
