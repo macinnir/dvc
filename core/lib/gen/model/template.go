@@ -6,7 +6,7 @@ var goModelTemplate = template.Must(template.New("go-model-file").Parse(`// Gene
 package models 
 
 import (
-	"github.com/macinnir/dvc/core/lib/utils/query"
+	query "github.com/macinnir/goquery"
 	"encoding/json"
 	"fmt"
 	"database/sql" {{ if .HasNull }}
