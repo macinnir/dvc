@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/macinnir/dvc/core/lib/utils/log"
-	"github.com/macinnir/dvc/core/lib/utils/query"
+	query "github.com/macinnir/goquery"
 
 	// Mysql Package
 	"database/sql"

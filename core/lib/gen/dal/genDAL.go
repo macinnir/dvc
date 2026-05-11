@@ -280,7 +280,7 @@ var bootstrapFileTpl = template.Must(template.New("dals-bootstrap").Parse(`// Ge
 package definitions
 
 import (
-	"{{ .DBPackage }}"
+	query "github.com/macinnir/goquery"
 	"{{ .LogPackage }}"
 	"{{ .ModelsPackage }}"
 	"{{ .DALPackage }}"
@@ -319,14 +319,12 @@ func GenerateDALsBootstrapFile(config *lib.Config, schemaList *schema.SchemaList
 	data := struct {
 		Tables        map[string]*schema.Table
 		BasePackage   string
-		DBPackage     string
 		LogPackage    string
 		ModelsPackage string
 		DALPackage    string
 	}{
 		BasePackage:   config.BasePackage,
 		Tables:        tables,
-		DBPackage:     "github.com/macinnir/dvc/core/lib/utils/query",
 		LogPackage:    "github.com/macinnir/dvc/core/lib/utils/log",
 		ModelsPackage: fmt.Sprintf("%s/%s", config.BasePackage, "gen/definitions/models"),
 		DALPackage:    fmt.Sprintf("%s/%s", config.BasePackage, "gen/dal"),

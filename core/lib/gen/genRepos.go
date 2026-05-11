@@ -34,7 +34,7 @@ import (
 	"{{ .BasePackage }}/core/components/config" 
 	{{ if .CacheConfig.HasHashID }}"{{ .BasePackage }}/app/providers/hashid"{{end}}{{ if gt (len .CacheConfig.Location) 0}}
 	"{{ .BasePackage }}/{{ .CacheConfig.Location }}"{{end}}{{if gt (len .CacheConfig.Search) 0}}
-	"github.com/macinnir/dvc/core/lib/utils/query"{{end}}
+	query "github.com/macinnir/goquery"{{end}}
 
 	"fmt"
 )
