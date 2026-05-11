@@ -246,6 +246,11 @@ func (r *{{ $.Name }}DALSelector) Where(whereParts ...*query.WherePart) *{{ $.Na
 	return r
 }
 
+func (r *{{ $.Name }}DALSelector) GroupBy(cols ...query.Column) *{{ $.Name }}DALSelector {
+	r.q.GroupBy(cols...)
+	return r
+}
+
 func (r *{{ $.Name }}DALSelector) Limit(limit, offset int64) *{{ $.Name }}DALSelector {
 	r.q = r.q.Limit(limit, offset)
 	return r
